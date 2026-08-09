@@ -10,6 +10,14 @@ enum class ThemePreference { SYSTEM, NIGHT, MIST }
 
 enum class MotionPreference { SYSTEM, FULL, REDUCED }
 
+enum class StorageDestination { DEVICE_GALLERY, CHALNA_VAULT }
+
+object StorageDestinationPolicy {
+    fun fromPersisted(value: String?): StorageDestination = value?.let {
+        runCatching { StorageDestination.valueOf(it) }.getOrNull()
+    } ?: StorageDestination.DEVICE_GALLERY
+}
+
 data class CaptureSettings(
     val audioEnabled: Boolean = true,
     val preferredQuality: CaptureQuality = CaptureQuality.AUTO,
@@ -18,7 +26,22 @@ data class CaptureSettings(
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val motion: MotionPreference = MotionPreference.SYSTEM,
     val setupComplete: Boolean = false,
+    val storageDestination: StorageDestination = StorageDestination.DEVICE_GALLERY,
 )
+
+data class CaptureSessionSettings(
+    val audioEnabled: Boolean,
+    val preferredQuality: CaptureQuality,
+    val storageDestination: StorageDestination,
+) {
+    companion object {
+        fun snapshot(settings: CaptureSettings): CaptureSessionSettings = CaptureSessionSettings(
+            audioEnabled = settings.audioEnabled,
+            preferredQuality = settings.preferredQuality,
+            storageDestination = settings.storageDestination,
+        )
+    }
+}
 
 sealed interface CaptureState {
     data object Idle : CaptureState
@@ -41,6 +64,12 @@ data class LastCapture(
     val displayName: String = "",
     val quality: CaptureQuality = CaptureQuality.AUTO,
     val audioIncluded: Boolean = false,
+    val id: String = "",
+    val storageDestination: StorageDestination = StorageDestination.DEVICE_GALLERY,
+    val privateRef: String? = null,
+    val sizeBytes: Long? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 ) {
     fun isUsable(): Boolean = uri.startsWith("content://") && durationMillis >= 0 && createdAtMillis > 0
 }

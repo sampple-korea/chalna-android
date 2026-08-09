@@ -12,6 +12,7 @@ import app.chalna.capture.domain.CaptureSettings
 import app.chalna.capture.domain.MotionPreference
 import app.chalna.capture.domain.ThemePreference
 import app.chalna.capture.domain.LastCapture
+import app.chalna.capture.domain.StorageDestinationPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +38,7 @@ class SettingsStore(context: Context) {
                 theme = p[THEME]?.let { runCatching { ThemePreference.valueOf(it) }.getOrNull() } ?: ThemePreference.SYSTEM,
                 motion = p[MOTION]?.let { runCatching { MotionPreference.valueOf(it) }.getOrNull() } ?: MotionPreference.SYSTEM,
                 setupComplete = p[SETUP_COMPLETE] ?: false,
+                storageDestination = StorageDestinationPolicy.fromPersisted(p[STORAGE_DESTINATION]),
             )
         }.stateIn(scope, SharingStarted.Eagerly, CaptureSettings())
 
@@ -51,6 +53,12 @@ class SettingsStore(context: Context) {
                 displayName = p[LAST_NAME].orEmpty(),
                 quality = p[LAST_QUALITY]?.let { runCatching { CaptureQuality.valueOf(it) }.getOrNull() } ?: CaptureQuality.AUTO,
                 audioIncluded = p[LAST_AUDIO] ?: false,
+                id = p[LAST_ID].orEmpty(),
+                storageDestination = StorageDestinationPolicy.fromPersisted(p[LAST_DESTINATION]),
+                privateRef = p[LAST_PRIVATE_REF],
+                sizeBytes = p[LAST_SIZE],
+                width = p[LAST_WIDTH],
+                height = p[LAST_HEIGHT],
             ).takeIf(LastCapture::isUsable)
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
@@ -62,6 +70,7 @@ class SettingsStore(context: Context) {
         it[THEME] = value.theme.name
         it[MOTION] = value.motion.name
         it[SETUP_COMPLETE] = value.setupComplete
+        it[STORAGE_DESTINATION] = value.storageDestination.name
     }
 
     suspend fun update(transform: (CaptureSettings) -> CaptureSettings) = update(transform(settings.value))
@@ -74,6 +83,12 @@ class SettingsStore(context: Context) {
             it.remove(LAST_NAME)
             it.remove(LAST_QUALITY)
             it.remove(LAST_AUDIO)
+            it.remove(LAST_ID)
+            it.remove(LAST_DESTINATION)
+            it.remove(LAST_PRIVATE_REF)
+            it.remove(LAST_SIZE)
+            it.remove(LAST_WIDTH)
+            it.remove(LAST_HEIGHT)
         } else {
             it[LAST_URI] = capture.uri
             it[LAST_DURATION] = capture.durationMillis
@@ -81,6 +96,12 @@ class SettingsStore(context: Context) {
             it[LAST_NAME] = capture.displayName
             it[LAST_QUALITY] = capture.quality.name
             it[LAST_AUDIO] = capture.audioIncluded
+            it[LAST_ID] = capture.id
+            it[LAST_DESTINATION] = capture.storageDestination.name
+            capture.privateRef?.let { value -> it[LAST_PRIVATE_REF] = value } ?: it.remove(LAST_PRIVATE_REF)
+            capture.sizeBytes?.let { value -> it[LAST_SIZE] = value } ?: it.remove(LAST_SIZE)
+            capture.width?.let { value -> it[LAST_WIDTH] = value } ?: it.remove(LAST_WIDTH)
+            capture.height?.let { value -> it[LAST_HEIGHT] = value } ?: it.remove(LAST_HEIGHT)
         }
     }
 
@@ -98,5 +119,12 @@ class SettingsStore(context: Context) {
         val LAST_NAME = stringPreferencesKey("last_capture_name")
         val LAST_QUALITY = stringPreferencesKey("last_capture_quality")
         val LAST_AUDIO = booleanPreferencesKey("last_capture_audio")
+        val STORAGE_DESTINATION = stringPreferencesKey("storage_destination")
+        val LAST_ID = stringPreferencesKey("last_capture_id")
+        val LAST_DESTINATION = stringPreferencesKey("last_capture_destination")
+        val LAST_PRIVATE_REF = stringPreferencesKey("last_capture_private_ref")
+        val LAST_SIZE = longPreferencesKey("last_capture_size")
+        val LAST_WIDTH = intPreferencesKey("last_capture_width")
+        val LAST_HEIGHT = intPreferencesKey("last_capture_height")
     }
 }

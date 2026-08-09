@@ -1,15 +1,11 @@
 package app.chalna.capture.capture
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Environment
-import android.provider.MediaStore
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.DynamicRange
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
@@ -23,17 +19,23 @@ import app.chalna.capture.data.SettingsStore
 import app.chalna.capture.domain.CaptureEngine
 import app.chalna.capture.domain.CaptureFileNames
 import app.chalna.capture.domain.CaptureQuality
+import app.chalna.capture.domain.CaptureSessionSettings
 import app.chalna.capture.domain.LastCapture
+import app.chalna.capture.media.AndroidCaptureDestinationFactory
+import app.chalna.capture.media.CaptureDestinationFactory
+import app.chalna.capture.media.CaptureOutputTarget
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
+import java.util.UUID
 
 class CameraXCaptureEngine(
     private val context: Context,
     private val lifecycleOwner: LifecycleOwner,
     private val settingsStore: SettingsStore,
+    private val destinationFactory: CaptureDestinationFactory = AndroidCaptureDestinationFactory(context),
 ) : CaptureEngine {
     private var provider: ProcessCameraProvider? = null
     private var recording: Recording? = null
@@ -42,13 +44,12 @@ class CameraXCaptureEngine(
     @Volatile private var discardOnFinalize = false
 
     override suspend fun start(invocationId: String): Long {
-        CaptureRuntime.record("engine_start_request")
         check(recording == null) { "Capture already active" }
         check(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) { "Camera permission required" }
-        val settings = settingsStore.settings.value
+        val settings = CaptureSessionSettings.snapshot(settingsStore.settings.value)
         if (settings.audioEnabled) check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "Microphone permission required" }
         val cameraProvider = awaitProvider()
-        CaptureRuntime.record("camera_provider_ready")
+        CaptureTelemetryRegistry.mark("camera_provider_ready")
         val selector = CameraSelector.DEFAULT_BACK_CAMERA
         check(cameraProvider.hasCamera(selector)) { "Rear camera unavailable" }
         val qualities = when (settings.preferredQuality) {
@@ -67,69 +68,77 @@ class CameraXCaptureEngine(
         ).build()
         val video = VideoCapture.withOutput(recorder)
         video.targetRotation = currentDisplayRotation()
+        val displayName = CaptureFileNames.video(System.currentTimeMillis())
+        val output = destinationFactory.prepare(
+            destination = settings.storageDestination,
+            id = UUID.randomUUID().toString(),
+            displayName = displayName,
+        )
         cameraProvider.unbindAll()
         cameraProvider.bindToLifecycle(lifecycleOwner, selector, video)
-        CaptureRuntime.record("camera_bind_complete")
-        val displayName = CaptureFileNames.video(System.currentTimeMillis())
-        val values = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
-            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-            put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Chalna")
-        }
-        val output = MediaStoreOutputOptions.Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI).setContentValues(values).build()
+        CaptureTelemetryRegistry.mark("camera_bind_complete")
         finalized = CompletableDeferred()
         discardOnFinalize = false
         val started = CompletableDeferred<Long>()
         startedAt = 0L
-        var pending = recorder.prepareRecording(context, output)
-        if (settings.audioEnabled) pending = pending.withAudioEnabled()
-        recording = pending.start(ContextCompat.getMainExecutor(context)) { event ->
-            when (event) {
-                is VideoRecordEvent.Start -> {
-                    startedAt = System.currentTimeMillis()
-                    CaptureRuntime.record("video_record_event_start")
-                    started.complete(startedAt)
-                }
-                is VideoRecordEvent.Finalize -> {
-                    CaptureRuntime.record("video_record_event_finalize")
-                    recording = null
-                    cameraProvider.unbindAll()
-                    val discard = discardOnFinalize
-                    discardOnFinalize = false
-                    if (!event.hasError() && startedAt > 0 && !discard) {
-                        finalized?.complete(
-                            LastCapture(
-                                event.outputResults.outputUri.toString(),
-                                System.currentTimeMillis() - startedAt,
-                                startedAt,
-                                displayName,
-                                effectiveQuality.toCaptureQuality(),
-                                settings.audioEnabled,
-                            ),
-                        )
-                    } else {
-                        val uri = event.outputResults.outputUri
-                        if (uri != android.net.Uri.EMPTY) runCatching { context.contentResolver.delete(uri, null, null) }
-                        val failure = IllegalStateException("CameraX finalize error ${event.error}")
-                        started.completeExceptionally(failure)
-                        finalized?.completeExceptionally(failure)
+        return try {
+            var pending = when (val target = output.target) {
+                is CaptureOutputTarget.DeviceGallery -> recorder.prepareRecording(context, target.options)
+                is CaptureOutputTarget.Vault -> recorder.prepareRecording(context, target.options)
+            }
+            if (settings.audioEnabled) pending = pending.withAudioEnabled()
+            recording = pending.start(ContextCompat.getMainExecutor(context)) { event ->
+                when (event) {
+                    is VideoRecordEvent.Start -> {
+                        CaptureTelemetryRegistry.mark("video_record_event_start")
+                        startedAt = System.currentTimeMillis()
+                        started.complete(startedAt)
+                    }
+                    is VideoRecordEvent.Finalize -> {
+                        CaptureTelemetryRegistry.mark("video_record_event_finalize")
+                        recording = null
+                        cameraProvider.unbindAll()
+                        val discard = discardOnFinalize
+                        discardOnFinalize = false
+                        if (!event.hasError() && startedAt > 0 && !discard) {
+                            finalized?.complete(
+                                LastCapture(
+                                    output.safeContentUri ?: event.outputResults.outputUri.toString(),
+                                    System.currentTimeMillis() - startedAt,
+                                    startedAt,
+                                    output.displayName,
+                                    effectiveQuality.toCaptureQuality(),
+                                    settings.audioEnabled,
+                                    id = output.id,
+                                    storageDestination = output.destination,
+                                    privateRef = output.privateRef,
+                                    sizeBytes = (output.target as? CaptureOutputTarget.Vault)?.file?.length()?.takeIf { it > 0 },
+                                ),
+                            )
+                        } else {
+                            destinationFactory.discard(output, event.outputResults.outputUri.toString())
+                            val finalizeFailure = IllegalStateException("CameraX finalize error ${event.error}")
+                            started.completeExceptionally(finalizeFailure)
+                            finalized?.completeExceptionally(finalizeFailure)
+                        }
                     }
                 }
             }
-        }
-        return try {
             withTimeout(10_000) { started.await() }
         } catch (failure: Throwable) {
             discardOnFinalize = true
-            recording?.stop()
+            val active = recording
+            runCatching { active?.stop() }
             runCatching { withTimeout(5_000) { finalized?.await() } }
+            runCatching { active?.close() }
+            destinationFactory.discard(output, null)
             provider?.unbindAll()
             throw failure
         }
     }
 
     override suspend fun stop(): LastCapture? {
-        CaptureRuntime.record("stop_request")
+        CaptureTelemetryRegistry.mark("stop_request")
         val active = recording ?: return null
         val result = finalized ?: return null
         active.stop()

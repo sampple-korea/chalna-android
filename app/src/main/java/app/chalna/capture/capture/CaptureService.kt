@@ -15,11 +15,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import app.chalna.capture.data.SettingsStore
+import app.chalna.capture.data.CaptureIndex
+import app.chalna.capture.data.FileCaptureIndexStore
 import app.chalna.capture.domain.CaptureCommand
 import app.chalna.capture.domain.CaptureCoordinator
 import app.chalna.capture.domain.CaptureRequest
 import app.chalna.capture.domain.CaptureState
 import app.chalna.capture.notifications.CaptureNotifications
+import app.chalna.capture.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,18 +39,20 @@ class CaptureService : Service(), LifecycleOwner {
     private lateinit var settings: SettingsStore
     private lateinit var coordinator: CaptureCoordinator
     private lateinit var engine: CameraXCaptureEngine
+    private lateinit var captureIndex: CaptureIndex
     private var autoStopJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         settings = SettingsStore(this)
+        captureIndex = CaptureIndex(FileCaptureIndexStore(this))
         engine = CameraXCaptureEngine(this, this, settings)
         coordinator = CaptureCoordinator(engine, onStateChanged = CaptureRuntime::publish)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        CaptureRuntime.record("service_receive")
+        CaptureTelemetryRegistry.mark("service_receive")
         val action = intent?.action
         if (action != ACTION_TOGGLE && action != ACTION_STOP) {
             stopSelfResult(startId)
@@ -55,7 +60,7 @@ class CaptureService : Service(), LifecycleOwner {
         }
         val id = intent?.getStringExtra(EXTRA_INVOCATION_ID) ?: UUID.randomUUID().toString()
         if (action == ACTION_TOGGLE && !hasRequiredPermissions()) {
-            val message = "Required camera, audio, or notification permission is missing"
+            val message = getString(R.string.capture_error_permission)
             CaptureRuntime.publish(CaptureState.Failed(message))
             errorHaptic()
             if (hasNotificationPermission()) {
@@ -70,8 +75,8 @@ class CaptureService : Service(), LifecycleOwner {
         if (action == ACTION_TOGGLE) {
             try {
                 beginForeground()
-            } catch (failure: RuntimeException) {
-                val message = failure.message ?: "Foreground capture could not start"
+            } catch (_: RuntimeException) {
+                val message = getString(R.string.capture_error_camera)
                 CaptureRuntime.publish(CaptureState.Failed(message))
                 errorHaptic()
                 if (hasNotificationPermission()) {
@@ -91,19 +96,21 @@ class CaptureService : Service(), LifecycleOwner {
             if (state is CaptureState.Recording) scheduleAutoStop(state)
             if (state is CaptureState.Saved) {
                 autoStopJob?.cancel()
-                settings.saveLastCapture(state.capture)
-                getSystemService(NotificationManager::class.java).notify(
-                    CaptureNotifications.NOTIFICATION_ID,
-                    CaptureNotifications.saved(this@CaptureService, state.capture),
-                )
-                stopForeground(STOP_FOREGROUND_DETACH)
+                persistFinalized(state.capture)
+                if (hasNotificationPermission()) {
+                    getSystemService(NotificationManager::class.java).notify(
+                        CaptureNotifications.NOTIFICATION_ID,
+                        CaptureNotifications.saved(this@CaptureService, state.capture),
+                    )
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                } else stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelfResult(startId)
             } else if (state is CaptureState.Failed || state is CaptureState.Idle) {
                 autoStopJob?.cancel()
                 if (state is CaptureState.Failed && hasNotificationPermission()) {
                     getSystemService(NotificationManager::class.java).notify(
                         CaptureNotifications.NOTIFICATION_ID,
-                        CaptureNotifications.error(this@CaptureService, state.message),
+                        CaptureNotifications.error(this@CaptureService, userFacingFailure(state.message)),
                     )
                 }
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -115,7 +122,6 @@ class CaptureService : Service(), LifecycleOwner {
 
     private fun hasRequiredPermissions(): Boolean {
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return false
-        if (!hasNotificationPermission()) return false
         return !settings.settings.value.audioEnabled || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     }
 
@@ -156,18 +162,20 @@ class CaptureService : Service(), LifecycleOwner {
             coordinator.dispatch(CaptureRequest("auto-${state.invocationId}", CaptureCommand.STOP)).also(::haptic)
             val final = coordinator.state
             if (final is CaptureState.Saved) {
-                settings.saveLastCapture(final.capture)
-                getSystemService(NotificationManager::class.java).notify(
-                    CaptureNotifications.NOTIFICATION_ID,
-                    CaptureNotifications.saved(this@CaptureService, final.capture),
-                )
-                stopForeground(STOP_FOREGROUND_DETACH)
+                persistFinalized(final.capture)
+                if (hasNotificationPermission()) {
+                    getSystemService(NotificationManager::class.java).notify(
+                        CaptureNotifications.NOTIFICATION_ID,
+                        CaptureNotifications.saved(this@CaptureService, final.capture),
+                    )
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                } else stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             } else if (final is CaptureState.Failed || final is CaptureState.Idle) {
                 if (final is CaptureState.Failed && hasNotificationPermission()) {
                     getSystemService(NotificationManager::class.java).notify(
                         CaptureNotifications.NOTIFICATION_ID,
-                        CaptureNotifications.error(this@CaptureService, final.message),
+                        CaptureNotifications.error(this@CaptureService, userFacingFailure(final.message)),
                     )
                 }
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -186,6 +194,18 @@ class CaptureService : Service(), LifecycleOwner {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private suspend fun persistFinalized(capture: app.chalna.capture.domain.LastCapture) {
+        runCatching { settings.saveLastCapture(capture) }
+        runCatching { captureIndex.recordFinalized(capture) }
+    }
+
+    private fun userFacingFailure(message: String): String = when {
+        message.contains("permission", ignoreCase = true) -> getString(R.string.capture_error_permission)
+        message.contains("space", ignoreCase = true) || message.contains("storage", ignoreCase = true) ->
+            getString(R.string.capture_error_storage)
+        else -> getString(R.string.capture_error_camera)
+    }
+
     companion object {
         const val ACTION_TOGGLE = "app.chalna.capture.action.TOGGLE"
         const val ACTION_STOP = "app.chalna.capture.action.STOP"
@@ -195,10 +215,11 @@ class CaptureService : Service(), LifecycleOwner {
         fun dispatch(context: Context, id: String): Boolean = dispatch(context, ACTION_TOGGLE, id)
 
         fun dispatch(context: Context, action: String, id: String): Boolean = try {
+            CaptureTelemetryRegistry.mark("command_dispatch")
             context.startForegroundService(intent(context, action, id))
             true
-        } catch (failure: RuntimeException) {
-            CaptureRuntime.publish(CaptureState.Failed(failure.message ?: "Foreground capture start was rejected"))
+        } catch (_: RuntimeException) {
+            CaptureRuntime.publish(CaptureState.Failed(context.getString(R.string.capture_error_camera)))
             false
         }
     }
