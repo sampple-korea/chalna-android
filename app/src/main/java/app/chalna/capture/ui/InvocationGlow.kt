@@ -74,7 +74,10 @@ internal fun InvocationGlow(
                 CapturePhase.STOPPING -> colors.accent2
                 else -> colors.accent
             }
-            val outer = Brush.radialGradient(listOf(atmosphere.copy(.25f), colors.accent2.copy(.10f), Color.Transparent), radius = radius)
+            val outer = Brush.radialGradient(
+                listOf(Color.Transparent, atmosphere.copy(.05f), atmosphere.copy(.16f), Color.Transparent),
+                radius = radius,
+            )
             val bloom = Brush.sweepGradient(
                 when (phase) {
                     CapturePhase.RECORDING -> listOf(colors.accent, Color(0xFFFF719C), Color(0xFFD965F5), colors.accent2, colors.accent)
@@ -86,13 +89,46 @@ internal fun InvocationGlow(
             )
             onDrawBehind {
                 if (active || strength > .01f) {
-                    drawCircle(outer, radius * strength.coerceAtLeast(0f) * breathing)
+                    val energy = strength.coerceAtLeast(0f)
+                    val outerRadius = radius * (.83f + .05f * breathing) * energy.coerceAtLeast(.08f)
+                    val ringRadius = radius * .57f * energy.coerceAtLeast(.05f)
+                    drawCircle(outer, outerRadius)
                     rotate(ambientPhase * 360f) {
-                        drawCircle(bloom, radius * .57f * strength.coerceAtLeast(.05f), alpha = (.55f * strength).coerceIn(0f,1f), style = Stroke(10.dp.toPx(), cap = StrokeCap.Round), blendMode = BlendMode.Screen)
+                        drawCircle(
+                            bloom,
+                            ringRadius,
+                            alpha = (.38f * energy).coerceIn(0f, 1f),
+                            style = Stroke(12.dp.toPx(), cap = StrokeCap.Round),
+                            blendMode = BlendMode.Screen,
+                        )
+                        drawCircle(
+                            bloom,
+                            ringRadius,
+                            alpha = (.92f * energy).coerceIn(0f, 1f),
+                            style = Stroke(2.2.dp.toPx(), cap = StrokeCap.Round),
+                            blendMode = BlendMode.Screen,
+                        )
                     }
-                    drawCircle(atmosphere.copy(alpha = (.32f * strength).coerceIn(0f,1f)), radius * .43f * breathing)
-                    drawCircle(Color.White.copy(alpha = (.94f * strength).coerceIn(0f,1f)), radius * .16f)
-                    drawCircle(Color.White.copy(alpha = (.45f * strength).coerceIn(0f,1f)), radius * .25f, center = Offset(center.x - radius*.05f, center.y - radius*.06f), blendMode = BlendMode.Screen)
+                    drawCircle(colors.surface.copy(alpha = (.82f * energy).coerceIn(0f, .82f)), radius * .41f * breathing)
+                    drawCircle(
+                        colors.outline.copy(alpha = (.72f * energy).coerceIn(0f, .72f)),
+                        radius * .41f * breathing,
+                        style = Stroke(1.2.dp.toPx()),
+                    )
+                    rotate(-ambientPhase * 74f) {
+                        drawArc(
+                            bloom,
+                            startAngle = -72f,
+                            sweepAngle = if (phase == CapturePhase.STOPPING) 178f else 224f,
+                            useCenter = false,
+                            topLeft = Offset(radius * .70f, radius * .70f),
+                            size = androidx.compose.ui.geometry.Size(radius * .60f, radius * .60f),
+                            alpha = (.78f * energy).coerceIn(0f, 1f),
+                            style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
+                            blendMode = BlendMode.Screen,
+                        )
+                    }
+                    drawCircle(colors.background.copy(alpha = .82f), radius * .16f)
                 } else {
                     drawCircle(colors.surfaceHigh, radius * .40f)
                     drawArc(colors.outline, -90f, 218f, false, topLeft = Offset(radius * .60f, radius * .60f), size = androidx.compose.ui.geometry.Size(radius * .80f, radius * .80f), style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))

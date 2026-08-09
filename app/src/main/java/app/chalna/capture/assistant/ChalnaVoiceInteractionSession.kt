@@ -258,11 +258,13 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             if (!pathMeasure.getPosTan(measuredLength * fraction, hotspotPosition, hotspotTangent)) return
             val palette = palette(kind)
             hotspotBloomPaint.color = palette.hot
-            hotspotBloomPaint.alpha = (70f * envelope * energy).toInt().coerceIn(0, 255)
+            hotspotBloomPaint.alpha = (22f * envelope * energy).toInt().coerceIn(0, 255)
             hotspotCorePaint.color = Color.WHITE
             hotspotCorePaint.alpha = (230f * envelope * energy).toInt().coerceIn(0, 255)
-            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (9f + 4f * resolveBoost), hotspotBloomPaint)
-            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * 1.65f, hotspotCorePaint)
+            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (11f + 3f * resolveBoost), hotspotBloomPaint)
+            hotspotBloomPaint.alpha = (38f * envelope * energy).toInt().coerceIn(0, 255)
+            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (5f + 1.5f * resolveBoost), hotspotBloomPaint)
+            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * 1.25f, hotspotCorePaint)
         }
 
         private fun drawOpticalLayer(canvas: Canvas, node: RenderNode, paint: Paint) {

@@ -12,6 +12,7 @@ import android.view.accessibility.AccessibilityManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -239,9 +241,7 @@ internal fun GalleryScreen(state: ChalnaUiState, d: UiDependencies, back: () -> 
         state.operationMessage?.let {
             ChalnaText(it, Modifier.padding(vertical = 6.dp), 13, ChalnaTheme.colors.danger)
         }
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            GalleryFilter.entries.forEach { filter -> ChoiceChip(filterLabel(filter), state.galleryFilter == filter) { d.setGalleryFilter(filter) } }
-        }
+        GalleryFilterControl(state.galleryFilter, d::setGalleryFilter)
         val visible = state.gallery.filter { when (state.galleryFilter) { GalleryFilter.ALL -> true; GalleryFilter.DEVICE_GALLERY -> it.destination == StorageDestinationUi.DEVICE_GALLERY; GalleryFilter.CHALNA_VAULT -> it.destination == StorageDestinationUi.CHALNA_VAULT } }
         if (visible.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -354,7 +354,45 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
     }
 }
 
-@Composable private fun PlayerAction(label: Int, icon: ChalnaIcon, action: () -> Unit) = Column(Modifier.width(82.dp).heightIn(min=64.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(.10f)).clickableNoRipple(Role.Button,onClick=action).padding(8.dp), horizontalAlignment=Alignment.CenterHorizontally) { ChalnaIconCanvas(icon,Modifier.size(22.dp),Color.White);Spacer(Modifier.height(4.dp));ChalnaText(stringResource(label),11,Color.White,align=TextAlign.Center) }
+@Composable
+private fun PlayerAction(label: Int, icon: ChalnaIcon, action: () -> Unit) = Column(
+    Modifier.width(86.dp).heightIn(min = 64.dp).clickableNoRipple(Role.Button, onClick = action).padding(horizontal = 6.dp, vertical = 8.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+) {
+    ChalnaIconCanvas(icon, Modifier.size(22.dp), Color.White)
+    Spacer(Modifier.height(5.dp))
+    ChalnaText(stringResource(label), 11, Color.White.copy(.84f), align = TextAlign.Center)
+}
+
+@Composable
+private fun GalleryFilterControl(selected: GalleryFilter, onSelect: (GalleryFilter) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp).height(48.dp).clip(RoundedCornerShape(15.dp))
+            .background(ChalnaTheme.colors.surface)
+            .border(1.dp, ChalnaTheme.colors.outline, RoundedCornerShape(15.dp))
+            .padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GalleryFilter.entries.forEach { filter ->
+            val isSelected = selected == filter
+            Box(
+                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) ChalnaTheme.colors.accent.copy(.17f) else Color.Transparent)
+                    .clickableNoRipple(Role.RadioButton) { onSelect(filter) }
+                    .semantics { role = Role.RadioButton; this.selected = isSelected },
+                contentAlignment = Alignment.Center,
+            ) {
+                ChalnaText(
+                    filterLabel(filter),
+                    13,
+                    if (isSelected) ChalnaTheme.colors.accent else ChalnaTheme.colors.muted,
+                    if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    TextAlign.Center,
+                )
+            }
+        }
+    }
+}
 
 @Composable private fun PlayerSurface(d: UiDependencies, modifier: Modifier) {
     AndroidView(modifier = modifier.background(Color.Black), factory = { context -> TextureView(context).apply {
@@ -451,7 +489,12 @@ internal fun evictThumbnail(uri: String) {
 @Composable private fun motionLabel(value: MotionMode)=stringResource(when(value){MotionMode.SYSTEM->R.string.motion_system;MotionMode.FULL->R.string.motion_full;MotionMode.REDUCED->R.string.motion_reduced})
 @Composable private fun filterLabel(value: GalleryFilter)=stringResource(when(value){GalleryFilter.ALL->R.string.filter_all;GalleryFilter.DEVICE_GALLERY->R.string.device_gallery;GalleryFilter.CHALNA_VAULT->R.string.chalna_vault})
 @Composable private fun destinationLabel(value: StorageDestinationUi)=stringResource(when(value){StorageDestinationUi.DEVICE_GALLERY->R.string.device_gallery;StorageDestinationUi.CHALNA_VAULT->R.string.chalna_vault})
-private fun formatMediaDate(millis:Long)=DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(Date(millis))
+@Composable private fun formatMediaDate(millis: Long): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return remember(millis, locale) {
+        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale).format(Date(millis))
+    }
+}
 private fun dayKey(millis: Long): Long = Calendar.getInstance().run {
     timeInMillis = millis
     set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
@@ -462,7 +505,7 @@ private fun dayKey(millis: Long): Long = Calendar.getInstance().run {
     return when (day) {
         today -> stringResource(R.string.today)
         today - 86_400_000L -> stringResource(R.string.yesterday)
-        else -> DateFormat.getDateInstance(DateFormat.LONG).format(Date(day))
+        else -> DateFormat.getDateInstance(DateFormat.LONG, LocalConfiguration.current.locales[0]).format(Date(day))
     }
 }
 @Composable private fun galleryItemDescription(item: MediaItemUi): String = stringResource(

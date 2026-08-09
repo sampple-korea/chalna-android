@@ -1,6 +1,7 @@
 package app.chalna.capture.ui
 
 import android.graphics.Bitmap
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,12 +20,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
@@ -36,6 +40,7 @@ import app.chalna.capture.assistant.InvocationPulseKind
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
@@ -46,30 +51,30 @@ class ChalnaScreenshotTest {
     @Test fun homeReadyMist() = captureApp("home-ready-mist", ChalnaScreenshotStates.homeReady)
     @Test fun homeRecordingNight() = captureApp("home-recording-night", ChalnaScreenshotStates.homeRecording)
     @Test fun setupMist() = captureApp("setup-mist", ChalnaScreenshotStates.setup)
-    @Test fun settingsNight() = captureApp("settings-night", ChalnaScreenshotStates.homeReadyNight) { onNodeWithContentDescription("Settings").performClick() }
-    @Test fun galleryNight() = captureApp("gallery-night", ChalnaScreenshotStates.gallery) { onNodeWithContentDescription("Gallery").performClick() }
-    @Test fun gallerySelectionNight() = captureApp("gallery-selection-night", ChalnaScreenshotStates.gallerySelected) { onNodeWithContentDescription("Gallery").performClick() }
-    @Test fun galleryEmptyNight() = captureApp("gallery-empty-night", ChalnaScreenshotStates.galleryEmpty) { onNodeWithContentDescription("Gallery").performClick() }
-    @Test fun galleryVaultFilterNight() = captureApp("gallery-vault-filter-night", ChalnaScreenshotStates.galleryVault) { onNodeWithContentDescription("Gallery").performClick() }
-    @Test fun galleryVaultSelectionNight() = captureApp("gallery-vault-selection-night", ChalnaScreenshotStates.galleryVaultSelected) { onNodeWithContentDescription("Gallery").performClick() }
-    @Test fun galleryDeleteConfirmationNight() = captureApp("gallery-delete-confirmation-night", ChalnaScreenshotStates.gallerySelected) { onNodeWithContentDescription("Gallery").performClick(); onNodeWithContentDescription("Delete").performClick() }
-    @Test fun galleryMist() = captureApp("gallery-mist", ChalnaScreenshotStates.galleryMist) { onNodeWithContentDescription("Gallery").performClick() }
+    @Test fun settingsNight() = captureApp("settings-night", ChalnaScreenshotStates.homeReadyNight) { onNodeWithContentDescription("설정").performClick() }
+    @Test fun galleryNight() = captureApp("gallery-night", ChalnaScreenshotStates.gallery) { onNodeWithContentDescription("갤러리").performClick() }
+    @Test fun gallerySelectionNight() = captureApp("gallery-selection-night", ChalnaScreenshotStates.gallerySelected) { onNodeWithContentDescription("갤러리").performClick() }
+    @Test fun galleryEmptyNight() = captureApp("gallery-empty-night", ChalnaScreenshotStates.galleryEmpty) { onNodeWithContentDescription("갤러리").performClick() }
+    @Test fun galleryVaultFilterNight() = captureApp("gallery-vault-filter-night", ChalnaScreenshotStates.galleryVault) { onNodeWithContentDescription("갤러리").performClick() }
+    @Test fun galleryVaultSelectionNight() = captureApp("gallery-vault-selection-night", ChalnaScreenshotStates.galleryVaultSelected) { onNodeWithContentDescription("갤러리").performClick() }
+    @Test fun galleryDeleteConfirmationNight() = captureApp("gallery-delete-confirmation-night", ChalnaScreenshotStates.gallerySelected) { onNodeWithContentDescription("갤러리").performClick(); onNodeWithContentDescription("삭제").performClick() }
+    @Test fun galleryMist() = captureApp("gallery-mist", ChalnaScreenshotStates.galleryMist) { onNodeWithContentDescription("갤러리").performClick() }
     @Test fun playerNight() = captureApp("player-night", ChalnaScreenshotStates.player)
     @Test fun playerControlsHiddenNight() = captureApp("player-controls-hidden-night", ChalnaScreenshotStates.player) { onNodeWithTag("player_touch_surface").performClick() }
-    @Test fun playerInfoNight() = captureApp("player-info-night", ChalnaScreenshotStates.player) { onNodeWithContentDescription("More").performClick(); onNodeWithText("Details").performClick() }
-    @Test fun playerDeleteConfirmationNight() = captureApp("player-delete-confirmation-night", ChalnaScreenshotStates.player) { onNodeWithContentDescription("More").performClick(); onNodeWithText("Delete").performClick() }
-    @Test fun playerVaultNight() = captureApp("player-vault-night", ChalnaScreenshotStates.vaultPlayer) { onNodeWithContentDescription("More").performClick() }
-    @Test fun settingsCameraDeniedNight() = captureApp("settings-camera-denied-night", ChalnaScreenshotStates.settingsCameraDenied) { onNodeWithContentDescription("Settings").performClick() }
-    @Test fun settingsAudioOffNight() = captureApp("settings-audio-off-night", ChalnaScreenshotStates.settingsAudioOff) { onNodeWithContentDescription("Settings").performClick() }
-    @Test fun settingsAssistantMissingNight() = captureApp("settings-assistant-missing-night", ChalnaScreenshotStates.settingsAssistantMissing) { onNodeWithContentDescription("Settings").performClick() }
-    @Test fun settingsNotificationOptionalNight() = captureApp("settings-notification-optional-night", ChalnaScreenshotStates.settingsNotificationOptional) { onNodeWithContentDescription("Settings").performClick() }
-    @Test fun settingsVaultMist() = captureApp("settings-vault-mist", ChalnaScreenshotStates.settingsVaultMist) { onNodeWithContentDescription("Settings").performClick() }
+    @Test fun playerInfoNight() = captureApp("player-info-night", ChalnaScreenshotStates.player) { onNodeWithContentDescription("더보기").performClick(); onNodeWithText("세부정보").performClick() }
+    @Test fun playerDeleteConfirmationNight() = captureApp("player-delete-confirmation-night", ChalnaScreenshotStates.player) { onNodeWithContentDescription("더보기").performClick(); onNodeWithText("삭제").performClick() }
+    @Test fun playerVaultNight() = captureApp("player-vault-night", ChalnaScreenshotStates.vaultPlayer) { onNodeWithContentDescription("더보기").performClick() }
+    @Test fun settingsCameraDeniedNight() = captureApp("settings-camera-denied-night", ChalnaScreenshotStates.settingsCameraDenied) { onNodeWithContentDescription("설정").performClick(); onNodeWithText("시스템").performScrollTo() }
+    @Test fun settingsAudioOffNight() = captureApp("settings-audio-off-night", ChalnaScreenshotStates.settingsAudioOff) { onNodeWithContentDescription("설정").performClick() }
+    @Test fun settingsAssistantMissingNight() = captureApp("settings-assistant-missing-night", ChalnaScreenshotStates.settingsAssistantMissing) { onNodeWithContentDescription("설정").performClick(); onNodeWithText("시스템").performScrollTo() }
+    @Test fun settingsNotificationOptionalNight() = captureApp("settings-notification-optional-night", ChalnaScreenshotStates.settingsNotificationOptional) { onNodeWithContentDescription("설정").performClick(); onNodeWithText("시스템").performScrollTo() }
+    @Test fun settingsVaultMist() = captureApp("settings-vault-mist", ChalnaScreenshotStates.settingsVaultMist) { onNodeWithContentDescription("설정").performClick() }
     @Test fun homeLargeFontMist() = captureContent("home-large-font-mist", {
         val density = LocalDensity.current
         CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) { ChalnaApp(ScreenshotDependencies(ChalnaScreenshotStates.homeReady)) }
     })
-    @Test fun galleryLargeFontNight() = captureLargeApp("gallery-large-font-night", ChalnaScreenshotStates.gallery) { onNodeWithContentDescription("Gallery").performClick() }
-    @Test fun settingsLargeFontMist() = captureLargeApp("settings-large-font-mist", ChalnaScreenshotStates.settingsVaultMist) { onNodeWithContentDescription("Settings").performClick() }
+    @Test fun galleryLargeFontNight() = captureLargeApp("gallery-large-font-night", ChalnaScreenshotStates.gallery) { onNodeWithContentDescription("갤러리").performClick() }
+    @Test fun settingsLargeFontMist() = captureLargeApp("settings-large-font-mist", ChalnaScreenshotStates.settingsVaultMist) { onNodeWithContentDescription("설정").performClick() }
     @Test fun glowStart000Night() = glow("glow-start-000-night", CapturePhase.STARTING, 0f, NightColors)
     @Test fun glowStart016Night() = glow("glow-start-016-night", CapturePhase.STARTING, .16f, NightColors)
     @Test fun glowStart034Night() = glow("glow-start-034-night", CapturePhase.STARTING, .34f, NightColors)
@@ -120,7 +125,16 @@ class ChalnaScreenshotTest {
     }, prepare)
 
     private fun captureContent(name: String, content: @Composable () -> Unit, prepare: ComposeTestRule.() -> Unit = {}) {
-        compose.setContent(content); compose.waitForIdle(); compose.prepare(); compose.waitForIdle()
+        compose.setContent {
+            val baseContext = LocalContext.current
+            val localizedConfiguration = Configuration(LocalConfiguration.current).apply { setLocale(Locale.KOREA) }
+            val localizedContext = baseContext.createConfigurationContext(localizedConfiguration)
+            CompositionLocalProvider(
+                LocalContext provides localizedContext,
+                LocalConfiguration provides localizedConfiguration,
+            ) { content() }
+        }
+        compose.waitForIdle(); compose.prepare(); compose.waitForIdle()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         FileOutputStream(File(directory, "$name.png")).use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
