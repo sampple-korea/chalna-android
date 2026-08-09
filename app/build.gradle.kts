@@ -17,8 +17,8 @@ android {
         applicationId = "app.chalna.capture"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = false
         buildConfigField("String", "GIT_SHA", "\"${providers.environmentVariable("GITHUB_SHA").orElse("local").get().take(12)}\"")
@@ -102,6 +102,8 @@ dependencies {
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.video)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui.compose)
     implementation(libs.coroutines.android)
 
     testImplementation(libs.junit4)

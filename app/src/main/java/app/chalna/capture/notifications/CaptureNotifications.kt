@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import app.chalna.capture.MainActivity
 import app.chalna.capture.R
 import app.chalna.capture.capture.CaptureService
 import app.chalna.capture.domain.LastCapture
@@ -24,7 +25,8 @@ object CaptureNotifications {
     fun active(context: Context): Notification {
         ensureChannel(context)
         val stop = PendingIntent.getService(context, 1, CaptureService.intent(context, CaptureService.ACTION_STOP), immutableUpdate())
-        val openIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        val openIntent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val open = PendingIntent.getActivity(context, 2, openIntent, immutableUpdate())
         val settings = PendingIntent.getActivity(context, 3, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData("package:${context.packageName}".toUri()), immutableUpdate())
         return Notification.Builder(context, CHANNEL_ID)
@@ -41,9 +43,11 @@ object CaptureNotifications {
 
     fun saved(context: Context, capture: LastCapture): Notification {
         ensureChannel(context)
-        val uri = capture.uri.toUri()
-        val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "video/mp4").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        val open = PendingIntent.getActivity(context, 4, view, immutableUpdate())
+        val view = Intent(context, MainActivity::class.java)
+            .setAction(MainActivity.ACTION_OPEN_CAPTURE)
+            .putExtra(MainActivity.EXTRA_CAPTURE_ID, capture.id)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val open = PendingIntent.getActivity(context, capture.id.hashCode(), view, immutableUpdate())
         return Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_chalna)
             .setContentTitle(context.getString(R.string.notification_saved_title))

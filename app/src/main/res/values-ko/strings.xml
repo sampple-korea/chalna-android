@@ -1,37 +1,39 @@
 <resources>
     <string name="app_name">찰나</string>
-    <string name="local_private">로컬 촬영 · 처음부터 비공개</string>
-    <string name="setup_title_1">카메라 접근</string><string name="setup_body_1">Assistant 호출 후 영상을 시작하려면 카메라 권한이 필요합니다. 호출 전에는 카메라를 켜지 않습니다.</string>
-    <string name="setup_title_2">영상에 소리 담기</string><string name="setup_body_2">주변 소리를 함께 저장하려면 마이크를 허용하세요. 오디오 없이도 사용할 수 있습니다.</string>
-    <string name="setup_title_3">녹화 상태 알림</string><string name="setup_body_3">화면을 보지 않아도 녹화 상태를 확인하고 즉시 중지할 수 있도록 알림을 사용합니다.</string>
-    <string name="setup_title_4">기본 어시스턴트 변경</string><string name="setup_body_4">찰나를 선택하면 Gemini 또는 기존 음성 비서 대신 찰나가 실행됩니다. Android 설정에서 언제든 되돌릴 수 있습니다.</string>
-    <string name="setup_title_5">준비 완료</string><string name="setup_body_5">기기의 Assistant 호출 동작으로 녹화를 시작하세요. 다시 호출하면 종료하고 저장합니다.</string>
-    <string name="continue_label">계속</string><string name="finish">홈으로</string><string name="camera_microphone">카메라 및 마이크</string>
-    <string name="allow_camera">카메라 권한 허용</string><string name="camera_permission_hint">호출 후 영상 촬영에 필요</string><string name="allow_microphone">마이크 권한 허용</string><string name="microphone_permission_hint">오디오를 켰을 때만 사용</string><string name="allow_notifications">알림 허용</string><string name="audio_disabled_ready">오디오가 꺼졌습니다. 마이크 권한 없이 사용할 수 있습니다.</string>
-    <string name="notifications">알림</string><string name="notifications_hint">녹화 상태와 중지 동작 표시</string><string name="open_assistant_settings">어시스턴트 설정 열기</string><string name="assistant_settings_hint">찰나를 선택한 뒤 돌아오세요</string>
-    <string name="assistant_selected">찰나가 어시스턴트로 선택됨</string><string name="ready">준비됨</string><string name="action_needed">조치 필요</string><string name="settings">설정</string><string name="back">뒤로</string>
-    <string name="capture_settings">촬영 설정</string><string name="capture_settings_hint">화질과 촬영 동작</string><string name="appearance_feedback">화면 및 피드백</string><string name="appearance_feedback_hint">테마, 움직임, 진동, 소리</string>
-    <string name="diagnostics">진단</string><string name="diagnostics_hint">명시적 촬영 준비 상태 확인</string><string name="help_compatibility">도움말 및 호환성</string><string name="help_compatibility_hint">어시스턴트와 기기 안내</string>
-    <string name="about_privacy">정보 및 개인정보</string><string name="about_privacy_hint">버전, 권한, 데이터 사용</string><string name="stop_capture">녹화 중지</string><string name="saved_as">%1$s(으)로 저장됨</string>
-    <string name="phase_ready">준비됨</string><string name="phase_starting">시작 중…</string><string name="phase_recording">녹화 중</string><string name="phase_stopping">저장 중…</string><string name="phase_saved">저장됨</string><string name="phase_error">확인 필요</string>
-    <string name="video_quality">영상 품질</string><string name="quality_auto">Auto</string><string name="quality_fhd">1080p</string><string name="quality_hd">720p</string><string name="capture_behavior">촬영 동작</string><string name="explicit_trigger_only">명시적 호출만</string><string name="explicit_trigger_detail">찰나를 호출하거나 진단 테스트를 확인하기 전까지 카메라와 마이크는 작동하지 않습니다.</string>
-    <string name="media_storage">미디어 저장소</string><string name="media_storage_detail">동영상은 시스템 미디어 모음에 로컬로 저장됩니다. 찰나는 업로드하지 않습니다.</string>
-    <string name="appearance">화면</string><string name="night">나이트</string><string name="mist">미스트</string><string name="system">시스템 설정</string><string name="feedback">피드백</string><string name="haptics">진동</string><string name="sound">소리</string><string name="reduced_motion">움직임 줄이기</string>
-    <string name="diagnostics_privacy">진단에는 제한된 시간 및 결과 메타데이터만 보관됩니다. 화면 캡처, 미디어 내용, 위치, 계정, 전면 앱은 저장하지 않습니다.</string><string name="run_diagnostic">확인 후 촬영 테스트</string><string name="clear_history">진단 기록 지우기</string>
-    <string name="no_diagnostics">진단 기록 없음</string><string name="no_diagnostics_detail">준비되면 확인 후 테스트하세요. 확인 전에는 카메라가 작동하지 않습니다.</string>
-    <string name="help_assistant">어시스턴트가 열리지 않음</string><string name="help_assistant_detail">Android 디지털 어시스턴트 앱 설정에서 찰나를 선택하세요. 일부 제조사는 기본 앱 아래에 둡니다.</string>
+    <string name="setup_title">찰나 설정</string><string name="setup_body">촬영에 필요한 항목을 설정하세요.</string><string name="finish_setup">설정 완료</string>
+    <string name="camera">카메라</string><string name="camera_setup_detail">영상 촬영에 필요</string>
+    <string name="audio">오디오</string><string name="audio_setup_on">소리 포함 · 눌러서 허용</string><string name="audio_setup_off">꺼짐 · 눌러서 소리 포함</string>
+    <string name="assistant">어시스턴트</string><string name="assistant_setup_detail">Android 설정에서 찰나 선택</string>
+    <string name="notifications_optional">알림 · 선택</string><string name="notifications_optional_detail">녹화 상태와 중지 동작</string>
+    <string name="allowed">허용됨</string><string name="selected">선택됨</string><string name="optional">선택 사항</string><string name="action_needed">조치 필요</string>
+    <string name="gallery">갤러리</string><string name="settings">설정</string><string name="back">뒤로</string>
+    <string name="phase_setup_required">설정 필요</string><string name="phase_ready">준비됨</string><string name="phase_starting">카메라 여는 중</string><string name="phase_recording">녹화 중</string><string name="phase_stopping">저장 중</string><string name="phase_saved">저장됨</string><string name="phase_error">오류</string>
+    <string name="home_trigger_hint">Assistant를 호출하면 바로 녹화합니다.</string><string name="latest_capture">마지막 촬영</string><string name="untitled_video">이름 없는 영상</string>
+    <string name="stop_capture">녹화 중지</string><string name="review_setup">설정</string>
+    <string name="capture">촬영</string><string name="include_audio">오디오 포함</string><string name="video_quality">영상 품질</string><string name="quality_auto">자동</string><string name="quality_fhd">1080p</string><string name="quality_hd">720p</string>
+    <string name="auto_stop">자동 종료</string><string name="no_limit">제한 없음</string><plurals name="seconds_value"><item quantity="other">%1$d초</item></plurals>
+    <string name="save_to">저장 위치</string><string name="device_gallery">기기 갤러리</string><string name="chalna_vault">찰나 보관함</string>
+    <string name="device_gallery_storage_detail">일반 갤러리 앱에서도 볼 수 있습니다.</string><string name="vault_storage_detail">찰나 앱 안에서 보관합니다. 앱을 삭제하면 함께 삭제됩니다.</string><string name="existing_videos_not_moved">기존 영상은 이동하지 않습니다.</string>
+    <string name="appearance_feedback">경험</string><string name="night">Night</string><string name="mist">Mist</string><string name="system">시스템</string><string name="haptics">햅틱</string><string name="reduced_motion">움직임 줄이기</string>
+    <string name="motion_effects">움직임 및 빛 효과</string><string name="motion_system">시스템 설정</string><string name="motion_full">전체</string><string name="motion_reduced">줄임</string>
+    <string name="access_setup">시스템</string><string name="support">앱</string><string name="microphone">마이크 권한</string><string name="audio_off">오디오가 꺼져 있어 필요 없음</string><string name="help">도움말 및 호환성</string><string name="help_short">사용 방법과 기기별 차이</string><string name="privacy">개인정보 및 정보</string><string name="privacy_short">저장과 권한 안내</string>
+    <string name="filter_all">전체</string><string name="gallery_empty_title">아직 촬영한 영상이 없습니다</string><string name="gallery_empty_body">Assistant를 호출하면 첫 영상이 여기에 나타납니다.</string><plurals name="items_selected"><item quantity="other">%1$d개 선택</item></plurals>
+    <string name="open_app_settings_detail">권한 차단됨 · 앱 설정 열기</string><string name="open_notification_settings_detail">알림 차단됨 · 시스템 설정 열기</string>
+    <string name="share">공유</string><string name="export">내보내기</string><string name="delete">삭제</string><string name="more">더보기</string><string name="details">세부정보</string><string name="open_external">다른 앱에서 열기</string>
+    <string name="cancel">취소</string><string name="delete_confirm">이 영상을 삭제할까요?</string><string name="delete_selected_confirm">선택한 영상을 삭제할까요?</string><string name="audio_included">오디오 포함</string><string name="audio_not_included">오디오 없음</string>
+    <string name="detail_file">파일</string><string name="detail_date">촬영 날짜</string><string name="detail_duration">재생 시간</string><string name="detail_resolution">해상도</string><string name="detail_size">파일 크기</string><string name="detail_storage">저장 위치</string><string name="detail_audio">오디오</string><string name="detail_type">형식</string>
+    <string name="today">오늘</string><string name="yesterday">어제</string><string name="duration_unknown">재생 시간 확인 불가</string><string name="gallery_item_description">%1$s, %2$s, %3$s</string>
+    <string name="play">재생</string><string name="pause">일시정지</string><string name="mute">음소거</string><string name="unmute">소리 켜기</string><string name="fullscreen">전체 화면</string>
+    <string name="help_use">시작과 종료</string><string name="help_use_detail">기기의 Assistant 호출 동작을 실행하면 녹화를 시작합니다. 다시 호출하면 종료합니다.</string>
+    <string name="help_assistant">기본 어시스턴트</string><string name="help_assistant_detail">찰나를 기본 어시스턴트로 설정하면 기존 Assistant 호출 동작이 찰나를 실행합니다. 언제든 다시 변경할 수 있습니다.</string><string name="change_assistant">기본 어시스턴트 변경</string>
     <string name="help_lock_screen">잠금 화면 동작</string><string name="help_lock_screen_detail">호출 가능 여부는 Android와 기기 보안 설정에 따라 다릅니다. 잠금 해제가 필요할 수 있습니다.</string>
-    <string name="help_oem">기기 호환성</string><string name="help_oem_detail">배터리 제한과 어시스턴트 제스처는 제조사마다 다릅니다. 녹화 중 포그라운드 실행을 허용하세요.</string>
-    <string name="help_privacy">숨겨진 촬영 없음</string><string name="help_privacy_detail">촬영 중에는 항상 화면과 지속 알림이 표시됩니다. 찰나는 미리 녹화하지 않습니다.</string>
-    <string name="version_info">버전 %1$s</string><string name="privacy">개인정보</string><string name="privacy_statement">찰나는 로컬에서 작동합니다. 인터넷 권한, 분석, 광고, 계정, 클라우드 동기화가 없습니다. 녹화물은 사용자가 관리하는 Android 미디어 저장소에 남습니다.</string>
-    <string name="permissions_used">사용 권한</string><string name="permissions_used_detail">카메라, 마이크, 알림. 위치, 연락처, 광범위 저장소, 오버레이, 접근성 서비스 권한은 사용하지 않습니다.</string><string name="build_info">빌드 정보</string><string name="build_info_detail">리비전 %1$s · 빌드 %2$s</string>
-    <string name="aura_recording">녹화 중</string><string name="aura_idle">찰나 오라</string>
-    <string name="notification_channel_name">진행 중인 촬영</string><string name="notification_recording_title">찰나 녹화 중</string><string name="notification_recording_text">촬영이 진행 중이며 항상 표시됩니다</string>
-    <string name="action_stop">중지</string><string name="action_open">찰나 열기</string><string name="action_settings">설정</string>
-    <string name="use_without_audio">오디오 없이 사용</string><string name="audio">오디오</string><string name="audio_on">오디오 켬</string><string name="audio_off">오디오 끔</string>
-    <string name="auto_stop">자동 종료</string><string name="no_limit">제한 없음</string>
-    <plurals name="seconds_value"><item quantity="other">%1$d초</item></plurals>
-    <string name="open_video">영상 열기</string><string name="diagnostic_real_video_warning">이 테스트는 실제 촬영 경로를 사용하며 짧은 영상을 저장합니다.</string><string name="confirm_capture">테스트 촬영 시작</string><string name="cancel">취소</string><string name="copy_diagnostics">진단 정보 복사</string>
-    <string name="notification_saved_title">영상이 저장되었습니다</string><string name="notification_saved_text">Movies/Chalna</string><string name="notification_error_title">찰나가 녹화를 시작하지 못했습니다</string>
-    <string name="setup_required">설정이 필요합니다</string><string name="review_setup">설정 확인</string><string name="file_not_found">저장된 영상을 찾을 수 없습니다.</string>
+    <string name="help_storage">저장 위치</string><string name="help_storage_detail">기기 갤러리 영상은 일반 갤러리 앱에 나타나며 앱을 삭제해도 남습니다. 찰나 보관함 영상은 앱 안에 보관되고 앱 삭제 시 함께 삭제됩니다.</string>
+    <string name="private_by_design">개인정보 및 앱 정보</string><string name="privacy_statement">영상은 선택한 저장 위치에 저장됩니다. 찰나는 인터넷 권한을 사용하지 않으며 영상을 업로드하지 않습니다.</string>
+    <string name="explicit_trigger_only">촬영 동작</string><string name="explicit_trigger_detail">카메라는 Assistant를 호출한 뒤에만 켜집니다. 미리 촬영하거나 카메라를 계속 켜 두지 않습니다. 찰나 보관함 영상은 앱 삭제 시 함께 삭제되고 기기 갤러리 영상은 남습니다.</string>
+    <string name="permissions_used">관련 접근 권한만 사용</string><string name="permissions_used_detail">카메라, 선택적 마이크, 선택적 알림. 위치, 연락처, 광범위 저장소, 오버레이, 접근성 서비스는 사용하지 않습니다.</string><string name="version_info">버전 %1$s</string>
+    <string name="glow_idle">찰나 준비됨</string><string name="glow_starting">촬영 시작 중</string><string name="glow_recording">녹화 중</string><string name="glow_stopping">촬영 저장 중</string><string name="glow_error">촬영 확인 필요</string>
+    <string name="notification_channel_name">진행 중인 촬영</string><string name="notification_recording_title">찰나가 녹화 중입니다</string><string name="notification_recording_text">다시 Assistant를 호출하거나 중지를 누르세요.</string><string name="notification_saved_title">영상이 저장되었습니다</string><string name="notification_saved_text">찰나 갤러리에서 확인하세요.</string><string name="notification_error_title">찰나가 녹화를 시작하지 못했습니다</string>
+    <string name="action_stop">중지</string><string name="action_open">찰나 열기</string><string name="action_settings">설정</string><string name="file_not_found">저장된 영상을 찾을 수 없습니다.</string><string name="no_video_viewer">영상을 열 수 있는 앱이 없습니다.</string>
+    <string name="capture_error_permission">촬영 권한이 필요합니다.</string><string name="capture_error_camera">카메라를 사용할 수 없습니다.</string><string name="capture_error_storage">저장 공간이 부족합니다.</string>
+    <string name="gallery_delete_failed">일부 영상을 삭제하지 못했습니다.</string><string name="gallery_share_failed">선택한 영상을 공유하지 못했습니다.</string><string name="gallery_export_failed">일부 영상을 기기 갤러리에 복사하지 못했습니다.</string><string name="player_open_failed">영상을 열 수 없습니다.</string>
 </resources>

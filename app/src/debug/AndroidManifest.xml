@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:name="app.chalna.capture.DebugChalnaApplication"
+        tools:replace="android:name">
+        <activity
+            android:name="app.chalna.capture.ui.VisualLabActivity"
+            android:exported="true"
+            android:label="@string/visual_lab"
+            android:theme="@style/Theme.Chalna">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,11 @@
+<resources>
+    <string name="visual_lab">찰나 Visual Lab</string>
+    <string name="visual_lab_subtitle">결정적 렌더러 및 접근성 QA</string>
+    <string name="lab_state_frames">상태 프레임</string>
+    <string name="lab_glow_timing">호출 Glow 타이밍</string>
+    <string name="lab_icon_masks">아이콘 마스크</string>
+    <string name="lab_large_font">큰 글꼴</string>
+    <string name="lab_capture_timing">촬영 타이밍</string>
+    <string name="lab_no_capture_timing">디버그 빌드에서 촬영을 호출하면 타이밍 마커가 표시됩니다.</string>
+    <string name="lab_clear_timing">타이밍 지우기</string>
+</resources>
