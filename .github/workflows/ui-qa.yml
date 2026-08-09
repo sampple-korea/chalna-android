@@ -42,6 +42,10 @@ jobs:
       - name: Policy before emulator
         shell: pwsh
         run: ./scripts/policy-check.ps1
+      - name: Reclaim runner space for emulator userdata
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk/ndk /usr/share/dotnet /opt/hostedtoolcache/CodeQL
+          df -h /
       - name: Run fixed emulator suite
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
