@@ -9,6 +9,7 @@ import android.os.CancellationSignal
 import android.view.Surface
 import android.view.TextureView
 import android.view.accessibility.AccessibilityManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -218,6 +219,9 @@ internal fun SettingsScreen(state: ChalnaUiState, d: UiDependencies, back: () ->
 internal fun GalleryScreen(state: ChalnaUiState, d: UiDependencies, back: () -> Unit, open: (String) -> Unit) {
     val selected = state.selectedMediaIds
     var confirmBatchDelete by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = selected.isNotEmpty()) {
+        if (confirmBatchDelete) confirmBatchDelete = false else d.clearMediaSelection()
+    }
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
         if (selected.isEmpty()) TopBar(stringResource(R.string.gallery), back) else TopBar(pluralStringResource(R.plurals.items_selected, selected.size, selected.size), d::clearMediaSelection) {
             IconButton(ChalnaIcon.SHARE, stringResource(R.string.share), onClick = d::shareSelectedMedia)

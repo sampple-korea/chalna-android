@@ -84,7 +84,7 @@ import kotlin.math.sin
             )
             val centerField = Brush.radialGradient(
                 listOf(colors.surfaceHigh.copy(.20f), Color.Transparent),
-                center = center,
+                center = Offset(size.width / 2f, size.height / 2f),
                 radius = size.minDimension * .60f,
             )
             onDrawBehind {

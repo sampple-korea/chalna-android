@@ -14,6 +14,7 @@ import android.graphics.Path
 import android.graphics.PathMeasure
 import android.graphics.RectF
 import android.graphics.RenderEffect
+import android.graphics.RenderNode
 import android.graphics.Shader
 import android.graphics.SweepGradient
 import android.os.Build
@@ -119,6 +120,8 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         private val corePaint = strokePaint(1.35f, 235)
         private val hotspotBloomPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val hotspotCorePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val atmosphereNode = RenderNode("chalna-atmosphere")
+        private val bloomNode = RenderNode("chalna-bloom")
         private var animator: ValueAnimator? = null
         private var atmosphereShader: SweepGradient? = null
         private var bloomShader: SweepGradient? = null
@@ -134,15 +137,7 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
             setLayerType(LAYER_TYPE_HARDWARE, null)
             if (Build.VERSION.SDK_INT >= 31) {
-                atmospherePaint.setRenderEffect(
-                    RenderEffect.createBlurEffect(density * 13f, density * 13f, Shader.TileMode.CLAMP),
-                )
-                bloomPaint.setRenderEffect(
-                    RenderEffect.createBlurEffect(density * 4.5f, density * 4.5f, Shader.TileMode.CLAMP),
-                )
-                hotspotBloomPaint.setRenderEffect(
-                    RenderEffect.createBlurEffect(density * 6f, density * 6f, Shader.TileMode.CLAMP),
-                )
+                installBlurEffects()
             }
         }
 
@@ -203,6 +198,8 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             atmospherePaint.shader = null
             bloomPaint.shader = null
             corePaint.shader = null
+            atmosphereNode.discardDisplayList()
+            bloomNode.discardDisplayList()
         }
 
         override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -224,6 +221,8 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             edgePath.addRoundRect(edgeBounds, corner, corner, Path.Direction.CW)
             pathMeasure.setPath(edgePath, true)
             measuredLength = pathMeasure.length
+            atmosphereNode.setPosition(0, 0, width, height)
+            bloomNode.setPosition(0, 0, width, height)
             installShaders(kind)
         }
 
@@ -245,8 +244,8 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             atmospherePaint.alpha = (34f * envelope * asymmetry).toInt().coerceIn(0, 255)
             bloomPaint.alpha = (112f * envelope * boost * contraction).toInt().coerceIn(0, 255)
             corePaint.alpha = (238f * envelope * boost).toInt().coerceIn(0, 255)
-            canvas.drawPath(edgePath, atmospherePaint)
-            canvas.drawPath(edgePath, bloomPaint)
+            drawOpticalLayer(canvas, atmosphereNode, atmospherePaint)
+            drawOpticalLayer(canvas, bloomNode, bloomPaint)
             canvas.drawPath(edgePath, corePaint)
 
             val direction = if (kind == InvocationPulseKind.STOP) -1f else 1f
@@ -264,6 +263,27 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             hotspotCorePaint.alpha = (230f * envelope * energy).toInt().coerceIn(0, 255)
             canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (9f + 4f * resolveBoost), hotspotBloomPaint)
             canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * 1.65f, hotspotCorePaint)
+        }
+
+        private fun drawOpticalLayer(canvas: Canvas, node: RenderNode, paint: Paint) {
+            if (Build.VERSION.SDK_INT >= 31 && canvas.isHardwareAccelerated) {
+                val recordingCanvas = node.beginRecording()
+                recordingCanvas.drawPath(edgePath, paint)
+                node.endRecording()
+                canvas.drawRenderNode(node)
+            } else {
+                canvas.drawPath(edgePath, paint)
+            }
+        }
+
+        @android.annotation.SuppressLint("NewApi")
+        private fun installBlurEffects() {
+            atmosphereNode.setRenderEffect(
+                RenderEffect.createBlurEffect(density * 13f, density * 13f, Shader.TileMode.CLAMP),
+            )
+            bloomNode.setRenderEffect(
+                RenderEffect.createBlurEffect(density * 4.5f, density * 4.5f, Shader.TileMode.CLAMP),
+            )
         }
 
         private fun installShaders(pulseKind: InvocationPulseKind) {

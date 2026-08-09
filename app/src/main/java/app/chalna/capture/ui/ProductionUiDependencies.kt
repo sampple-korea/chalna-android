@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
-import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.PowerManager
@@ -321,7 +320,7 @@ class ProductionUiDependencies(
 
     override fun setSound(value: Boolean) {
         if (value && !granted(Manifest.permission.RECORD_AUDIO)) {
-            requestMicrophone()
+            if (overlay.value.microphoneBlocked) openAppSettings() else requestMicrophone()
         } else {
             updateSettings { copy(audioEnabled = value) }
         }
@@ -558,7 +557,7 @@ class ProductionUiDependencies(
     private fun share(ids: Set<String>) {
         if (ids.isEmpty()) return
         activity.lifecycleScope.launch {
-            val uris = withContext(Dispatchers.IO) { galleryRepository.shareUris(ids) }.map(Uri::parse)
+            val uris = withContext(Dispatchers.IO) { galleryRepository.shareUris(ids) }.map { it.toUri() }
             if (uris.isEmpty()) {
                 publishOperationError(R.string.gallery_share_failed)
                 return@launch
