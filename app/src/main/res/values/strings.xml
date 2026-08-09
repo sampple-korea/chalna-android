@@ -1,0 +1,48 @@
+<resources>
+    <string name="app_name">Chalna</string>
+    <string name="local_private">Local capture · private by design</string>
+    <string name="setup_title_1">Capture at the moment you ask</string>
+    <string name="setup_body_1">Chalna starts only after an Assistant invocation, notification action, or a diagnostics confirmation. There is no pre-capture.</string>
+    <string name="setup_title_2">Allow capture access</string>
+    <string name="setup_body_2">Camera and microphone are needed to record. Notifications keep an active recording visible and controllable.</string>
+    <string name="setup_title_3">Choose Chalna as your Assistant</string>
+    <string name="setup_body_3">Open Android settings, select Chalna as the digital assistant app, then return here.</string>
+    <string name="setup_title_4">Ready for the first moment</string>
+    <string name="setup_body_4">Review your setup. You can change quality, appearance, and feedback later.</string>
+    <string name="continue_label">Continue</string><string name="finish">Finish setup</string>
+    <string name="camera_microphone">Camera and microphone</string><string name="camera_microphone_hint">Used only during an explicit capture</string>
+    <string name="notifications">Notifications</string><string name="notifications_hint">Shows recording status and a stop action</string>
+    <string name="open_assistant_settings">Open Assistant settings</string><string name="assistant_settings_hint">Select Chalna, then come back</string>
+    <string name="assistant_selected">Chalna selected as Assistant</string><string name="ready">Ready</string><string name="action_needed">Action needed</string>
+    <string name="settings">Settings</string><string name="back">Back</string>
+    <string name="capture_settings">Capture settings</string><string name="capture_settings_hint">Quality and capture behavior</string>
+    <string name="appearance_feedback">Appearance &amp; feedback</string><string name="appearance_feedback_hint">Theme, motion, haptics, and sound</string>
+    <string name="diagnostics">Diagnostics</string><string name="diagnostics_hint">Check explicit capture readiness</string>
+    <string name="help_compatibility">Help &amp; compatibility</string><string name="help_compatibility_hint">Assistant and device guidance</string>
+    <string name="about_privacy">About &amp; privacy</string><string name="about_privacy_hint">Version, permissions, and data use</string>
+    <string name="test_capture">Test capture</string><string name="stop_capture">Stop recording</string><string name="saved_as">Saved as %1$s</string>
+    <string name="phase_ready">Ready</string><string name="phase_starting">Starting…</string><string name="phase_recording">Recording</string><string name="phase_stopping">Saving…</string><string name="phase_saved">Saved</string><string name="phase_error">Needs attention</string>
+    <string name="video_quality">Video quality</string><string name="quality_auto">Auto</string><string name="quality_fhd">1080p</string><string name="quality_hd">720p</string><string name="capture_behavior">Capture behavior</string>
+    <string name="explicit_trigger_only">Explicit trigger only</string><string name="explicit_trigger_detail">The camera and microphone stay inactive until you invoke Chalna or confirm a diagnostic test.</string>
+    <string name="media_storage">Media storage</string><string name="media_storage_detail">Videos are saved locally to the system media collection. Chalna does not upload them.</string>
+    <string name="appearance">Appearance</string><string name="night">Night</string><string name="mist">Mist</string><string name="system">Follow system</string>
+    <string name="feedback">Feedback</string><string name="haptics">Haptics</string><string name="sound">Sound</string><string name="reduced_motion">Reduced motion</string>
+    <string name="diagnostics_privacy">Diagnostics keep bounded timing and result metadata only. They never store screenshots, media contents, location, accounts, or the foreground app.</string>
+    <string name="run_diagnostic">Run confirmed capture test</string><string name="clear_history">Clear diagnostic history</string>
+    <string name="no_diagnostics">No diagnostic history</string><string name="no_diagnostics_detail">Run a confirmed test when you are ready. Camera access begins only after confirmation.</string>
+    <string name="help_assistant">Assistant does not open</string><string name="help_assistant_detail">Check Android’s digital assistant app setting and select Chalna. Some manufacturers place this under Default apps.</string>
+    <string name="help_lock_screen">Lock-screen behavior</string><string name="help_lock_screen_detail">Invocation availability depends on Android and device security settings. Unlocking may be required.</string>
+    <string name="help_oem">Device compatibility</string><string name="help_oem_detail">Battery restrictions and Assistant gestures vary by manufacturer. Allow foreground operation during an active recording.</string>
+    <string name="help_privacy">Nothing hidden</string><string name="help_privacy_detail">An active capture always has visible UI and a persistent notification. Chalna never records in advance.</string>
+    <string name="version_info">Version %1$s</string><string name="privacy">Privacy</string>
+    <string name="privacy_statement">Chalna works locally. It has no internet permission, analytics, advertising, accounts, or cloud sync. Your recordings remain in Android media storage under your control.</string>
+    <string name="permissions_used">Permissions used</string><string name="permissions_used_detail">Camera, microphone, and notifications. No location, contacts, broad storage, overlay, or accessibility-service access.</string>
+    <string name="build_info">Build information</string><string name="build_info_detail">Revision %1$s · built %2$s</string>
+    <string name="aura_recording">Recording</string><string name="aura_idle">Chalna Aura</string>
+    <string name="notification_channel_name">Active captures</string><string name="notification_recording_title">Chalna is recording</string><string name="notification_recording_text">Capture is active and visible</string>
+    <string name="action_stop">Stop</string><string name="action_open">Open Chalna</string><string name="action_settings">Settings</string>
+    <string name="use_without_audio">Use without audio</string><string name="audio">Audio</string><string name="audio_on">Audio on</string><string name="audio_off">Audio off</string>
+    <string name="auto_stop">Auto stop</string><string name="no_limit">No limit</string><string name="seconds_value">%1$d sec</string>
+    <string name="open_video">Open video</string><string name="diagnostic_real_video_warning">This test uses the production capture path and saves a real short video.</string><string name="confirm_capture">Start test capture</string><string name="cancel">Cancel</string><string name="copy_diagnostics">Copy diagnostics</string>
+    <string name="notification_saved_title">Video saved</string><string name="notification_saved_text">Movies/Chalna</string><string name="notification_error_title">Chalna could not start recording</string>
+</resources>
