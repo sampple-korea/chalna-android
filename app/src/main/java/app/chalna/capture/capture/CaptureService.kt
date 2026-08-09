@@ -47,7 +47,11 @@ class CaptureService : Service(), LifecycleOwner {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val action = intent?.action ?: ACTION_TOGGLE
+        val action = intent?.action
+        if (action != ACTION_TOGGLE && action != ACTION_STOP) {
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
         val id = intent?.getStringExtra(EXTRA_INVOCATION_ID) ?: UUID.randomUUID().toString()
         if (action == ACTION_TOGGLE && !hasRequiredPermissions()) {
             CaptureRuntime.publish(CaptureState.Failed("Required camera, audio, or notification permission is missing"))
@@ -133,6 +137,15 @@ class CaptureService : Service(), LifecycleOwner {
                 )
                 stopForeground(STOP_FOREGROUND_DETACH)
                 stopSelf()
+            } else if (final is CaptureState.Failed || final is CaptureState.Idle) {
+                if (final is CaptureState.Failed && hasNotificationPermission()) {
+                    getSystemService(NotificationManager::class.java).notify(
+                        CaptureNotifications.NOTIFICATION_ID,
+                        CaptureNotifications.error(this@CaptureService, final.message),
+                    )
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
         }
     }
@@ -153,8 +166,14 @@ class CaptureService : Service(), LifecycleOwner {
         const val EXTRA_INVOCATION_ID = "invocation_id"
         fun intent(context: Context, action: String, id: String = UUID.randomUUID().toString()) =
             Intent(context, CaptureService::class.java).setAction(action).putExtra(EXTRA_INVOCATION_ID, id)
-        fun dispatch(context: Context, id: String) {
-            context.startForegroundService(intent(context, ACTION_TOGGLE, id))
+        fun dispatch(context: Context, id: String): Boolean = dispatch(context, ACTION_TOGGLE, id)
+
+        fun dispatch(context: Context, action: String, id: String): Boolean = try {
+            context.startForegroundService(intent(context, action, id))
+            true
+        } catch (failure: RuntimeException) {
+            CaptureRuntime.publish(CaptureState.Failed(failure.message ?: "Foreground capture start was rejected"))
+            false
         }
     }
 }

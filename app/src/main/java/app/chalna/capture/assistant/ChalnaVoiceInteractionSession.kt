@@ -18,12 +18,12 @@ class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInte
     private var dispatchedSession: String? = null
 
     override fun onShow(args: Bundle?, showFlags: Int) {
+        super.onShow(args, showFlags)
         val id = args?.getString(KEY_SHOW_SESSION_ID) ?: "session-${UUID.randomUUID()}"
         if (dispatchedSession != id) {
             dispatchedSession = id
             CaptureService.dispatch(appContext, id)
         }
-        super.onShow(args, showFlags)
     }
 
     override fun onHandleAssist(data: Bundle?, structure: AssistStructure?, content: AssistContent?) {

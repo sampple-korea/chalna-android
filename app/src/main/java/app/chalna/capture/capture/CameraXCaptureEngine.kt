@@ -59,8 +59,9 @@ class CameraXCaptureEngine(
         val video = VideoCapture.withOutput(recorder)
         cameraProvider.unbindAll()
         cameraProvider.bindToLifecycle(lifecycleOwner, selector, video)
+        val displayName = CaptureFileNames.video(System.currentTimeMillis())
         val values = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, CaptureFileNames.video(System.currentTimeMillis()))
+            put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
             put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Chalna")
         }
@@ -85,6 +86,9 @@ class CameraXCaptureEngine(
                                 event.outputResults.outputUri.toString(),
                                 System.currentTimeMillis() - startedAt,
                                 startedAt,
+                                displayName,
+                                settings.preferredQuality,
+                                settings.audioEnabled,
                             ),
                         )
                     } else {

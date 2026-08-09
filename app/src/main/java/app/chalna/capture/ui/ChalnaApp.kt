@@ -141,7 +141,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 }
 
 @Composable private fun PermissionRows(s: ChalnaUiState, d: UiDependencies) {
-    ActionCard(R.string.camera_microphone, R.string.camera_microphone_hint, s.cameraGranted && s.microphoneGranted, d::requestCameraAndMicrophone)
+    ActionCard(R.string.camera_microphone, R.string.camera_microphone_hint, s.cameraGranted && (s.microphoneGranted || !s.sound), d::requestCameraAndMicrophone)
     if (!s.microphoneGranted && s.sound) {
         Spacer(Modifier.height(10.dp))
         SecondaryButton(stringResource(R.string.use_without_audio)) { d.setSound(false) }
@@ -151,7 +151,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 }
 
 @Composable private fun SummaryCard(s: ChalnaUiState) = GlassCard {
-    StatusLine(R.string.camera_microphone, s.cameraGranted && s.microphoneGranted)
+    StatusLine(R.string.camera_microphone, s.cameraGranted && (s.microphoneGranted || !s.sound))
     StatusLine(R.string.notifications, s.notificationsGranted)
     StatusLine(R.string.assistant_selected, s.assistantSelected)
 }

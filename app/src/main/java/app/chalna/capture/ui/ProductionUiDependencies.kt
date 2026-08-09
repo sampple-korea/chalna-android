@@ -98,7 +98,7 @@ class ProductionUiDependencies(
                     setupComplete = settings.setupComplete,
                     phase = phase,
                     durationSeconds = elapsed,
-                    lastSavedName = (capture as? CaptureState.Saved)?.capture?.uri?.substringAfterLast('/'),
+                    lastSavedName = (capture as? CaptureState.Saved)?.capture?.displayName?.ifBlank { null },
                     errorMessage = (capture as? CaptureState.Failed)?.message,
                     quality = quality,
                     appearance = appearance,
@@ -119,7 +119,7 @@ class ProductionUiDependencies(
 
     override fun toggleCapture() {
         val action = if (CaptureRuntime.state.value is CaptureState.Recording) CaptureService.ACTION_STOP else CaptureService.ACTION_TOGGLE
-        ContextCompat.startForegroundService(activity, CaptureService.intent(activity, action, "activity-${UUID.randomUUID()}"))
+        CaptureService.dispatch(activity, action, "activity-${UUID.randomUUID()}")
     }
 
     override fun requestCameraAndMicrophone() {

@@ -38,6 +38,9 @@ data class LastCapture(
     val uri: String,
     val durationMillis: Long,
     val createdAtMillis: Long,
+    val displayName: String = "",
+    val quality: CaptureQuality = CaptureQuality.AUTO,
+    val audioIncluded: Boolean = false,
 ) {
     fun isUsable(): Boolean = uri.startsWith("content://") && durationMillis >= 0 && createdAtMillis > 0
 }
