@@ -1,5 +1,11 @@
 # Third-party notices
 
+## Noto Sans Korean
+
+The Chalna interface embeds the variable Noto Sans Korean font from the official Google Fonts repository. It is licensed under the SIL Open Font License 1.1. The complete license is included at `licenses/NotoSansKR-OFL.txt`.
+
+Source: https://github.com/google/fonts/tree/main/ofl/notosanskr
+
 Chalna source declares the following direct dependencies. This is an inventory aid, not a substitute for the license files resolved into the verified build. Exact transitive versions and license texts are **Pending verification** until CI produces and archives a dependency/SBOM report.
 
 | Component family | Declared version | Typical license | Source |

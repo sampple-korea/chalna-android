@@ -4,6 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import app.chalna.capture.R
 
 @Immutable
 data class ChalnaColors(
@@ -36,3 +40,10 @@ val LocalChalnaColors = staticCompositionLocalOf { NightColors }
 object ChalnaTheme {
     val colors: ChalnaColors @Composable get() = LocalChalnaColors.current
 }
+
+val ChalnaFontFamily = FontFamily(
+    Font(R.font.noto_sans_kr_variable, FontWeight.Normal),
+    Font(R.font.noto_sans_kr_variable, FontWeight.Medium),
+    Font(R.font.noto_sans_kr_variable, FontWeight.SemiBold),
+    Font(R.font.noto_sans_kr_variable, FontWeight.Bold),
+)

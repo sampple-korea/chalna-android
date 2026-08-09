@@ -12,7 +12,7 @@
     <string name="setup_title_5">Setup complete</string>
     <string name="setup_body_5">Invoke the device Assistant action to start recording. Invoke it again to stop and save.</string>
     <string name="continue_label">Continue</string><string name="finish">Finish setup</string>
-    <string name="camera_microphone">Camera and microphone</string><string name="camera_microphone_hint">Used only during an explicit capture</string>
+    <string name="camera_microphone">Camera and microphone</string>
     <string name="allow_camera">Allow camera access</string><string name="camera_permission_hint">Required for video capture after your trigger</string>
     <string name="allow_microphone">Allow microphone access</string><string name="microphone_permission_hint">Used only when audio is enabled</string>
     <string name="allow_notifications">Allow notifications</string><string name="audio_disabled_ready">Audio is off. Microphone permission is not required.</string>

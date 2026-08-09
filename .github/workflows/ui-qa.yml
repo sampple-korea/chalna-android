@@ -65,6 +65,11 @@ jobs:
           script: |
             adb shell settings put system font_scale 1.0
             ./gradlew --no-daemon --stacktrace :app:connectedDebugAndroidTest
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am instrument -w -r -e class app.chalna.capture.ui.ChalnaScreenshotTest app.chalna.capture.debug.test/androidx.test.runner.AndroidJUnitRunner | tee screenshot-instrumentation.txt
+            grep -q '^OK (' screenshot-instrumentation.txt
+            ! grep -q 'FAILURES!!!' screenshot-instrumentation.txt
             mkdir -p ui-screenshots
             adb pull /sdcard/Android/data/app.chalna.capture.debug/files/screenshots/. ui-screenshots/ || true
             adb shell am start -W -n app.chalna.capture.debug/app.chalna.capture.MainActivity
@@ -80,4 +85,5 @@ jobs:
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
             app/build/outputs/connected_android_test_additional_output/
+            screenshot-instrumentation.txt
             ui-screenshots/

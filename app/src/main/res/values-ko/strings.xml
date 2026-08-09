@@ -6,7 +6,7 @@
     <string name="setup_title_3">녹화 상태 알림</string><string name="setup_body_3">화면을 보지 않아도 녹화 상태를 확인하고 즉시 중지할 수 있도록 알림을 사용합니다.</string>
     <string name="setup_title_4">기본 어시스턴트 변경</string><string name="setup_body_4">찰나를 선택하면 Gemini 또는 기존 음성 비서 대신 찰나가 실행됩니다. Android 설정에서 언제든 되돌릴 수 있습니다.</string>
     <string name="setup_title_5">준비 완료</string><string name="setup_body_5">기기의 Assistant 호출 동작으로 녹화를 시작하세요. 다시 호출하면 종료하고 저장합니다.</string>
-    <string name="continue_label">계속</string><string name="finish">홈으로</string><string name="camera_microphone">카메라 및 마이크</string><string name="camera_microphone_hint">명시적으로 촬영할 때만 사용</string>
+    <string name="continue_label">계속</string><string name="finish">홈으로</string><string name="camera_microphone">카메라 및 마이크</string>
     <string name="allow_camera">카메라 권한 허용</string><string name="camera_permission_hint">호출 후 영상 촬영에 필요</string><string name="allow_microphone">마이크 권한 허용</string><string name="microphone_permission_hint">오디오를 켰을 때만 사용</string><string name="allow_notifications">알림 허용</string><string name="audio_disabled_ready">오디오가 꺼졌습니다. 마이크 권한 없이 사용할 수 있습니다.</string>
     <string name="notifications">알림</string><string name="notifications_hint">녹화 상태와 중지 동작 표시</string><string name="open_assistant_settings">어시스턴트 설정 열기</string><string name="assistant_settings_hint">찰나를 선택한 뒤 돌아오세요</string>
     <string name="assistant_selected">찰나가 어시스턴트로 선택됨</string><string name="ready">준비됨</string><string name="action_needed">조치 필요</string><string name="settings">설정</string><string name="back">뒤로</string>
