@@ -30,15 +30,21 @@ jobs:
       CHALNA_RELEASE_STORE_PASSWORD: ${{ secrets.CHALNA_RELEASE_STORE_PASSWORD }}
       CHALNA_RELEASE_KEY_ALIAS: ${{ secrets.CHALNA_RELEASE_KEY_ALIAS }}
       CHALNA_RELEASE_KEY_PASSWORD: ${{ secrets.CHALNA_RELEASE_KEY_PASSWORD }}
+      CHALNA_RELEASE_CERT_SHA256: ${{ secrets.CHALNA_RELEASE_CERT_SHA256 }}
       CHALNA_KEYSTORE_PATH: ${{ github.workspace }}/.release/chalna-release.p12
     steps:
-      - name: Validate version and immutable release policy
+      - name: Validate version and release tooling
         shell: bash
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "$VERSION" = "1.0.0"
-          gh api -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/immutable-releases" --jq '.enabled == true' | grep -qx true
+          gh release verify --help >/dev/null
+          gh release verify-asset --help >/dev/null
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
       - name: Checkout exact main commit
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -63,9 +69,15 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$KEYSTORE_B64"
+          test -n "$CHALNA_RELEASE_STORE_PASSWORD"
+          test -n "$CHALNA_RELEASE_KEY_ALIAS"
+          test -n "$CHALNA_RELEASE_KEY_PASSWORD"
+          test -n "$CHALNA_RELEASE_CERT_SHA256"
           install -d -m 700 .release
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$CHALNA_KEYSTORE_PATH"
           chmod 600 "$CHALNA_KEYSTORE_PATH"
+          keytool -list -storetype PKCS12 -keystore "$CHALNA_KEYSTORE_PATH" \
+            -storepass "$CHALNA_RELEASE_STORE_PASSWORD" -alias "$CHALNA_RELEASE_KEY_ALIAS" >/dev/null
       - name: Policy, tests, and signed release build
         shell: bash
         run: |
@@ -85,24 +97,27 @@ jobs:
           test -s "$APK_IN"
           cp "$APK_IN" "$APK"
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          APKANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          test -x "$APKANALYZER"
           "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$APK"
           CERT_OUTPUT="$($BUILD_TOOLS/apksigner verify --verbose --print-certs "$APK")"
           printf '%s\n' "$CERT_OUTPUT"
           grep -q 'Verified using v2 scheme.*true' <<< "$CERT_OUTPUT"
           CERT_SHA="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$CERT_OUTPUT" | head -1 | tr '[:lower:]' '[:upper:]')"
           test -n "$CERT_SHA"
+          test "$CERT_SHA" = "$CHALNA_RELEASE_CERT_SHA256"
           ! grep -qi 'Android Debug' <<< "$CERT_OUTPUT"
-          APP_ID="$($BUILD_TOOLS/apkanalyzer manifest application-id "$APK")"
-          VERSION_NAME="$($BUILD_TOOLS/apkanalyzer manifest version-name "$APK")"
-          VERSION_CODE="$($BUILD_TOOLS/apkanalyzer manifest version-code "$APK")"
-          MIN_SDK="$($BUILD_TOOLS/apkanalyzer manifest min-sdk "$APK")"
-          TARGET_SDK="$($BUILD_TOOLS/apkanalyzer manifest target-sdk "$APK")"
+          APP_ID="$($APKANALYZER manifest application-id "$APK")"
+          VERSION_NAME="$($APKANALYZER manifest version-name "$APK")"
+          VERSION_CODE="$($APKANALYZER manifest version-code "$APK")"
+          MIN_SDK="$($APKANALYZER manifest min-sdk "$APK")"
+          TARGET_SDK="$($APKANALYZER manifest target-sdk "$APK")"
           test "$APP_ID" = 'app.chalna.capture'
           test "$VERSION_NAME" = "$VERSION"
           test "$VERSION_CODE" = '1'
           "$BUILD_TOOLS/aapt2" dump permissions "$APK" | tee permissions.txt
           ! grep -q 'android.permission.INTERNET' permissions.txt
-          ! "$BUILD_TOOLS/aapt2" dump xmltree "$APK" --file AndroidManifest.xml | grep -q 'android:debuggable.*0xffffffff'
+          ! "$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'android:debuggable.*0xffffffff'
           SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
           SIZE="$(stat -c%s "$APK")"
           printf '%s  %s\n' "$SHA" "$APK" > "$CHECKSUM"
@@ -130,6 +145,11 @@ jobs:
             --draft --target "$GITHUB_SHA" --title "Chalna v$VERSION" --notes-file docs/RELEASE_NOTES_v1.0.0.md
           test "$(gh release view "v$VERSION" --json assets --jq '.assets | length')" = '3'
           test "$(gh release view "v$VERSION" --json targetCommitish --jq .targetCommitish)" = "$GITHUB_SHA"
+          test "$(gh release view "v$VERSION" --json assets --jq '[.assets[].name] | sort | join("\n")')" = "$(printf '%s\n' \
+            "chalna-v${VERSION}-SHA256.txt" \
+            "chalna-v${VERSION}-build-info.json" \
+            "chalna-v${VERSION}-release.apk")"
+          test "$(gh release view "v$VERSION" --json assets --jq '[.assets[] | select(.size <= 0)] | length')" = '0'
       - name: Publish immutable release
         shell: bash
         run: |
@@ -149,10 +169,18 @@ jobs:
           gh release verify-asset "v$VERSION" "chalna-v${VERSION}-release.apk" --repo "$GITHUB_REPOSITORY"
           gh release verify "v$VERSION" --repo "$GITHUB_REPOSITORY"
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          APKANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
           REMOTE_CERT="$($BUILD_TOOLS/apksigner verify --verbose --print-certs "chalna-v${VERSION}-release.apk")"
           grep -q "Signer #1 certificate SHA-256 digest: $(tr '[:upper:]' '[:lower:]' <<< '${{ steps.apk.outputs.cert_sha }}')" <<< "$REMOTE_CERT"
-          test "$($BUILD_TOOLS/apkanalyzer manifest application-id "chalna-v${VERSION}-release.apk")" = 'app.chalna.capture'
-          test "$($BUILD_TOOLS/apkanalyzer manifest version-name "chalna-v${VERSION}-release.apk")" = "$VERSION"
+          test "$($APKANALYZER manifest application-id "chalna-v${VERSION}-release.apk")" = 'app.chalna.capture'
+          test "$($APKANALYZER manifest version-name "chalna-v${VERSION}-release.apk")" = "$VERSION"
+      - name: Remove failed draft release
+        if: failure()
+        shell: bash
+        run: |
+          if test "$(gh release view "v$VERSION" --json isDraft --jq .isDraft 2>/dev/null)" = 'true'; then
+            gh release delete "v$VERSION" --yes --cleanup-tag
+          fi
       - name: Remove signing key
         if: always()
         shell: bash
