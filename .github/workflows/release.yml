@@ -88,7 +88,7 @@ jobs:
           set -euo pipefail
           pwsh ./scripts/policy-check.ps1
           export BUILD_DATE_UTC="$(git show -s --format=%cI "$GITHUB_SHA")"
-          ./gradlew --no-daemon --stacktrace :app:lintRelease :app:testReleaseUnitTest :app:assembleRelease
+          ./gradlew --no-daemon --stacktrace :app:lintRelease :app:testDebugUnitTest :app:assembleRelease
       - name: Validate signed APK and create metadata
         id: apk
         shell: bash
