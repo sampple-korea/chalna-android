@@ -43,7 +43,7 @@
     <string name="explicit_trigger_only">Capture behavior</string><string name="explicit_trigger_detail">The camera starts only after you invoke Assistant. There is no pre-capture or always-on camera. Videos in Chalna vault are removed if the app is uninstalled; videos in Device gallery remain.</string>
     <string name="permissions_used">Only relevant access</string><string name="permissions_used_detail">Camera, optional microphone, and optional notifications. No location, contacts, broad storage, overlay, or accessibility service.</string>
     <string name="version_info">Version %1$s</string>
-    <string name="notification_channel_name">Active captures</string><string name="notification_recording_title">Chalna is recording</string><string name="notification_recording_text">Invoke Assistant again or tap Stop.</string>
+    <string name="notification_channel_name">Active captures</string><string name="notification_starting_title">Opening camera</string><string name="notification_starting_text">Preparing your recording.</string><string name="notification_recording_title">Chalna is recording</string><string name="notification_recording_text">Invoke Assistant again or tap Stop.</string>
     <string name="notification_saved_title">Video saved</string><string name="notification_saved_text">Saved to your Chalna gallery</string><string name="notification_error_title">Chalna could not start recording</string>
     <string name="action_stop">Stop</string><string name="action_open">Open Chalna</string><string name="action_settings">Settings</string>
     <string name="file_not_found">The saved video can no longer be found.</string>

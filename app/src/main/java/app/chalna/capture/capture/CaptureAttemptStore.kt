@@ -5,10 +5,13 @@ import android.content.ContentUris
 import android.content.Context
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.AtomicFile
 import app.chalna.capture.domain.StorageDestination
 import app.chalna.capture.media.AndroidCaptureDestinationFactory
 import app.chalna.capture.media.PreparedCaptureOutput
 import app.chalna.capture.notifications.CaptureNotifications
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -18,48 +21,67 @@ import kotlinx.coroutines.withContext
 /** Durable identity for the one output that may be incomplete after abrupt process death. */
 class CaptureAttemptStore(context: Context) {
     private val appContext = context.applicationContext
-    private val preferences = appContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+    private val file = AtomicFile(File(appContext.filesDir, FILE_NAME))
 
-    fun hasAttempt(): Boolean = preferences.contains(KEY_ID)
+    fun hasAttempt(): Boolean = file.baseFile.exists()
 
-    suspend fun mark(output: PreparedCaptureOutput) = withContext(Dispatchers.IO) {
-        check(
-            preferences.edit()
-                .putString(KEY_ID, output.id)
-                .putString(KEY_DESTINATION, output.destination.name)
-                .putString(KEY_DISPLAY_NAME, output.displayName)
-                .putString(KEY_PRIVATE_REF, output.privateRef)
-                .commit(),
-        ) { "Capture recovery marker could not be stored" }
+    suspend fun mark(output: PreparedCaptureOutput) = recoveryMutex.withLock {
+        withContext(Dispatchers.IO) {
+            val stream = file.startWrite()
+            try {
+                DataOutputStream(stream).apply {
+                    writeUTF(output.id)
+                    writeUTF(output.destination.name)
+                    writeUTF(output.displayName)
+                    writeUTF(output.privateRef.orEmpty())
+                    flush()
+                }
+                file.finishWrite(stream)
+            } catch (failure: Throwable) {
+                file.failWrite(stream)
+                throw failure
+            }
+        }
     }
 
-    suspend fun clear(): Boolean = withContext(Dispatchers.IO) {
-        preferences.edit().clear().commit()
+    suspend fun clear(): Boolean = recoveryMutex.withLock {
+        withContext(Dispatchers.IO) {
+            file.delete()
+            !file.baseFile.exists()
+        }
     }
 
     suspend fun recover(cancelStaleNotification: Boolean = true) = recoveryMutex.withLock {
         withContext(Dispatchers.IO) {
-            val id = preferences.getString(KEY_ID, null) ?: return@withContext
-            val destination = preferences.getString(KEY_DESTINATION, null)
-                ?.let { runCatching { StorageDestination.valueOf(it) }.getOrNull() }
-            val displayName = preferences.getString(KEY_DISPLAY_NAME, null)
-            val privateRef = preferences.getString(KEY_PRIVATE_REF, null)
-            if (id.isNotBlank() && displayName.isValidCaptureName()) {
+            val attempt = readAttempt()
+            if (attempt != null && attempt.id.isNotBlank() && attempt.displayName.isValidCaptureName()) {
                 runCatching {
-                    when (destination) {
-                        StorageDestination.CHALNA_VAULT -> deleteVaultAttempt(privateRef)
-                        StorageDestination.DEVICE_GALLERY -> deletePendingMediaStoreAttempt(displayName)
-                        null -> Unit
+                    when (attempt.destination) {
+                        StorageDestination.CHALNA_VAULT -> deleteVaultAttempt(attempt.privateRef)
+                        StorageDestination.DEVICE_GALLERY -> deletePendingMediaStoreAttempt(attempt.displayName)
                     }
                 }
             }
-            preferences.edit().clear().commit()
+            file.delete()
             if (cancelStaleNotification) {
                 appContext.getSystemService(NotificationManager::class.java)
                     .cancel(CaptureNotifications.NOTIFICATION_ID)
             }
         }
     }
+
+    private fun readAttempt(): Attempt? = runCatching {
+        file.openRead().use { input ->
+            DataInputStream(input).use { data ->
+                Attempt(
+                    id = data.readUTF(),
+                    destination = StorageDestination.valueOf(data.readUTF()),
+                    displayName = data.readUTF(),
+                    privateRef = data.readUTF().ifBlank { null },
+                )
+            }
+        }
+    }.getOrNull()
 
     private fun deleteVaultAttempt(privateRef: String?) {
         if (privateRef.isNullOrBlank()) return
@@ -92,12 +114,15 @@ class CaptureAttemptStore(context: Context) {
         this != null && startsWith("CHALNA_") && endsWith(".mp4", ignoreCase = true) &&
             none { it == '/' || it == '\\' }
 
+    private data class Attempt(
+        val id: String,
+        val destination: StorageDestination,
+        val displayName: String,
+        val privateRef: String?,
+    )
+
     private companion object {
-        const val PREFERENCES = "active_capture_attempt"
-        const val KEY_ID = "id"
-        const val KEY_DESTINATION = "destination"
-        const val KEY_DISPLAY_NAME = "display_name"
-        const val KEY_PRIVATE_REF = "private_ref"
+        const val FILE_NAME = "active-capture-attempt"
         val recoveryMutex = Mutex()
     }
 }

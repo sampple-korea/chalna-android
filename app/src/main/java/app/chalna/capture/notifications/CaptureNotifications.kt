@@ -41,6 +41,24 @@ object CaptureNotifications {
             .build()
     }
 
+    fun starting(context: Context): Notification {
+        ensureChannel(context)
+        val stop = PendingIntent.getService(context, 1, CaptureService.intent(context, CaptureService.ACTION_STOP), immutableUpdate())
+        val openIntent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val open = PendingIntent.getActivity(context, 2, openIntent, immutableUpdate())
+        return Notification.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_chalna)
+            .setContentTitle(context.getString(R.string.notification_starting_title))
+            .setContentText(context.getString(R.string.notification_starting_text))
+            .setOngoing(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setContentIntent(open)
+            .setOnlyAlertOnce(true)
+            .addAction(Notification.Action.Builder(null, context.getString(R.string.action_stop), stop).build())
+            .build()
+    }
+
     fun saved(context: Context, capture: LastCapture): Notification {
         ensureChannel(context)
         val view = Intent(context, MainActivity::class.java)

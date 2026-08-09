@@ -20,13 +20,16 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.CompletableDeferred
 
 private val Context.settingsDataStore by preferencesDataStore("capture_settings")
 
 class SettingsStore(context: Context) {
     private val store = context.applicationContext.settingsDataStore
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val initialSettingsLoaded = CompletableDeferred<Unit>()
     val settings: StateFlow<CaptureSettings> = store.data
         .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
         .map { p ->
@@ -40,7 +43,13 @@ class SettingsStore(context: Context) {
                 setupComplete = p[SETUP_COMPLETE] ?: false,
                 storageDestination = StorageDestinationPolicy.fromPersisted(p[STORAGE_DESTINATION]),
             )
-        }.stateIn(scope, SharingStarted.Eagerly, CaptureSettings())
+        }.onEach { initialSettingsLoaded.complete(Unit) }
+        .stateIn(scope, SharingStarted.Eagerly, CaptureSettings())
+
+    suspend fun snapshot(): CaptureSettings {
+        initialSettingsLoaded.await()
+        return settings.value
+    }
 
     val lastCapture: StateFlow<LastCapture?> = store.data
         .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
@@ -74,7 +83,7 @@ class SettingsStore(context: Context) {
         it[STORAGE_DESTINATION] = value.storageDestination.name
     }
 
-    suspend fun update(transform: (CaptureSettings) -> CaptureSettings) = update(transform(settings.value))
+    suspend fun update(transform: (CaptureSettings) -> CaptureSettings) = update(transform(snapshot()))
 
     suspend fun saveLastCapture(capture: LastCapture?) = store.edit {
         if (capture == null) {

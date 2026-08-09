@@ -23,6 +23,7 @@ import app.chalna.capture.domain.CaptureRequest
 import app.chalna.capture.domain.CaptureState
 import app.chalna.capture.notifications.CaptureNotifications
 import app.chalna.capture.R
+import app.chalna.capture.ChalnaApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,11 +43,12 @@ class CaptureService : Service(), LifecycleOwner {
     private lateinit var captureIndex: CaptureIndex
     private lateinit var attemptStore: CaptureAttemptStore
     private var autoStopJob: Job? = null
+    private var foregroundStarted = false
 
     override fun onCreate() {
         super.onCreate()
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
-        settings = SettingsStore(this)
+        settings = (application as ChalnaApplication).settingsStore
         captureIndex = CaptureIndex(FileCaptureIndexStore(this))
         attemptStore = CaptureAttemptStore(this)
         engine = CameraXCaptureEngine(this, this, settings)
@@ -61,7 +63,8 @@ class CaptureService : Service(), LifecycleOwner {
             return START_NOT_STICKY
         }
         val id = intent?.getStringExtra(EXTRA_INVOCATION_ID) ?: UUID.randomUUID().toString()
-        if (action == ACTION_TOGGLE && !hasRequiredPermissions()) {
+        val startCandidate = isStartCandidate(action)
+        if (startCandidate && !hasCameraPermission()) {
             val message = getString(R.string.capture_error_permission)
             CaptureRuntime.publish(CaptureState.Failed(message))
             errorHaptic()
@@ -74,9 +77,9 @@ class CaptureService : Service(), LifecycleOwner {
             stopSelfResult(startId)
             return START_NOT_STICKY
         }
-        if (action == ACTION_TOGGLE) {
+        if (startCandidate && !foregroundStarted) {
             try {
-                beginForeground()
+                beginForeground(includeMicrophone = false)
             } catch (_: RuntimeException) {
                 val message = getString(R.string.capture_error_camera)
                 CaptureRuntime.publish(CaptureState.Failed(message))
@@ -92,16 +95,35 @@ class CaptureService : Service(), LifecycleOwner {
             }
         }
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
-        val autoStopSeconds = settings.settings.value.autoStopSeconds
         scope.launch {
+            val sessionSettings = settings.snapshot()
+            val startingCapture = isStartCandidate(action)
+            if (startingCapture && sessionSettings.audioEnabled && !hasMicrophonePermission()) {
+                failPermission(startId)
+                return@launch
+            }
+            if (startingCapture && sessionSettings.audioEnabled) {
+                try {
+                    beginForeground(includeMicrophone = true)
+                } catch (_: RuntimeException) {
+                    failCamera(startId)
+                    return@launch
+                }
+            }
             if (attemptStore.hasAttempt() && CaptureRuntime.state.value !is CaptureState.Starting &&
                 CaptureRuntime.state.value !is CaptureState.Recording && CaptureRuntime.state.value !is CaptureState.Saving
             ) {
                 runCatching { attemptStore.recover(cancelStaleNotification = false) }
             }
             val state = coordinator.dispatch(CaptureRequest(id, if (action == ACTION_STOP) CaptureCommand.STOP else CaptureCommand.TOGGLE))
+            if (state is CaptureState.Recording) {
+                getSystemService(NotificationManager::class.java).notify(
+                    CaptureNotifications.NOTIFICATION_ID,
+                    CaptureNotifications.active(this@CaptureService),
+                )
+            }
             haptic(state)
-            if (state is CaptureState.Recording) scheduleAutoStop(state, autoStopSeconds)
+            if (state is CaptureState.Recording) scheduleAutoStop(state, sessionSettings.autoStopSeconds)
             if (state is CaptureState.Saved) {
                 autoStopJob?.cancel()
                 persistFinalized(state.capture)
@@ -110,39 +132,80 @@ class CaptureService : Service(), LifecycleOwner {
                         CaptureNotifications.NOTIFICATION_ID,
                         CaptureNotifications.saved(this@CaptureService, state.capture),
                     )
-                    stopForeground(STOP_FOREGROUND_DETACH)
-                } else stopForeground(STOP_FOREGROUND_REMOVE)
+                    endForeground(STOP_FOREGROUND_DETACH)
+                } else endForeground(STOP_FOREGROUND_REMOVE)
                 stopSelfResult(startId)
             } else if (state is CaptureState.Failed || state is CaptureState.Idle) {
                 autoStopJob?.cancel()
+                endForeground(STOP_FOREGROUND_REMOVE)
                 if (state is CaptureState.Failed && hasNotificationPermission()) {
                     getSystemService(NotificationManager::class.java).notify(
                         CaptureNotifications.NOTIFICATION_ID,
                         CaptureNotifications.error(this@CaptureService, userFacingFailure(state.message)),
                     )
                 }
-                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelfResult(startId)
             }
         }
         return START_NOT_STICKY
     }
 
-    private fun hasRequiredPermissions(): Boolean {
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return false
-        return !settings.settings.value.audioEnabled || checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    private fun hasCameraPermission(): Boolean =
+        checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+
+    private fun isStartCandidate(action: String?): Boolean = action == ACTION_TOGGLE && when (coordinator.state) {
+        CaptureState.Idle, is CaptureState.Failed, is CaptureState.Saved -> true
+        is CaptureState.Starting, is CaptureState.Recording, is CaptureState.Stopping, is CaptureState.Saving -> false
     }
+
+    private fun hasMicrophonePermission(): Boolean =
+        checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     private fun hasNotificationPermission(): Boolean =
         Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    private fun beginForeground() {
-        val notification = CaptureNotifications.active(this)
+    private fun beginForeground(includeMicrophone: Boolean) {
+        val notification = CaptureNotifications.starting(this)
         if (Build.VERSION.SDK_INT >= 30) {
             val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
-                if (settings.settings.value.audioEnabled) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+                if (includeMicrophone) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
             startForeground(CaptureNotifications.NOTIFICATION_ID, notification, type)
         } else startForeground(CaptureNotifications.NOTIFICATION_ID, notification)
+        foregroundStarted = true
+    }
+
+    private fun endForeground(behavior: Int) {
+        if (!foregroundStarted) return
+        stopForeground(behavior)
+        foregroundStarted = false
+    }
+
+    private fun failPermission(startId: Int) {
+        val message = getString(R.string.capture_error_permission)
+        CaptureRuntime.publish(CaptureState.Failed(message))
+        errorHaptic()
+        endForeground(STOP_FOREGROUND_REMOVE)
+        if (hasNotificationPermission()) {
+            getSystemService(NotificationManager::class.java).notify(
+                CaptureNotifications.NOTIFICATION_ID,
+                CaptureNotifications.error(this, message),
+            )
+        }
+        stopSelfResult(startId)
+    }
+
+    private fun failCamera(startId: Int) {
+        val message = getString(R.string.capture_error_camera)
+        CaptureRuntime.publish(CaptureState.Failed(message))
+        errorHaptic()
+        endForeground(STOP_FOREGROUND_REMOVE)
+        if (hasNotificationPermission()) {
+            getSystemService(NotificationManager::class.java).notify(
+                CaptureNotifications.NOTIFICATION_ID,
+                CaptureNotifications.error(this, message),
+            )
+        }
+        stopSelfResult(startId)
     }
 
     private fun haptic(state: CaptureState) {
@@ -175,17 +238,17 @@ class CaptureService : Service(), LifecycleOwner {
                         CaptureNotifications.NOTIFICATION_ID,
                         CaptureNotifications.saved(this@CaptureService, final.capture),
                     )
-                    stopForeground(STOP_FOREGROUND_DETACH)
-                } else stopForeground(STOP_FOREGROUND_REMOVE)
+                    endForeground(STOP_FOREGROUND_DETACH)
+                } else endForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             } else if (final is CaptureState.Failed || final is CaptureState.Idle) {
+                endForeground(STOP_FOREGROUND_REMOVE)
                 if (final is CaptureState.Failed && hasNotificationPermission()) {
                     getSystemService(NotificationManager::class.java).notify(
                         CaptureNotifications.NOTIFICATION_ID,
                         CaptureNotifications.error(this@CaptureService, userFacingFailure(final.message)),
                     )
                 }
-                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }

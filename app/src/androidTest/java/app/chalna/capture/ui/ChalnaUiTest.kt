@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
@@ -31,7 +32,8 @@ class ChalnaUiTest {
         val fake = FakeUiDependencies(ChalnaUiState(setupComplete = true, ready = true, reducedMotion = true))
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithContentDescription("Settings").performClick()
-        compose.onNodeWithText("Capture").assertIsDisplayed(); compose.onNodeWithText("System").assertIsDisplayed()
+        compose.onNodeWithText("Capture").assertIsDisplayed()
+        compose.onNodeWithText("System").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun galleryLongPressSelectionHasBatchActions() {

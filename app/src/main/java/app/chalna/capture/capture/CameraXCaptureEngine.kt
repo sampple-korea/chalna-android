@@ -53,7 +53,7 @@ class CameraXCaptureEngine(
     override suspend fun start(invocationId: String): Long {
         check(recording == null) { "Capture already active" }
         check(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) { "Camera permission required" }
-        val settings = CaptureSessionSettings.snapshot(settingsStore.settings.value)
+        val settings = CaptureSessionSettings.snapshot(settingsStore.snapshot())
         if (settings.audioEnabled) check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "Microphone permission required" }
         val cameraProvider = awaitProvider()
         CaptureTelemetryRegistry.mark("camera_provider_ready")
