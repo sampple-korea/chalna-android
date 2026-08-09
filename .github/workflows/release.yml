@@ -6,7 +6,7 @@ on:
       version:
         description: SemVer without the v prefix
         required: true
-        default: 1.0.0
+        default: 1.1.0
         type: string
 
 permissions:
@@ -23,18 +23,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
+      attestations: read
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ github.event.inputs.version }}
       CHALNA_KEYSTORE_PATH: ${{ github.workspace }}/.release/chalna-release.p12
+      EXPECTED_RELEASE_CERT_SHA256: E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9
     steps:
       - name: Validate version and release tooling
         shell: bash
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test "$VERSION" = "1.0.0"
+          test "$VERSION" = "1.1.0"
           gh release verify --help >/dev/null
           gh release verify-asset --help >/dev/null
           if gh release view "v$VERSION" >/dev/null 2>&1; then
@@ -73,6 +75,7 @@ jobs:
           test -n "$CHALNA_RELEASE_KEY_ALIAS"
           test -n "$CHALNA_RELEASE_KEY_PASSWORD"
           test -n "$CHALNA_RELEASE_CERT_SHA256"
+          test "$CHALNA_RELEASE_CERT_SHA256" = "$EXPECTED_RELEASE_CERT_SHA256"
           install -d -m 700 .release
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$CHALNA_KEYSTORE_PATH"
           chmod 600 "$CHALNA_KEYSTORE_PATH"
@@ -88,6 +91,11 @@ jobs:
           set -euo pipefail
           pwsh ./scripts/policy-check.ps1
           export BUILD_DATE_UTC="$(git show -s --format=%cI "$GITHUB_SHA")"
+          ./gradlew --no-daemon --stacktrace :app:dependencies | tee dependency-report.txt
+          if grep -Eqi 'androidx\.compose\.material(3)?:|com\.google\.android\.material:|material-icons-(core|extended)|androidx\.media3:media3-ui-compose-material3' dependency-report.txt; then
+            echo "Resolved dependency graph contains a forbidden Material dependency." >&2
+            exit 1
+          fi
           ./gradlew --no-daemon --stacktrace :app:lintRelease :app:testDebugUnitTest :app:assembleRelease
       - name: Validate signed APK and create metadata
         id: apk
@@ -111,6 +119,7 @@ jobs:
           grep -q 'Verified using v2 scheme.*true' <<< "$CERT_OUTPUT"
           CERT_SHA="$(sed -n 's/^.*certificate SHA-256 digest: //p' <<< "$CERT_OUTPUT" | head -1 | tr '[:lower:]' '[:upper:]')"
           test -n "$CERT_SHA"
+          test "$CERT_SHA" = "$EXPECTED_RELEASE_CERT_SHA256"
           test "$CERT_SHA" = "$CHALNA_RELEASE_CERT_SHA256"
           ! grep -qi 'Android Debug' <<< "$CERT_OUTPUT"
           APP_ID="$($APKANALYZER manifest application-id "$APK")"
@@ -120,9 +129,17 @@ jobs:
           TARGET_SDK="$($APKANALYZER manifest target-sdk "$APK")"
           test "$APP_ID" = 'app.chalna.capture'
           test "$VERSION_NAME" = "$VERSION"
-          test "$VERSION_CODE" = '1'
+          test "$VERSION_CODE" = '2'
           "$BUILD_TOOLS/aapt2" dump permissions "$APK" | tee permissions.txt
           ! grep -q 'android.permission.INTERNET' permissions.txt
+          ! grep -q 'android.permission.READ_MEDIA_VIDEO' permissions.txt
+          "$APKANALYZER" manifest print "$APK" > manifest.txt
+          ! grep -Eqi 'VisualLab|Diagnostics' manifest.txt
+          "$APKANALYZER" dex packages "$APK" > dex-packages.txt
+          ! grep -Eqi 'VisualLab|Diagnostics' dex-packages.txt
+          if test -f app/build/outputs/mapping/release/mapping.txt; then
+            ! grep -Eqi 'VisualLab|Diagnostics' app/build/outputs/mapping/release/mapping.txt
+          fi
           ! "$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'android:debuggable.*0xffffffff'
           SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
           SIZE="$(stat -c%s "$APK")"
@@ -178,7 +195,7 @@ jobs:
             "${{ steps.apk.outputs.apk }}" \
             "${{ steps.apk.outputs.checksum }}" \
             "${{ steps.apk.outputs.info }}" \
-            --draft --target "$GITHUB_SHA" --title "Chalna v$VERSION" --notes-file docs/RELEASE_NOTES_v1.0.0.md
+            --draft --target "$GITHUB_SHA" --title "Chalna v$VERSION" --notes-file docs/RELEASE_NOTES_v1.1.0.md
           test "$(gh release view "v$VERSION" --json assets --jq '.assets | length')" = '3'
           test "$(gh release view "v$VERSION" --json targetCommitish --jq .targetCommitish)" = "$GITHUB_SHA"
           test "$(gh release view "v$VERSION" --json assets --jq '[.assets[].name] | sort | join("\n")')" = "$(printf '%s\n' \
@@ -202,15 +219,35 @@ jobs:
           cd remote
           sha256sum -c "chalna-v${VERSION}-SHA256.txt"
           test "$(sha256sum "chalna-v${VERSION}-release.apk" | cut -d' ' -f1)" = "${{ steps.apk.outputs.sha }}"
-          gh release verify-asset "v$VERSION" "chalna-v${VERSION}-release.apk" --repo "$GITHUB_REPOSITORY"
-          gh release verify "v$VERSION" --repo "$GITHUB_REPOSITORY"
+          verified=false
+          for attempt in $(seq 1 12); do
+            if gh release verify-asset "v$VERSION" "chalna-v${VERSION}-release.apk" --repo "$GITHUB_REPOSITORY" && \
+               gh release verify "v$VERSION" --repo "$GITHUB_REPOSITORY"; then
+              verified=true
+              break
+            fi
+            if test "$attempt" -lt 12; then
+              echo "Immutable-release attestation not available yet (attempt $attempt/12); retrying in 10 seconds."
+              sleep 10
+            fi
+          done
+          test "$verified" = true
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
           APKANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
           REMOTE_CERT="$($BUILD_TOOLS/apksigner verify --verbose --print-certs "chalna-v${VERSION}-release.apk")"
           REMOTE_CERT_SHA="$(sed -n 's/^.*certificate SHA-256 digest: //p' <<< "$REMOTE_CERT" | head -1 | tr '[:lower:]' '[:upper:]')"
           test "$REMOTE_CERT_SHA" = '${{ steps.apk.outputs.cert_sha }}'
+          test "$REMOTE_CERT_SHA" = "$EXPECTED_RELEASE_CERT_SHA256"
           test "$($APKANALYZER manifest application-id "chalna-v${VERSION}-release.apk")" = 'app.chalna.capture'
           test "$($APKANALYZER manifest version-name "chalna-v${VERSION}-release.apk")" = "$VERSION"
+          test "$($APKANALYZER manifest version-code "chalna-v${VERSION}-release.apk")" = '2'
+          "$BUILD_TOOLS/aapt2" dump permissions "chalna-v${VERSION}-release.apk" > remote-permissions.txt
+          ! grep -q 'android.permission.INTERNET' remote-permissions.txt
+          ! grep -q 'android.permission.READ_MEDIA_VIDEO' remote-permissions.txt
+          "$APKANALYZER" manifest print "chalna-v${VERSION}-release.apk" > remote-manifest.txt
+          ! grep -Eqi 'VisualLab|Diagnostics' remote-manifest.txt
+          "$APKANALYZER" dex packages "chalna-v${VERSION}-release.apk" > remote-dex-packages.txt
+          ! grep -Eqi 'VisualLab|Diagnostics' remote-dex-packages.txt
       - name: Remove failed draft release
         if: failure()
         shell: bash

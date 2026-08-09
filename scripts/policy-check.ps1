@@ -7,6 +7,7 @@ function Add-Failure([string]$message) { $failures.Add($message) }
 $manifest = Get-Content -Raw (Join-Path $root "app/src/main/AndroidManifest.xml")
 $forbiddenPermissions = @(
   "android.permission.INTERNET",
+  "android.permission.READ_MEDIA_VIDEO",
   "android.permission.ACCESS_FINE_LOCATION",
   "android.permission.ACCESS_COARSE_LOCATION",
   "android.permission.READ_CONTACTS",
@@ -32,7 +33,8 @@ $forbiddenDependencies = @(
   "androidx.compose.material3:",
   "com.google.android.material:",
   "material-icons-core",
-  "material-icons-extended"
+  "material-icons-extended",
+  "androidx.media3:media3-ui-compose-material3"
 )
 foreach ($dependency in $forbiddenDependencies) {
   if ($gradleText.Contains($dependency)) { Add-Failure "Forbidden dependency: $dependency" }
@@ -47,6 +49,14 @@ foreach ($file in $mainSources) {
   }
   if ($file.Extension -in @('.kt', '.java') -and $text -match '(?i)\bTODO\b|\bFIXME\b|lorem ipsum|coming soon') {
     Add-Failure "Unfinished production marker: $($file.FullName)"
+  }
+  if ($text -match '(?i)\bVisualLab(?:Activity|Screen|Route|Panel)?\b') {
+    Add-Failure "Production VisualLab reference is forbidden: $($file.FullName)"
+  }
+  $diagnosticsUi = $text -match '(?i)\bDiagnostics(?:Activity|Screen|Route|Panel)\b|["'']diagnostics["'']'
+  if ($file.Extension -eq '.xml') { $diagnosticsUi = $diagnosticsUi -or $text -match '(?i)>\s*Diagnostics\s*<' }
+  if ($diagnosticsUi) {
+    Add-Failure "Production Diagnostics UI/component reference is forbidden: $($file.FullName)"
   }
 }
 
@@ -79,4 +89,3 @@ if ($failures.Count -gt 0) {
   exit 1
 }
 Write-Output "Policy checks passed."
-

@@ -28,4 +28,4 @@ Chalna uses the Noto Sans Korean variable family from Google Fonts for consisten
 
 ## Validation
 
-The API 34 instrumentation suite verifies custom-control semantics and navigation and renders deterministic day/night, setup, state, settings, diagnostics, help, and privacy captures. `docs/screenshots/home-ready-night.png` is the canonical inspected result. Spoken TalkBack order, 200% system font, RTL, and physical-display contrast remain in the device plan rather than being inferred from screenshots.
+The API 34 instrumentation suite verifies custom-control semantics and navigation and renders deterministic day/night, setup, capture state, settings, gallery, player-glow, icon, help, and privacy captures. CI requires non-empty PNGs whose names identify gallery, glow, and icon coverage. Existing committed screenshots remain v1.0.0 evidence until replacement v1.1.0 artifacts are inspected. Spoken TalkBack order, 200% system font, RTL, and physical-display contrast remain in the device plan rather than being inferred from screenshots.

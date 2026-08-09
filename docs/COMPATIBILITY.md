@@ -2,7 +2,7 @@
 
 ## Supported baseline
 
-Android 10/API 29 and newer; target/compile API 36. A rear camera is required. Microphone is optional when audio is disabled. Phones are the primary form factor; tablets/foldables should remain usable but Assistant affordances may differ. Android TV, Automotive, Wear OS, ChromeOS, and managed-device support are not claimed.
+Android 10/API 29 and newer; target API 36, compile API 37.1. A rear camera is required. Microphone is optional when audio is disabled. Phones are the primary form factor; tablets/foldables should remain usable but Assistant affordances may differ. Android TV, Automotive, Wear OS, ChromeOS, and managed-device support are not claimed.
 
 ## Platform behavior
 
@@ -12,7 +12,9 @@ Android 10/API 29 and newer; target/compile API 36. A rear camera is required. M
 | API 33 | Runtime notification permission | denied notification visibility and stop recovery |
 | API 34–36 | camera/microphone FGS types and while-in-use restrictions | valid Assistant-trigger exemption/path, start timing |
 | Keyguard | system may call keyguard Assistant entry point | OEM support, strong-auth state, no unlock/bypass |
-| MediaStore | scoped shared-media output | gallery visibility, finalize, deletion, storage-full behavior |
+| Device Gallery | scoped MediaStore output under `Movies/Chalna` without `READ_MEDIA_VIDEO` | visibility, finalize, deletion, storage-full behavior |
+| Chalna Vault | app-private local file output | finalize, URI grants, export/share/delete, clear-data/uninstall behavior |
+| Media3 1.11.0 | local indexed content playback | codecs, seek/duration, lifecycle/surface release, audio focus |
 | CameraX quality | select supported rear-camera profile | fallback order, encoder failures, lens availability |
 
 API 37 behavior is outside the v1 production target and requires later validation.

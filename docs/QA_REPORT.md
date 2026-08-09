@@ -2,6 +2,10 @@
 
 Report date: 2026-08-09. Android compilation and tests ran only on GitHub-hosted runners, per repository policy.
 
+## v1.1.0 status
+
+Current source targets v1.1.0/version code 2. Its gallery, Chalna Vault, local Media3 player, Diagnostics/VisualLab removal, gallery/glow/icon screenshots, signing continuity, APK policy, and immutable-release verification are **Pending verification**. The evidence below is the immutable v1.0.0 baseline and must not be presented as proof of v1.1.0.
+
 ## Remote evidence
 
 | Area | Result | Evidence |
@@ -16,7 +20,7 @@ Report date: 2026-08-09. Android compilation and tests ran only on GitHub-hosted
 | Install/launch smoke | Pass | same API 34 emulator run; application process verified |
 | Visual review | Pass after deliberate refinement | downloaded artifact `ui-qa-api-34-31311630522`; five selected PNGs committed under `docs/screenshots/` |
 
-The final release commit must repeat Android CI and UI QA. APK signing, alignment, package/version, merged-permission, immutable-release, re-download, checksum, and signature evidence is emitted by `.github/workflows/release.yml` into the immutable Release and `chalna-v1.0.0-build-info.json` asset.
+The v1.1.0 release commit must repeat Android CI and UI QA. APK signing, alignment, package/version, merged-permission, immutable-release, re-download, checksum, and signature evidence is emitted by `.github/workflows/release.yml` into the immutable Release and `chalna-v1.1.0-build-info.json` asset.
 
 ## Visual findings and fixes
 
@@ -24,7 +28,7 @@ The first rendered pass showed an all-cool recording action, a cool error ring, 
 
 ## Source/security audit
 
-- Manifest contains no `INTERNET`, location, contacts, SMS, call-log, broad-storage, overlay, accessibility-service, or boot-start permission/receiver.
+- v1.0.0 manifest contains no `INTERNET`, location, contacts, SMS, call-log, broad-storage, overlay, accessibility-service, or boot-start permission/receiver. v1.1.0 additionally requires proof that `READ_MEDIA_VIDEO` is absent.
 - Material 2/3, Google Material, Material icon, and ripple imports/dependencies are blocked by CI policy.
 - Camera provider acquisition, binding, Recorder preparation, and audio enablement occur only after an explicit service dispatch. No pre-capture, pre-buffer, camera warm-up, persistent binding, or hidden notification path was found.
 - Voice assist structures/screenshots are ignored. Components are non-exported unless the Android voice-interaction contract requires system binding.
@@ -32,4 +36,4 @@ The first rendered pass showed an all-cool recording action, a cool error ring, 
 
 ## Physical-device-only validation
 
-No physical Android device was connected. The following are implemented but not claimed as physically verified: OEM power-button/gesture routing, locked screen-on/off delivery, real rear-camera/audio encoding, privacy indicators, gallery playback/orientation, camera-busy/low-storage behavior, Assistant-to-CameraX start latency, thermal/battery behavior, 90/120 Hz frame pacing, and TalkBack spoken output. Follow `docs/DEVICE_TEST_PLAN.md` before declaring a specific model supported.
+No physical Android device was connected. The following are not claimed as physically verified: OEM power-button/gesture routing, locked screen-on/off delivery, real rear-camera/audio encoding, privacy indicators, Device Gallery/Vault behavior, in-app playback, share/export/delete grants, camera-busy/low-storage behavior, Assistant-to-CameraX start latency, thermal/battery behavior, 90/120 Hz frame pacing, and TalkBack spoken output. Follow `docs/DEVICE_TEST_PLAN.md` before declaring a specific model supported.

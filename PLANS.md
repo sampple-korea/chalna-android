@@ -1,66 +1,40 @@
-# Chalna v1.0.0 execution record
+# Chalna v1.1.0 second-pass plan
 
-## Product goal
+## Goal
 
-Ship a private, signed, immutable GitHub Release of an Android 10+ app that turns the selected system Assistant invocation into a visible local-only CameraX video recording toggle. No pre-capture and no network permission.
+Prepare a private, signed, immutable v1.1.0 update that adds local capture management and playback without expanding sensor triggers, network access, or broad media permissions. The package remains `app.chalna.capture`; the update is version name `1.1.0`, version code `2`.
 
-## Current state
+## Baseline
 
-- GitHub owner authenticated as `sampple-korea`.
-- Private repository created: `sampple-korea/chalna-android`.
-- Official platform and library documentation reviewed on 2026-08-09.
-- Production implementation is complete. Android CI `31311630513` and UI QA `31311630522` are green for commit `3c8f06b90056f7eb24ac2417cf695968c2fa6f3c`; the final documentation/release-workflow commit must pass the same gates before publication.
+- Immutable v1.0.0 was published from commit `80dc98ccdc2587812e99270928531b6d40972be8` with package `app.chalna.capture`, version code `1`, and signer SHA-256 `E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9`.
+- v1.1.0 must remain installable as an update by preserving both application ID and signing identity.
+- Android compilation, dependency resolution, tests, emulator work, APK inspection, and release packaging run only on GitHub-hosted CI.
 
-## Decisions
+## Second-pass scope
 
-- Application ID: `app.chalna.capture`; version `1.0.0` (`1`).
-- `minSdk 29`, `compileSdk 37.1`, `targetSdk 36`; current stable AndroidX requires API 37 compilation while target 36 avoids Android 17 behavior opt-in before physical-device validation.
-- AGP 9.3.1, Gradle 9.5.0, built-in Kotlin 2.3.21, JDK 17 bytecode.
-- Compose BOM 2026.06.00; Foundation-only custom design system.
-- CameraX 1.6.1 Recorder with `MediaStoreOutputOptions`; rear camera; no Preview use case.
-- Single `app` module. Explicit coordinator/engine seams without a DI framework.
-- Voice Interaction components are system-bound; recording service is not exported.
-- Settings use DataStore Preferences and an in-memory `StateFlow` cache.
-- Diagnostics retain only bounded metadata; never assist structure, screenshots, media contents, account, location, or foreground-app identity.
-- CI uses GitHub-hosted runners exclusively for Android compilation, unit tests, lint, instrumentation, screenshots, and packaging.
+1. Replace the production Diagnostics and VisualLab surfaces with capture-library navigation and tests.
+2. Add a local capture index, filtering, selection, deletion, sharing/export actions, and an in-app local player.
+3. Offer two explicit storage destinations:
+   - **Device Gallery:** writes into Android MediaStore under `Movies/Chalna`; other authorized gallery/backup applications may see it.
+   - **Chalna Vault:** writes into Chalna's app-private local storage; it is not a claim of encryption and is removed with app data/uninstall unless exported first.
+4. Use stable AndroidX Media3 1.11.0 only through `media3-exoplayer` and the non-Material `media3-ui-compose` module. Do not add streaming modules, network stacks, Media3 Material 3 UI, media sessions, downloads, or ads.
+5. Refine gallery, playback glow, and custom icon states while retaining the Foundation-only design system.
+6. Keep capture cold until an Assistant invocation or notification action; browsing and playback of already-saved files must not bind camera or microphone.
 
-## Implementation stages
+## Policy and verification
 
-1. Repository policy, product/UX/architecture documentation, Android scaffold.
-2. Voice interaction, foreground capture service, CameraX Recorder, MediaStore, notification, haptic, state machine.
-3. Setup, Home, settings, diagnostics, help/privacy, custom visuals, motion, accessibility, localization.
-4. Unit, UI, screenshot, policy, lint, formatting, static-analysis tests.
-5. Remote CI correction loop, screenshot inspection, deliberate design refinement.
-6. Signing secrets, release build, APK validation, immutable release, remote re-download verification.
+- Forbid `INTERNET`, `READ_MEDIA_VIDEO`, broad storage, unrelated permissions, Material libraries/icons/ripple, production Diagnostics, and VisualLab.
+- Assert non-empty JVM test XML with zero failures/errors and archive it from Android CI.
+- Require UI QA to export non-empty gallery, glow, and icon PNGs in addition to instrumentation reports.
+- Build a minified signed release and inspect alignment, signature schemes, package, version, SDKs, debuggable state, forbidden permissions, and absence of Diagnostics/VisualLab in the manifest, DEX package listing, and R8 mapping.
+- Pin signer continuity to the verified v1.0.0 fingerprint as well as the protected repository secret.
+- Publish exactly three versioned assets, then re-download and independently recheck checksum, signature, package, version code, permissions, and forbidden production surfaces.
+- Grant the release job only `contents: write` and `attestations: read`, then retry immutable-release verification for at most 12 attempts with 10-second intervals to tolerate bounded GitHub attestation propagation; fail if verification remains unavailable.
 
-## Test strategy
+## Exit criteria
 
-- JVM tests cover command serialization, transition legality, deduplication, readiness, timing statistics, quality fallback, filenames, and recovery.
-- Instrumentation covers setup/navigation/state rendering/settings/semantics/large-font themes.
-- Deterministic screenshot states run on a fixed API/device/locale configuration and publish PNG artifacts for manual inspection.
-- Scripts fail on forbidden Material imports/dependencies, forbidden permissions, pre-capture patterns, dynamic versions, placeholders, secrets, signing files, and unpinned actions.
+- Android CI and UI QA are green for the exact release commit and their artifacts are inspected.
+- Release workflow logs and downloaded assets prove package/signing continuity, version code `2`, checksum integrity, and immutable-release verification.
+- Device Gallery and Chalna Vault recording, playback, export/share/delete, OEM Assistant invocation, keyguard delivery, hardware latency, thermal/battery behavior, and accessibility remain explicitly unverified until corresponding CI or physical-device evidence exists.
 
-## CI failures and fixes
-
-- API 37.1 was required by current stable AndroidX; CI installation was corrected from API 37 to 37.1.
-- Voice-interaction metadata, target-SDK lint, icon resources, and Canvas allocation warnings were corrected from complete CI logs.
-- Emulator images initially failed for disk capacity; runner space reclamation and a 2 GiB userdata partition fixed creation.
-- Runners without KVM exposed slow/offline installs; KVM access is enabled when available with a software fallback.
-- Raw `am instrument` returned process success despite one failed screenshot; UI QA now uses `connectedDebugAndroidTest` and separately asserts `OK`/absence of `FAILURES!!!` for screenshot export.
-- Screenshot cold-capture redraw was retried once; the final 15-state capture suite is green.
-
-## Design review
-
-UI QA artifact `ui-qa-api-34-31311630522` was downloaded and inspected at original resolution. The first pass exposed an overly cool recording action, cool error Aura, weak default settings, and incorrect variable-font axis selection. Refinement added state-specific warm/error spectra, a solid coral stop action, Auto/audio-on defaults, explicit font axes, stronger Korean/Latin weight, a five-step setup flow, and expanded screenshot coverage. The second artifact was inspected before committing five final captures in `docs/screenshots/`.
-
-## Release readiness
-
-The user-provided PKCS#12 signing source was parsed as a `PrivateKeyEntry`; alias, century-long certificate validity, RSA-4096 key, and SHA-256 certificate fingerprint were verified without committing the key. Five separate `CHALNA_RELEASE_*` secrets are configured. Repository immutable releases are enabled. The release workflow builds, validates, emulator-smokes, creates a complete draft, publishes it, re-downloads all assets, verifies checksum/signature/package/version, and runs GitHub release/asset integrity verification.
-
-## Verification results
-
-Source/CI/UI evidence is recorded in `docs/QA_REPORT.md`. Final APK-specific evidence is intentionally generated into the immutable `chalna-v1.0.0-build-info.json` release asset, because an APK hash and release run ID cannot be embedded into the source commit that produces them without changing that artifact.
-
-## Remaining blockers
-
-None confirmed. Physical-device-only OEM invocation, lock-screen delivery, hardware latency, heat, battery, and high-refresh-rate checks will remain explicitly unverified unless a device becomes available.
+No v1.1.0 completion, test, signing, or publication claim is valid before those artifacts are inspected.

@@ -78,6 +78,16 @@ jobs:
             ! grep -q 'FAILURES!!!' screenshot-instrumentation.txt
             mkdir -p ui-screenshots
             adb pull /sdcard/Android/data/app.chalna.capture.debug/files/screenshots/. ui-screenshots/ || true
+            for screenshot in \
+              gallery-night.png gallery-selection-night.png \
+              glow-start-000-night.png glow-start-016-night.png glow-start-034-night.png \
+              glow-start-050-night.png glow-start-078-night.png glow-stop-050-mist.png \
+              glow-error-050-night.png icon-mask-circle.png icon-mask-squircle.png icon-mask-square.png; do
+              test -n "$(find ui-screenshots -type f -name "$screenshot" -size +0c -print -quit)" || {
+                echo "Required screenshot artifact is missing or empty: $screenshot" >&2
+                exit 1
+              }
+            done
             adb shell am start -W -n app.chalna.capture.debug/app.chalna.capture.MainActivity
             adb shell pidof app.chalna.capture.debug
       - name: Upload UI reports and screenshots

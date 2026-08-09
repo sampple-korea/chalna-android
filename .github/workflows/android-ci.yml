@@ -46,8 +46,30 @@ jobs:
       - name: Static source analysis
         shell: pwsh
         run: ./scripts/static-analysis.ps1
-      - name: Dependency verification and Android checks
-        run: ./gradlew --no-daemon --stacktrace :app:dependencies :app:lintRelease :app:testDebugUnitTest :app:assembleDebug
+      - name: Resolve and inspect dependency graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --stacktrace :app:dependencies | tee dependency-report.txt
+          if grep -Eqi 'androidx\.compose\.material(3)?:|com\.google\.android\.material:|material-icons-(core|extended)|androidx\.media3:media3-ui-compose-material3' dependency-report.txt; then
+            echo "Resolved dependency graph contains a forbidden Material dependency." >&2
+            exit 1
+          fi
+      - name: Android lint, unit tests, and debug APK
+        run: ./gradlew --no-daemon --stacktrace :app:lintRelease :app:testDebugUnitTest :app:assembleDebug
+      - name: Verify unit-test result artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t results < <(find app/build/test-results/testDebugUnitTest -type f -name 'TEST-*.xml' -size +0c -print)
+          test "${#results[@]}" -gt 0
+          test -s app/build/test-results/testDebugUnitTest/TEST-app.chalna.capture.data.CaptureIndexTest.xml
+          test -s app/build/test-results/testDebugUnitTest/TEST-app.chalna.capture.domain.GalleryModelsTest.xml
+          test -s app/build/test-results/testDebugUnitTest/TEST-app.chalna.capture.gallery.GalleryRepositoryTest.xml
+          if grep -E -q '(failures|errors)="[1-9][0-9]*"' "${results[@]}"; then
+            echo "Unit-test XML reports contain failures or errors." >&2
+            exit 1
+          fi
       - name: Upload reports and debug APK
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -57,4 +79,6 @@ jobs:
           retention-days: 14
           path: |
             app/build/reports/
+            app/build/test-results/testDebugUnitTest/
             app/build/outputs/apk/debug/*.apk
+            dependency-report.txt
