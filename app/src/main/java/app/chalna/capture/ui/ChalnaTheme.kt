@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontVariation
 import app.chalna.capture.R
 
 @Immutable
@@ -42,8 +43,8 @@ object ChalnaTheme {
 }
 
 val ChalnaFontFamily = FontFamily(
-    Font(R.font.noto_sans_kr_variable, FontWeight.Normal),
-    Font(R.font.noto_sans_kr_variable, FontWeight.Medium),
-    Font(R.font.noto_sans_kr_variable, FontWeight.SemiBold),
-    Font(R.font.noto_sans_kr_variable, FontWeight.Bold),
+    Font(R.font.noto_sans_kr_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+    Font(R.font.noto_sans_kr_variable, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
+    Font(R.font.noto_sans_kr_variable, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
+    Font(R.font.noto_sans_kr_variable, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
 )

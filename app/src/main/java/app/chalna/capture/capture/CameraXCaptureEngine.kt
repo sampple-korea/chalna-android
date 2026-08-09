@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.DynamicRange
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
@@ -17,6 +18,7 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import android.view.WindowManager
 import app.chalna.capture.data.SettingsStore
 import app.chalna.capture.domain.CaptureEngine
 import app.chalna.capture.domain.CaptureFileNames
@@ -52,6 +54,10 @@ class CameraXCaptureEngine(
             CaptureQuality.AUTO, CaptureQuality.FHD -> listOf(Quality.FHD, Quality.HD, Quality.SD)
             CaptureQuality.HD -> listOf(Quality.HD, Quality.SD, Quality.FHD)
         }
+        val supported = Recorder.getVideoCapabilities(cameraProvider.getCameraInfo(selector))
+            .getSupportedQualities(DynamicRange.SDR)
+        val effectiveQuality = qualities.firstOrNull(supported::contains) ?: supported.firstOrNull()
+            ?: error("No stable video quality is available")
         val recorder = Recorder.Builder().setQualitySelector(
             QualitySelector.fromOrderedList(
                 qualities.distinct(),
@@ -59,6 +65,7 @@ class CameraXCaptureEngine(
             ),
         ).build()
         val video = VideoCapture.withOutput(recorder)
+        video.targetRotation = currentDisplayRotation()
         cameraProvider.unbindAll()
         cameraProvider.bindToLifecycle(lifecycleOwner, selector, video)
         CaptureRuntime.record("camera_bind_complete")
@@ -92,7 +99,7 @@ class CameraXCaptureEngine(
                                 System.currentTimeMillis() - startedAt,
                                 startedAt,
                                 displayName,
-                                settings.preferredQuality,
+                                effectiveQuality.toCaptureQuality(),
                                 settings.audioEnabled,
                             ),
                         )
@@ -121,6 +128,15 @@ class CameraXCaptureEngine(
         recording?.close()
         recording = null
         provider?.unbindAll()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun currentDisplayRotation(): Int =
+        context.getSystemService(WindowManager::class.java).defaultDisplay.rotation
+
+    private fun Quality.toCaptureQuality(): CaptureQuality = when (this) {
+        Quality.FHD -> CaptureQuality.FHD
+        else -> CaptureQuality.HD
     }
 
     private suspend fun awaitProvider(): ProcessCameraProvider = provider ?: suspendCoroutine { continuation ->
