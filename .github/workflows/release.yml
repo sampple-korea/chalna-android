@@ -21,7 +21,7 @@ jobs:
     name: Build, verify, publish, re-download
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     permissions:
       contents: write
     env:
@@ -140,6 +140,34 @@ jobs:
           echo "info=$INFO" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "cert_sha=$CERT_SHA" >> "$GITHUB_OUTPUT"
+      - name: Reclaim runner space for release smoke test
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk/ndk /usr/share/dotnet /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Enable KVM access for release smoke test
+        run: |
+          if test -e /dev/kvm; then
+            echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger --name-match=kvm
+            test -r /dev/kvm -a -w /dev/kvm
+          else
+            echo "KVM is unavailable; using the emulator software fallback."
+          fi
+      - name: Install and launch signed release APK
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_2
+          target: aosp_atd
+          disk-size: 2048M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          script: |
+            adb install -r "${{ steps.apk.outputs.apk }}"
+            adb shell am start -W -n app.chalna.capture/app.chalna.capture.MainActivity
+            test -n "$(adb shell pidof app.chalna.capture)"
       - name: Create complete draft release
         shell: bash
         run: |

@@ -9,7 +9,7 @@ Ship a private, signed, immutable GitHub Release of an Android 10+ app that turn
 - GitHub owner authenticated as `sampple-korea`.
 - Private repository created: `sampple-korea/chalna-android`.
 - Official platform and library documentation reviewed on 2026-08-09.
-- Implementation in progress. No build, test, screenshot, APK, or release claim is valid yet.
+- Production implementation is complete. Android CI `31311630513` and UI QA `31311630522` are green for commit `3c8f06b90056f7eb24ac2417cf695968c2fa6f3c`; the final documentation/release-workflow commit must pass the same gates before publication.
 
 ## Decisions
 
@@ -42,19 +42,24 @@ Ship a private, signed, immutable GitHub Release of an Android 10+ app that turn
 
 ## CI failures and fixes
 
-None yet; workflows have not run.
+- API 37.1 was required by current stable AndroidX; CI installation was corrected from API 37 to 37.1.
+- Voice-interaction metadata, target-SDK lint, icon resources, and Canvas allocation warnings were corrected from complete CI logs.
+- Emulator images initially failed for disk capacity; runner space reclamation and a 2 GiB userdata partition fixed creation.
+- Runners without KVM exposed slow/offline installs; KVM access is enabled when available with a software fallback.
+- Raw `am instrument` returned process success despite one failed screenshot; UI QA now uses `connectedDebugAndroidTest` and separately asserts `OK`/absence of `FAILURES!!!` for screenshot export.
+- Screenshot cold-capture redraw was retried once; the final 15-state capture suite is green.
 
 ## Design review
 
-Pending first rendered screenshot artifact. Release is prohibited before at least one documented refinement pass.
+UI QA artifact `ui-qa-api-34-31311630522` was downloaded and inspected at original resolution. The first pass exposed an overly cool recording action, cool error Aura, weak default settings, and incorrect variable-font axis selection. Refinement added state-specific warm/error spectra, a solid coral stop action, Auto/audio-on defaults, explicit font axes, stronger Korean/Latin weight, a five-step setup flow, and expanded screenshot coverage. The second artifact was inspected before committing five final captures in `docs/screenshots/`.
 
 ## Release readiness
 
-Signing source exists outside the repository at the user-provided Desktop location, but alias/certificate metadata and GitHub secrets are not yet verified. Immutable release is not yet enabled. No tag or release exists.
+The user-provided PKCS#12 signing source was parsed as a `PrivateKeyEntry`; alias, century-long certificate validity, RSA-4096 key, and SHA-256 certificate fingerprint were verified without committing the key. Five separate `CHALNA_RELEASE_*` secrets are configured. Repository immutable releases are enabled. The release workflow builds, validates, emulator-smokes, creates a complete draft, publishes it, re-downloads all assets, verifies checksum/signature/package/version, and runs GitHub release/asset integrity verification.
 
 ## Verification results
 
-Pending.
+Source/CI/UI evidence is recorded in `docs/QA_REPORT.md`. Final APK-specific evidence is intentionally generated into the immutable `chalna-v1.0.0-build-info.json` release asset, because an APK hash and release run ID cannot be embedded into the source commit that produces them without changing that artifact.
 
 ## Remaining blockers
 

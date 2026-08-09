@@ -1,39 +1,35 @@
 # QA report
 
-Report date: 2026-08-09. Documentation/source inspection only. No local Android build was run, in accordance with repository policy. No CI log, test report, screenshot, device run, APK, signature, checksum, or release asset has been inspected.
+Report date: 2026-08-09. Android compilation and tests ran only on GitHub-hosted runners, per repository policy.
 
-## Source-verified facts
+## Remote evidence
 
-| Check | Evidence | Status |
+| Area | Result | Evidence |
 |---|---|---|
-| Application/SDK metadata | `app/build.gradle.kts`: `app.chalna.capture`, 1.0.0 (1), min 29, target/compile 36 | Verified by source inspection |
-| Toolchain declarations | version catalog/build files: AGP 9.3.1, Gradle 9.5.0, Kotlin 2.3.21, Compose BOM 2026.06.00, CameraX 1.6.1 | Verified by source inspection only |
-| Manifest network permission | no `android.permission.INTERNET`; cleartext disabled | Verified by source inspection only |
-| Component boundary | capture service non-exported; voice services require `BIND_VOICE_INTERACTION` | Verified by source inspection only |
-| Coordinator model | serialized states and bounded invocation-ID dedupe visible in source | Verified by source inspection only |
+| Policy and dependency audit | Pass | Android CI [31311630513](https://github.com/sampple-korea/chalna-android/actions/runs/31311630513) |
+| Formatting and static analysis | Pass | same run; repository scripts returned success |
+| Android Lint | Pass, warnings-as-errors | same run; downloaded `lint-results-release` reports inspected |
+| JVM tests | 13 passed, 0 failed, 0 skipped | downloaded `testDebugUnitTest` HTML from run 31311630513 |
+| Debug APK | Built and archived | `android-ci-31311630513` artifact |
+| Instrumentation | 18 passed | UI QA [31311630522](https://github.com/sampple-korea/chalna-android/actions/runs/31311630522), API 34 AOSP ATD |
+| Screenshot suite | 15 passed independently | same run; instrumentation log ended `OK (15 tests)` and contained no failure marker |
+| Install/launch smoke | Pass | same API 34 emulator run; application process verified |
+| Visual review | Pass after deliberate refinement | downloaded artifact `ui-qa-api-34-31311630522`; five selected PNGs committed under `docs/screenshots/` |
 
-Source inspection does not prove runtime behavior, resolved dependencies, merged manifest, packaged APK contents, or policy compliance.
+The final release commit must repeat Android CI and UI QA. APK signing, alignment, package/version, merged-permission, immutable-release, re-download, checksum, and signature evidence is emitted by `.github/workflows/release.yml` into the immutable Release and `chalna-v1.0.0-build-info.json` asset.
 
-## Pending verification ledger
+## Visual findings and fixes
 
-| Area | Required evidence | Result / evidence link |
-|---|---|---|
-| Policy scan | forbidden permissions/dependencies/imports/pre-capture patterns; secrets/dynamic versions | Pending verification |
-| Debug/release compile | full GitHub Actions logs and commit SHA | Pending verification |
-| JVM tests | report and test counts/failures | Pending verification |
-| Lint/static analysis | complete logs and reports | Pending verification |
-| Instrumentation | API/device/locale configuration and report | Pending verification |
-| UI screenshots | artifact manifest plus visual review, including `home-ready-night.png` | Pending verification |
-| Accessibility | semantics, TalkBack, focus, contrast, 200% font, RTL | Pending verification |
-| No-pre-capture invariant | instrumented lifecycle traces and physical privacy indicators | Pending verification |
-| Camera/audio/MediaStore | start/stop/finalize/error and playable output | Pending verification |
-| Keyguard/OEM | completed device matrix | Pending verification |
-| Long-run performance | thermal, battery, frame/finalize reliability | Pending verification |
-| Release APK | metadata, merged permissions, exported components, debuggable/minification | Pending verification |
-| Signing | `apksigner verify --verbose --print-certs` and expected certificate fingerprint | Pending verification |
-| Integrity | CI and downloaded-asset SHA-256 match | Pending verification |
-| GitHub release | private immutable release/tag/commit/asset API inspection | Pending verification |
+The first rendered pass showed an all-cool recording action, a cool error ring, default screenshot settings inconsistent with product defaults, and a variable font rendered at its thin default axis. The refinement pass introduced recording rose/coral energy, amber/coral error Aura, a solid stop control, Auto quality/audio-on defaults, explicit Noto Sans Korean weight axes, a five-step setup flow, and a 15-state screenshot matrix. Night and Mist were then re-rendered and inspected for hierarchy, wrapping, contrast, glow intensity, system insets, icon weight, and clipping.
 
-## Decision
+## Source/security audit
 
-Release readiness: **Not established — Pending verification**. Update each row with immutable evidence; do not replace “Pending verification” with Pass based only on source review or workflow configuration.
+- Manifest contains no `INTERNET`, location, contacts, SMS, call-log, broad-storage, overlay, accessibility-service, or boot-start permission/receiver.
+- Material 2/3, Google Material, Material icon, and ripple imports/dependencies are blocked by CI policy.
+- Camera provider acquisition, binding, Recorder preparation, and audio enablement occur only after an explicit service dispatch. No pre-capture, pre-buffer, camera warm-up, persistent binding, or hidden notification path was found.
+- Voice assist structures/screenshots are ignored. Components are non-exported unless the Android voice-interaction contract requires system binding.
+- Final audit fixes added live prerequisite reconciliation, microphone-gated audio enablement, stale MediaStore validation, timeout/finalize cleanup, and step-scoped release secrets.
+
+## Physical-device-only validation
+
+No physical Android device was connected. The following are implemented but not claimed as physically verified: OEM power-button/gesture routing, locked screen-on/off delivery, real rear-camera/audio encoding, privacy indicators, gallery playback/orientation, camera-busy/low-storage behavior, Assistant-to-CameraX start latency, thermal/battery behavior, 90/120 Hz frame pacing, and TalkBack spoken output. Follow `docs/DEVICE_TEST_PLAN.md` before declaring a specific model supported.

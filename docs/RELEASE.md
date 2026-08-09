@@ -1,57 +1,46 @@
-# Release runbook
+# Release record and verification
 
-Android work runs in GitHub Actions, never on the local PC. A configured workflow is not evidence of a successful release; inspect logs and artifacts from the exact commit.
+Android work runs in GitHub Actions, never on the local PC. The `v1.0.0` workflow executes from the exact `main` commit with `contents: write` only in the release job; ordinary CI is read-only.
 
-## Preconditions
+## Signing
 
-- Version/changelog/product/privacy/security documents reviewed.
-- Protected release environment and least-privilege workflow permissions configured.
-- PKCS#12 keystore and passwords stored only as GitHub secrets; expected alias and SHA-256 certificate fingerprint recorded out of repository.
-- Actions pinned, dependency versions fixed, private-repository visibility confirmed, and immutable Releases enabled where available.
-- Device-test and QA blockers explicitly accepted or closed; no undocumented “pass.”
+The dedicated user-provided PKCS#12 key is stored outside the repository. Local inspection verified alias `dev-siro`, `PrivateKeyEntry`, RSA-4096, certificate validity through 2126, and the expected SHA-256 certificate fingerprint. The workflow receives five independently stored secrets:
 
-## CI verification
+- `CHALNA_RELEASE_KEYSTORE_B64`
+- `CHALNA_RELEASE_STORE_PASSWORD`
+- `CHALNA_RELEASE_KEY_ALIAS`
+- `CHALNA_RELEASE_KEY_PASSWORD`
+- `CHALNA_RELEASE_CERT_SHA256`
 
-Trigger the release candidate workflow at an immutable commit. Inspect every job log, not only the green summary. Required jobs: policy scans; clean release build; JVM tests; lint/static analysis; instrumentation; deterministic UI screenshots; packaging/signing. Download reports and artifacts, record run URL/ID, workflow commit SHA, runner image, tool versions, test counts, and artifact retention.
+Passwords are step-scoped, the restored file is mode `0600`, the certificate digest must equal the pinned expected value, and signing material is removed with `if: always()`.
 
-## Artifact verification
+## Candidate evidence
 
-On a disposable verification environment, inspect the downloaded candidate with Android SDK tools:
+- Android CI: [run 31311630513](https://github.com/sampple-korea/chalna-android/actions/runs/31311630513), pass.
+- UI QA: [run 31311630522](https://github.com/sampple-korea/chalna-android/actions/runs/31311630522), pass.
+- Screenshots: artifact `ui-qa-api-34-31311630522`, 15 PNG states; final selected images committed.
+- Repository visibility and immutable-release setting were re-read through GitHub CLI/API before release preparation.
 
-```text
-sha256sum chalna-1.0.0.apk
-apksigner verify --verbose --print-certs chalna-1.0.0.apk
-aapt2 dump badging chalna-1.0.0.apk
-apkanalyzer manifest permissions chalna-1.0.0.apk
-apkanalyzer manifest print chalna-1.0.0.apk
-apkanalyzer files list chalna-1.0.0.apk
-```
+## Release transaction
 
-Confirm package `app.chalna.capture`, version 1.0.0/1, min 29, target 36, expected signer fingerprint, no debug/test flags, no `INTERNET` or unrelated permission, correct exported/protected components, expected FGS types, no signing files/secrets, and reasonable contents. Install that exact hash on test devices; complete smoke, permission, keyguard, start/stop/finalize, notification, and no-pre-trigger sensor checks.
+`.github/workflows/release.yml` validates SemVer and `gh release verify*` capability, checks that the release does not already exist, restores/validates signing identity, runs policy/lint/release unit tests, and builds a minified signed APK. It then verifies zip alignment, APK signature schemes, non-debug certificate, expected certificate fingerprint, package, version name/code, min/target SDK, debuggable state, and forbidden permissions. The exact signed APK is installed and launched on an API 34 emulator before publication.
 
-## Publish and independently verify
+The workflow creates a draft containing exactly these nonempty assets:
 
-Create tag `v1.0.0` at the verified commit without rewriting history. Create a private GitHub Release, attach only the verified signed APK/checksum/notices, and publish accurate limitations. Re-download the asset through the GitHub release/API, recompute SHA-256, rerun signature/metadata inspection, and confirm repository visibility, tag target, asset size/name/content type, release state, and immutability. A mismatch blocks release.
+- `chalna-v1.0.0-release.apk`
+- `chalna-v1.0.0-SHA256.txt`
+- `chalna-v1.0.0-build-info.json`
 
-## Pending release record
+Only after asset names/count/sizes and target commit pass does it publish. Repository immutable releases were enabled before this transaction. After publication, it re-downloads the assets, checks SHA-256, runs `gh release verify-asset` and `gh release verify`, reruns `apksigner`, and rechecks package/version. A failed mutable draft is cleaned up; a published immutable release is never deleted or modified by the workflow.
 
-| Evidence | Required value | Recorded value |
-|---|---|---|
-| Commit SHA | exact 40-character commit | Pending verification |
-| CI run URL/ID | successful inspected run | Pending verification |
-| Test/lint/instrumentation summaries | zero blocking failures | Pending verification |
-| Screenshot artifact/review | approved evidence link | Pending verification |
-| Device-test report | supported matrix/accepted limits | Pending verification |
-| APK filename/size | exact release asset | Pending verification |
-| APK SHA-256 from CI | 64 hex characters | Pending verification |
-| Signing certificate SHA-256 | matches approved certificate | Pending verification |
-| APK metadata/permissions | expected package/version/SDK/manifest | Pending verification |
-| Tag and target | `v1.0.0` → verified commit | Pending verification |
-| GitHub release URL/ID | private, immutable, non-draft production release | Pending verification |
-| Re-downloaded SHA-256/signature | exact match | Pending verification |
+## Authoritative final values
+
+The APK hash, byte size, signer fingerprint, commit SHA, tag, SDK values, and release workflow run ID are stored in the immutable `chalna-v1.0.0-build-info.json` asset. Keeping self-derived APK hashes out of the source commit avoids a circular build where recording the hash changes the artifact being hashed.
+
+GitHub artifact attestations are not relied on for this private personal Pro repository; APK signing, SHA-256, immutable-release verification, and GitHub release/asset integrity verification remain mandatory.
 
 ## Rollback
 
-Do not overwrite or replace an immutable asset. If verification fails, mark the release unsuitable, preserve evidence, fix on a new commit, increment version as appropriate, and issue a new signed release. Never force-push the release tag.
+Never overwrite an immutable asset or force-push the release tag. A future correction uses a new source commit, incremented version, newly signed APK, and new immutable release.
 
-References: [Android app signing](https://developer.android.com/studio/publish/app-signing), [apksigner](https://developer.android.com/tools/apksigner), [apkanalyzer](https://developer.android.com/tools/apkanalyzer), [GitHub release management](https://docs.github.com/repositories/releasing-projects-on-github/managing-releases-in-a-repository), and [artifact attestations](https://docs.github.com/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
+References: [Android app signing](https://developer.android.com/studio/publish/app-signing), [apksigner](https://developer.android.com/tools/apksigner), [apkanalyzer](https://developer.android.com/tools/apkanalyzer), [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases), and [release integrity verification](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/verify-release-integrity).
