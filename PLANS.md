@@ -33,8 +33,10 @@ Prepare a private, signed, immutable v1.1.0 update that adds local capture manag
 
 ## Exit criteria
 
-- Android CI and UI QA are green for the exact release commit and their artifacts are inspected.
-- Release workflow logs and downloaded assets prove package/signing continuity, version code `2`, checksum integrity, and immutable-release verification.
+- Android CI [31322147848](https://github.com/sampple-korea/chalna-android/actions/runs/31322147848) is green: policy, formatting, static analysis, resolved dependency inspection, lint, 32 JVM tests, and debug APK passed.
+- UI QA [31322147867](https://github.com/sampple-korea/chalna-android/actions/runs/31322147867) is green: 44 connected tests, an independent 38-frame deterministic screenshot pass, required artifact checks, and install/launch smoke passed.
+- All 38 rendered PNGs were downloaded. Home, Gallery, Player, Settings, Glow, icon masks, Night/Mist, and 200% font captures were directly inspected after a deliberate refinement pass; selected exact outputs are committed in `docs/screenshots/`.
+- The release workflow must prove package/signing continuity, version code `2`, checksum integrity, published immutable-release verification, and remote APK identity before completion. Its signed `build-info` asset is the durable release ledger.
 - Device Gallery and Chalna Vault recording, playback, export/share/delete, OEM Assistant invocation, keyguard delivery, hardware latency, thermal/battery behavior, and accessibility remain explicitly unverified until corresponding CI or physical-device evidence exists.
 
-No v1.1.0 completion, test, signing, or publication claim is valid before those artifacts are inspected.
+No signing or publication claim is valid before the release workflow and re-downloaded artifact are inspected.

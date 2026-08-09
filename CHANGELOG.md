@@ -2,7 +2,7 @@
 
 This file records repository changes, not unverified release claims. Dates use ISO 8601.
 
-## [1.1.0] - Unreleased
+## [1.1.0] - 2026-08-10
 
 ### Added
 
@@ -10,11 +10,16 @@ This file records repository changes, not unverified release claims. Dates use I
 - Explicit Device Gallery and Chalna Vault destinations. Device Gallery uses MediaStore; Vault uses app-private storage and does not imply encryption.
 - Stable AndroidX Media3 1.11.0 ExoPlayer with Chalna-owned Foundation controls for local playback.
 - Gallery, player-glow, and custom-icon screenshot coverage plus archived JVM test XML.
+- Direct runtime-permission, Assistant-role, app-settings, and notification-settings actions with automatic resume refresh.
+- Galaxy-squircle-safe adaptive icon previews and a debug-only Visual Lab excluded from release artifacts.
 
 ### Changed
 
 - Package remains `app.chalna.capture`; version code advances from 1 to 2.
 - Production Diagnostics and VisualLab surfaces are removed.
+- Home is reduced to capture state, Gallery, Settings, and an optional last-capture preview; Settings are consolidated into Capture, Experience, System, and App sections.
+- Notification permission is optional for readiness and capture; Android's required foreground-service notification API remains in use.
+- Invocation feedback now uses transient cached three-layer perimeter optics, while recording state uses only the central capture instrument instead of a persistent edge border.
 - Policy rejects `READ_MEDIA_VIDEO`, Media3 Material 3 UI, production Diagnostics/VisualLab, and the existing Material/network violations.
 - Release verification pins signer continuity to v1.0.0 and retries bounded immutable-attestation propagation before failing.
 

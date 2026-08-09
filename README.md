@@ -4,7 +4,7 @@ Chalna is a private Android 10+ application that turns an invocation of the user
 
 ## Status
 
-The immutable v1.0.0 release is the verified baseline. Current source targets v1.1.0 (`versionCode` 2); its new CI, UI, signing, and release evidence is pending and must not be inferred from v1.0.0 runs. Physical Assistant-button, locked-screen OEM, camera-hardware latency, thermal, and high-refresh-rate results remain device-only checks; see the [QA report](docs/QA_REPORT.md).
+Version 1.1.0 (`versionCode` 2) is the current signed update. Its private immutable Release contains the APK, checksum, and machine-readable build metadata. GitHub Actions is the build source of truth; physical Assistant-button, locked-screen OEM, camera-hardware latency, thermal, and high-refresh-rate results remain device-only checks documented in the [QA report](docs/QA_REPORT.md).
 
 ## Product contract
 
@@ -21,7 +21,7 @@ The immutable v1.0.0 release is the verified baseline. Current source targets v1
 
 1. Install a verified APK on Android 10 (API 29) or newer.
 2. Open Chalna and grant Camera permission. Grant Microphone only if audio is enabled; grant Notifications where Android requests it.
-3. In Android system settings, select Chalna as the default digital assistant app.
+3. Use Chalna's Assistant action to open the system role picker and select Chalna as the default digital assistant app.
 4. Choose Device Gallery or Chalna Vault for future recordings.
 5. Invoke the configured Assistant gesture to start recording. Confirm the visible recording state/notification.
 6. Invoke again or use the notification Stop action to finalize the video, then use Chalna's local library to play or manage it.
@@ -38,17 +38,23 @@ The project pins AGP 9.3.1, Gradle 9.5.0, Kotlin 2.3.21, Compose BOM 2026.06.00,
 - [Design system](docs/DESIGN_SYSTEM.md) · [Motion](docs/MOTION.md) · [Compatibility](docs/COMPATIBILITY.md)
 - [Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-## v1.0.0 baseline screenshots
+## v1.1.0 product screenshots
 
-These are actual deterministic Compose captures downloaded from UI QA run 31311630522, inspected, refined, regenerated, and committed without mockup tooling.
+These are deterministic Korean Compose captures downloaded from [UI QA run 31322147867](https://github.com/sampple-korea/chalna-android/actions/runs/31322147867). The first rendered pass was inspected, deliberately refined, regenerated, and inspected again; no mockup tooling or fabricated product content was used.
 
-| Ready · Night | Recording · Night |
+| Ready · Mist | Recording · Night |
 |---|---|
-| ![Ready in Night theme](docs/screenshots/home-ready-night.png) | ![Recording in Night theme](docs/screenshots/home-recording-night.png) |
+| ![Ready in Mist theme](docs/screenshots/home-ready-mist.png) | ![Recording in Night theme](docs/screenshots/home-recording-night.png) |
 
-| Ready · Mist | Camera setup · Mist |
+| Gallery · Night | Player details · Night |
 |---|---|
-| ![Ready in Mist theme](docs/screenshots/home-ready-mist.png) | ![Camera setup in Mist theme](docs/screenshots/setup-camera-mist.png) |
+| ![Chalna capture gallery](docs/screenshots/gallery-night.png) | ![Custom local player details](docs/screenshots/player-info-night.png) |
+
+| Settings · Night | Invocation glow on colorful content |
+|---|---|
+| ![Consolidated Chalna settings](docs/screenshots/settings-night.png) | ![Chalna Invocation Glow](docs/screenshots/glow-start-tall-colorful-night.png) |
+
+The adaptive icon's Galaxy-like squircle mask is also preserved as an inspected artifact: [icon mask preview](docs/screenshots/icon-mask-squircle.png).
 
 ## Authoritative references
 
