@@ -26,6 +26,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -64,10 +65,10 @@ class ChalnaScreenshotTest {
     @Test fun playerInfoNight() = captureApp("player-info-night", ChalnaScreenshotStates.player) { onNodeWithContentDescription("더보기").performClick(); onNodeWithText("세부정보").performClick() }
     @Test fun playerDeleteConfirmationNight() = captureApp("player-delete-confirmation-night", ChalnaScreenshotStates.player) { onNodeWithContentDescription("더보기").performClick(); onNodeWithText("삭제").performClick() }
     @Test fun playerVaultNight() = captureApp("player-vault-night", ChalnaScreenshotStates.vaultPlayer) { onNodeWithContentDescription("더보기").performClick() }
-    @Test fun settingsCameraDeniedNight() = captureApp("settings-camera-denied-night", ChalnaScreenshotStates.settingsCameraDenied) { onNodeWithContentDescription("설정").performClick(); onNodeWithText("시스템").performScrollTo() }
+    @Test fun settingsCameraDeniedNight() = captureApp("settings-camera-denied-night", ChalnaScreenshotStates.settingsCameraDenied) { onNodeWithContentDescription("설정").performClick(); onAllNodesWithText("시스템")[1].performScrollTo() }
     @Test fun settingsAudioOffNight() = captureApp("settings-audio-off-night", ChalnaScreenshotStates.settingsAudioOff) { onNodeWithContentDescription("설정").performClick() }
-    @Test fun settingsAssistantMissingNight() = captureApp("settings-assistant-missing-night", ChalnaScreenshotStates.settingsAssistantMissing) { onNodeWithContentDescription("설정").performClick(); onNodeWithText("시스템").performScrollTo() }
-    @Test fun settingsNotificationOptionalNight() = captureApp("settings-notification-optional-night", ChalnaScreenshotStates.settingsNotificationOptional) { onNodeWithContentDescription("설정").performClick(); onNodeWithText("시스템").performScrollTo() }
+    @Test fun settingsAssistantMissingNight() = captureApp("settings-assistant-missing-night", ChalnaScreenshotStates.settingsAssistantMissing) { onNodeWithContentDescription("설정").performClick(); onAllNodesWithText("시스템")[1].performScrollTo() }
+    @Test fun settingsNotificationOptionalNight() = captureApp("settings-notification-optional-night", ChalnaScreenshotStates.settingsNotificationOptional) { onNodeWithContentDescription("설정").performClick(); onAllNodesWithText("시스템")[1].performScrollTo() }
     @Test fun settingsVaultMist() = captureApp("settings-vault-mist", ChalnaScreenshotStates.settingsVaultMist) { onNodeWithContentDescription("설정").performClick() }
     @Test fun homeLargeFontMist() = captureContent("home-large-font-mist", {
         val density = LocalDensity.current
