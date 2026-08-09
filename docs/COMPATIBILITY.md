@@ -8,7 +8,7 @@ Android 10/API 29 and newer; target API 36, compile API 37.1. A rear camera is r
 
 | Area | Expected | Risk / required evidence |
 |---|---|---|
-| API 29–32 | Assistant role and legacy notification permission behavior | OEM gesture routing, background camera restrictions |
+| API 29–32 | Assistant role metadata with session and non-capturing recognition services; legacy notification behavior | OEM gesture routing, background camera restrictions |
 | API 33 | Runtime notification permission | denied notification visibility and stop recovery |
 | API 34–36 | camera/microphone FGS types and while-in-use restrictions | valid Assistant-trigger exemption/path, start timing |
 | Keyguard | system may call keyguard Assistant entry point | OEM support, strong-auth state, no unlock/bypass |
@@ -18,6 +18,8 @@ Android 10/API 29 and newer; target API 36, compile API 37.1. A rear camera is r
 | CameraX quality | select supported rear-camera profile | fallback order, encoder failures, lens availability |
 
 API 37 behavior is outside the v1 production target and requires later validation.
+
+API 34 CI installs Chalna and assigns `android.app.role.ASSISTANT` without bypassing qualification. It verifies that Android maps both `voice_interaction_service` and `voice_recognition_service` to Chalna. The recognition component rejects speech requests without microphone access; its presence satisfies Android's role contract and does not turn Chalna into a speech assistant.
 
 ## OEM limitations
 

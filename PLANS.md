@@ -37,11 +37,11 @@ Publish a private, signed, immutable v1.1.1 hotfix that restores Android Assista
 - The APK declares a valid, system-bound recognition-service component. It rejects speech requests without recording audio because Chalna is not a speech assistant.
 - API 34 UI QA and signed-release smoke tests assign `android.app.role.ASSISTANT` to the installed package without bypassing role qualification, then verify both secure service mappings.
 - The immutable v1.1.0 tag and assets remain untouched; v1.1.1 uses a new tag and versioned assets.
+- Android CI [31324093962](https://github.com/sampple-korea/chalna-android/actions/runs/31324093962) passed policy, formatting, static analysis, dependency inspection, lint, JVM tests, and debug assembly for the fix commit.
+- UI QA [31324097583](https://github.com/sampple-korea/chalna-android/actions/runs/31324097583) passed connected tests, 38 deterministic screenshot tests, artifact checks, install/launch, Assistant role assignment, and secure service-wiring verification on API 34.
 
-- Android CI [31322147848](https://github.com/sampple-korea/chalna-android/actions/runs/31322147848) is green: policy, formatting, static analysis, resolved dependency inspection, lint, 32 JVM tests, and debug APK passed.
-- UI QA [31322147867](https://github.com/sampple-korea/chalna-android/actions/runs/31322147867) is green: 44 connected tests, an independent 38-frame deterministic screenshot pass, required artifact checks, and install/launch smoke passed.
-- All 38 rendered PNGs were downloaded. Home, Gallery, Player, Settings, Glow, icon masks, Night/Mist, and 200% font captures were directly inspected after a deliberate refinement pass; selected exact outputs are committed in `docs/screenshots/`.
-- The release workflow must prove package/signing continuity, version code `2`, checksum integrity, published immutable-release verification, and remote APK identity before completion. Its signed `build-info` asset is the durable release ledger.
+- The unchanged v1.1 UI retains the 38 rendered PNGs inspected across Home, Gallery, Player, Settings, Glow, icon masks, Night/Mist, and 200% font states; selected exact outputs remain committed in `docs/screenshots/`.
+- The release workflow must prove package/signing continuity, version code `3`, Assistant role qualification, checksum integrity, published immutable-release verification, and remote APK identity before completion. Its signed `build-info` asset is the durable release ledger.
 - Device Gallery and Chalna Vault recording, playback, export/share/delete, OEM Assistant invocation, keyguard delivery, hardware latency, thermal/battery behavior, and accessibility remain explicitly unverified until corresponding CI or physical-device evidence exists.
 
 No signing or publication claim is valid before the release workflow and re-downloaded artifact are inspected.
