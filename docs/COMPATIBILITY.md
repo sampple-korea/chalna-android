@@ -1,0 +1,26 @@
+# Compatibility
+
+## Supported baseline
+
+Android 10/API 29 and newer; target/compile API 36. A rear camera is required. Microphone is optional when audio is disabled. Phones are the primary form factor; tablets/foldables should remain usable but Assistant affordances may differ. Android TV, Automotive, Wear OS, ChromeOS, and managed-device support are not claimed.
+
+## Platform behavior
+
+| Area | Expected | Risk / required evidence |
+|---|---|---|
+| API 29–32 | Assistant role and legacy notification permission behavior | OEM gesture routing, background camera restrictions |
+| API 33 | Runtime notification permission | denied notification visibility and stop recovery |
+| API 34–36 | camera/microphone FGS types and while-in-use restrictions | valid Assistant-trigger exemption/path, start timing |
+| Keyguard | system may call keyguard Assistant entry point | OEM support, strong-auth state, no unlock/bypass |
+| MediaStore | scoped shared-media output | gallery visibility, finalize, deletion, storage-full behavior |
+| CameraX quality | select supported rear-camera profile | fallback order, encoder failures, lens availability |
+
+API 37 behavior is outside the v1 production target and requires later validation.
+
+## OEM limitations
+
+Samsung, Google Pixel, Xiaomi/Redmi, Oppo/OnePlus/Realme, Vivo, Motorola, and other vendors may rename default-assistant settings; reserve power-button/gesture entry points; kill background processes; suppress autostart; alter keyguard behavior; delay notifications; or impose camera/thermal policies. Chalna must report failure and release resources, not attempt hidden persistence, accessibility/overlay workarounds, boot capture, battery-optimization coercion, or unrelated permissions.
+
+Work profiles, parental controls, enterprise policy, disabled camera sensors, privacy toggles, concurrent camera use, calls, low storage, thermal throttling, and Do Not Disturb can alter behavior. Supported status is **Pending verification** until the corresponding matrix row passes.
+
+References: [Assistant/VoiceInteractionService](https://developer.android.com/reference/android/service/voice/VoiceInteractionService), [foreground services](https://developer.android.com/develop/background-work/services/fgs), [FGS types](https://developer.android.com/develop/background-work/services/fgs/service-types), [camera privacy controls](https://developer.android.com/training/permissions/explaining-access), and [CameraX device compatibility](https://developer.android.com/media/camera/camerax/devices).
