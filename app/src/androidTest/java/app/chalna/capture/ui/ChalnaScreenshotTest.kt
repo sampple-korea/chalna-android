@@ -15,25 +15,22 @@ import org.junit.Test
 class ChalnaScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun deterministicHomeStates() {
-        val states = linkedMapOf(
-            "home-ready-mist" to ChalnaScreenshotStates.homeReady,
-            "home-recording-night" to ChalnaScreenshotStates.homeRecording,
-            "home-saved-mist" to ChalnaScreenshotStates.homeSaved,
-            "home-error-night" to ChalnaScreenshotStates.homeError,
-        )
-        states.forEach { (name, state) ->
-            val fake = ScreenshotDependencies(state)
-            compose.setContent { ChalnaApp(fake) }
-            compose.waitForIdle()
-            val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
-            val directory = File(
-                InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
-                "screenshots",
-            ).apply { mkdirs() }
-            FileOutputStream(File(directory, "$name.png")).use {
-                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
-            }
+    @Test fun homeReadyMist() = capture("home-ready-mist", ChalnaScreenshotStates.homeReady)
+    @Test fun homeRecordingNight() = capture("home-recording-night", ChalnaScreenshotStates.homeRecording)
+    @Test fun homeSavedMist() = capture("home-saved-mist", ChalnaScreenshotStates.homeSaved)
+    @Test fun homeErrorNight() = capture("home-error-night", ChalnaScreenshotStates.homeError)
+
+    private fun capture(name: String, state: ChalnaUiState) {
+        val fake = ScreenshotDependencies(state)
+        compose.setContent { ChalnaApp(fake) }
+        compose.waitForIdle()
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val directory = File(
+            InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
+            "screenshots",
+        ).apply { mkdirs() }
+        FileOutputStream(File(directory, "$name.png")).use {
+            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
     }
 }
