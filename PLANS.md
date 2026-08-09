@@ -14,7 +14,7 @@ Ship a private, signed, immutable GitHub Release of an Android 10+ app that turn
 ## Decisions
 
 - Application ID: `app.chalna.capture`; version `1.0.0` (`1`).
-- `minSdk 29`, `compileSdk 37`, `targetSdk 36`; current stable AndroidX requires API 37 compilation while target 36 avoids Android 17 behavior opt-in before physical-device validation.
+- `minSdk 29`, `compileSdk 37.1`, `targetSdk 36`; current stable AndroidX requires API 37 compilation while target 36 avoids Android 17 behavior opt-in before physical-device validation.
 - AGP 9.3.1, Gradle 9.5.0, built-in Kotlin 2.3.21, JDK 17 bytecode.
 - Compose BOM 2026.06.00; Foundation-only custom design system.
 - CameraX 1.6.1 Recorder with `MediaStoreOutputOptions`; rear camera; no Preview use case.

@@ -4,7 +4,7 @@ Chalna is a private Android 10+ application that turns an invocation of the user
 
 ## Status
 
-Implementation is in progress. Source inspection confirms the intended application ID (`app.chalna.capture`), Android API range (`minSdk 29`, `compileSdk 37`, `targetSdk 36`), declared camera/audio foreground-service path, lack of `INTERNET` permission, and pinned dependency declarations. Build, test, screenshot, physical-device, signing, APK, and release verification remain **Pending verification**; see [QA report](docs/QA_REPORT.md) and [release runbook](docs/RELEASE.md).
+Implementation is in progress. Source inspection confirms the intended application ID (`app.chalna.capture`), Android API range (`minSdk 29`, `compileSdk 37.1`, `targetSdk 36`), declared camera/audio foreground-service path, lack of `INTERNET` permission, and pinned dependency declarations. Build, test, screenshot, physical-device, signing, APK, and release verification remain **Pending verification**; see [QA report](docs/QA_REPORT.md) and [release runbook](docs/RELEASE.md).
 
 ## Product contract
 

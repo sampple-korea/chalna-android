@@ -51,6 +51,6 @@ The app declares no `INTERNET`; cleartext is disabled; backup is disabled. Media
 
 ## Build boundaries
 
-`minSdk 29`, `compileSdk 37`, `targetSdk 36`, Java 17, AGP 9.3.1, Gradle 9.5.0, Kotlin 2.3.21, Compose BOM 2026.06.00, CameraX 1.6.1. Current stable Core and Lifecycle require API 37 compilation; target API 36 remains independently pinned until Android 17 behavior changes receive physical-device validation. CI alone builds/tests/packages Android artifacts.
+`minSdk 29`, `compileSdk 37.1`, `targetSdk 36`, Java 17, AGP 9.3.1, Gradle 9.5.0, Kotlin 2.3.21, Compose BOM 2026.06.00, CameraX 1.6.1. Current stable Core and Lifecycle require API 37 compilation; target API 36 remains independently pinned until Android 17 behavior changes receive physical-device validation. CI alone builds/tests/packages Android artifacts.
 
 References: [VoiceInteractionService](https://developer.android.com/reference/android/service/voice/VoiceInteractionService), [CameraX architecture](https://developer.android.com/media/camera/camerax/architecture), [video capture](https://developer.android.com/media/camera/camerax/video-capture), [foreground-service types](https://developer.android.com/develop/background-work/services/fgs/service-types), and [MediaStore](https://developer.android.com/training/data-storage/shared/media).

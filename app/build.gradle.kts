@@ -7,7 +7,11 @@ plugins {
 
 android {
     namespace = "app.chalna.capture"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
 
     defaultConfig {
         applicationId = "app.chalna.capture"
