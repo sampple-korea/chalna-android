@@ -17,7 +17,7 @@ Prepare a private, signed, immutable v1.1.0 update that adds local capture manag
 3. Offer two explicit storage destinations:
    - **Device Gallery:** writes into Android MediaStore under `Movies/Chalna`; other authorized gallery/backup applications may see it.
    - **Chalna Vault:** writes into Chalna's app-private local storage; it is not a claim of encryption and is removed with app data/uninstall unless exported first.
-4. Use stable AndroidX Media3 1.11.0 only through `media3-exoplayer` and the non-Material `media3-ui-compose` module. Do not add streaming modules, network stacks, Media3 Material 3 UI, media sessions, downloads, or ads.
+4. Use stable AndroidX Media3 1.11.0 only through `media3-exoplayer`; keep every player control in the Foundation-only Chalna UI. Do not add Media3 UI, streaming, network, media-session, download, or ads modules.
 5. Refine gallery, playback glow, and custom icon states while retaining the Foundation-only design system.
 6. Keep capture cold until an Assistant invocation or notification action; browsing and playback of already-saved files must not bind camera or microphone.
 

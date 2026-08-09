@@ -14,9 +14,9 @@ Chalna source declares the following direct dependencies. This is an inventory a
 | Kotlin / Compose compiler plugin | 2.3.21 | Apache-2.0 | [Kotlin](https://github.com/JetBrains/kotlin) |
 | AndroidX Compose BOM / Runtime / UI / Foundation / Animation | 2026.06.00 BOM | Apache-2.0 | [AndroidX](https://github.com/androidx/androidx) |
 | CameraX Core / Camera2 / Lifecycle / Video | 1.6.1 | Apache-2.0 | [CameraX releases](https://developer.android.com/jetpack/androidx/releases/camera) |
-| AndroidX Media3 ExoPlayer / UI Compose | 1.11.0 | Apache-2.0 | [Media3 releases](https://developer.android.com/jetpack/androidx/releases/media3) · [AndroidX source license](https://github.com/androidx/media/blob/release/LICENSE) |
+| AndroidX Media3 ExoPlayer | 1.11.0 | Apache-2.0 | [Media3 releases](https://developer.android.com/jetpack/androidx/releases/media3) · [AndroidX source license](https://github.com/androidx/media/blob/release/LICENSE) |
 | Activity, Core, Lifecycle, DataStore, AndroidX Test, Espresso | versions pinned in `libs.versions.toml` | Apache-2.0 | [AndroidX releases](https://developer.android.com/jetpack/androidx/versions) |
 | kotlinx.coroutines | 1.10.2 | Apache-2.0 | [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) |
 | JUnit 4 | 4.13.2 | Eclipse Public License 1.0 | [JUnit 4](https://github.com/junit-team/junit4) |
 
-Release procedure: generate the resolved dependency graph; collect bundled notices and licenses; verify every transitive component and license; preserve required attributions in the distributed artifact/release; record discrepancies here. Media3 is limited to `media3-exoplayer` and non-Material `media3-ui-compose` for local content playback. No streaming extension/network stack, `media3-ui-compose-material3`, other Material library, Material icon package, or Material ripple dependency is intentionally permitted.
+Release procedure: generate the resolved dependency graph; collect bundled notices and licenses; verify every transitive component and license; preserve required attributions in the distributed artifact/release; record discrepancies here. Media3 is limited to `media3-exoplayer` for local content playback. No Media3 UI module, streaming extension/network stack, Material library, Material icon package, or Material ripple dependency is intentionally permitted.

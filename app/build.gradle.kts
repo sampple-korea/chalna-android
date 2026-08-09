@@ -103,7 +103,6 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.video)
     implementation(libs.media3.exoplayer)
-    implementation(libs.media3.ui.compose)
     implementation(libs.coroutines.android)
 
     testImplementation(libs.junit4)

@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -51,6 +53,10 @@ private fun VisualLab() = Column(
     Body(stringResource(R.string.visual_lab_subtitle))
     SectionTitle(stringResource(R.string.lab_state_frames))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        GlassCard(Modifier.size(154.dp, 190.dp)) {
+            InvocationGlow(CapturePhase.READY, true, Modifier.size(122.dp).align(Alignment.CenterHorizontally), deterministicProgress = 0f, enabled = false)
+            Spacer(Modifier.height(6.dp)); ChalnaText("SETUP", 12, weight = androidx.compose.ui.text.font.FontWeight.Bold)
+        }
         CapturePhase.entries.forEach { phase ->
             GlassCard(Modifier.size(154.dp, 190.dp)) {
                 InvocationGlow(phase, true, Modifier.size(122.dp).align(Alignment.CenterHorizontally), deterministicProgress = if (phase == CapturePhase.READY) 0f else 1f)
@@ -78,7 +84,21 @@ private fun VisualLab() = Column(
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         listOf(CircleShape, RoundedCornerShape(24.dp), RoundedCornerShape(10.dp)).forEach { shape ->
             Box(Modifier.size(92.dp).clip(shape).background(Color(0xFF101526)), contentAlignment = Alignment.Center) {
-                ChalnaIconCanvas(ChalnaIcon.MARK, Modifier.size(58.dp), ChalnaTheme.colors.accent)
+                Image(painterResource(R.drawable.ic_chalna_mark), null, Modifier.fillMaxSize())
+            }
+        }
+    }
+    SectionTitle(stringResource(R.string.lab_theme_contrast))
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf(NightColors, MistColors).forEach { colors ->
+            CompositionLocalProvider(LocalChalnaColors provides colors) {
+                Column(
+                    Modifier.size(158.dp, 112.dp).clip(RoundedCornerShape(18.dp))
+                        .background(colors.background).padding(14.dp),
+                ) {
+                    ChalnaText(if (colors === NightColors) "Night" else "Mist", 15, weight = androidx.compose.ui.text.font.FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp)); Body(stringResource(R.string.setup_body))
+                }
             }
         }
     }
@@ -95,7 +115,7 @@ private fun VisualLab() = Column(
         val origin = markers.first().elapsedRealtimeMillis
         markers.takeLast(12).forEach { marker ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ChalnaText(marker.name, 12, modifier = Modifier.weight(1f))
+                ChalnaText(marker.name, Modifier.weight(1f), 12)
                 ChalnaText("+${marker.elapsedRealtimeMillis - origin} ms", 12, ChalnaTheme.colors.muted)
             }
         }

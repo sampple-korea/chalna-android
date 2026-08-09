@@ -109,33 +109,38 @@ internal fun SetupScreen(state: ChalnaUiState, d: UiDependencies) = ScreenColumn
 internal fun HomeScreen(state: ChalnaUiState, d: UiDependencies, navigate: (ChalnaRoute) -> Unit) = ScreenColumn {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
         ChalnaIconCanvas(ChalnaIcon.MARK, Modifier.size(30.dp), ChalnaTheme.colors.accent)
-        Spacer(Modifier.width(9.dp)); ChalnaText(stringResource(R.string.app_name), 23, weight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(9.dp)); ChalnaText(stringResource(R.string.app_name), Modifier.weight(1f), 23, weight = FontWeight.Bold)
         IconButton(ChalnaIcon.GALLERY, stringResource(R.string.gallery)) { d.refreshGallery(); navigate(ChalnaRoute.GALLERY) }
         IconButton(ChalnaIcon.SETTINGS, stringResource(R.string.settings)) { navigate(ChalnaRoute.SETTINGS) }
     }
     Spacer(Modifier.height(36.dp))
-    InvocationGlow(state.phase, state.reducedMotion || state.powerSaver, Modifier.size(210.dp).align(Alignment.CenterHorizontally))
+    InvocationGlow(
+        state.phase,
+        state.reducedMotion || state.powerSaver,
+        Modifier.size(210.dp).align(Alignment.CenterHorizontally),
+        enabled = state.ready || state.phase != CapturePhase.READY,
+    )
     Spacer(Modifier.height(26.dp))
     ChalnaText(
         if (!state.ready && state.phase == CapturePhase.READY) stringResource(R.string.phase_setup_required) else phaseTitle(state.phase),
+        Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
         28,
         weight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
         align = TextAlign.Center,
     )
     if (state.phase == CapturePhase.RECORDING || state.phase == CapturePhase.STOPPING) {
-        ChalnaText(formatDuration(state.durationSeconds * 1000), 18, ChalnaTheme.colors.muted, FontWeight.Medium, Modifier.fillMaxWidth(), TextAlign.Center)
+        ChalnaText(formatDuration(state.durationSeconds * 1000), Modifier.fillMaxWidth(), 18, ChalnaTheme.colors.muted, FontWeight.Medium, TextAlign.Center)
     }
-    state.errorMessage?.let { ChalnaText(it, 14, ChalnaTheme.colors.danger, modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive }, align = TextAlign.Center) }
+    state.errorMessage?.let { ChalnaText(it, Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive }, 14, ChalnaTheme.colors.danger, align = TextAlign.Center) }
     Spacer(Modifier.height(22.dp))
     when {
         state.phase == CapturePhase.RECORDING -> PrimaryButton(stringResource(R.string.stop_capture), onClick = d::toggleCapture)
         !state.ready -> PrimaryButton(stringResource(R.string.review_setup), onClick = d::reviewSetup)
         else -> ChalnaText(
             stringResource(R.string.home_trigger_hint),
+            Modifier.fillMaxWidth(),
             15,
             ChalnaTheme.colors.muted,
-            modifier = Modifier.fillMaxWidth(),
             align = TextAlign.Center,
         )
     }
@@ -160,18 +165,18 @@ internal fun SettingsScreen(state: ChalnaUiState, d: UiDependencies, back: () ->
     TopBar(stringResource(R.string.settings), back)
     SectionTitle(stringResource(R.string.capture))
     Column {
-        ChalnaText(stringResource(R.string.save_to), 14, ChalnaTheme.colors.muted, modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 6.dp))
+        ChalnaText(stringResource(R.string.save_to), Modifier.padding(start = 8.dp, top = 18.dp, bottom = 6.dp), 14, ChalnaTheme.colors.muted)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StorageDestinationUi.entries.forEach { destination -> ChoiceChip(destinationLabel(destination), state.storageDestination == destination) { d.setStorageDestination(destination) } }
         }
         Body(stringResource(if (state.storageDestination == StorageDestinationUi.CHALNA_VAULT) R.string.vault_storage_detail else R.string.device_gallery_storage_detail))
         ChalnaText(stringResource(R.string.existing_videos_not_moved), 12, ChalnaTheme.colors.muted)
         Spacer(Modifier.height(12.dp)); ToggleRow(stringResource(R.string.include_audio), state.sound, d::setSound)
-        ChalnaText(stringResource(R.string.video_quality), 14, ChalnaTheme.colors.muted, modifier = Modifier.padding(8.dp))
+        ChalnaText(stringResource(R.string.video_quality), Modifier.padding(8.dp), 14, ChalnaTheme.colors.muted)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             VideoQuality.entries.forEach { quality -> ChoiceChip(qualityLabel(quality), state.quality == quality) { d.setQuality(quality) } }
         }
-        ChalnaText(stringResource(R.string.auto_stop), 14, ChalnaTheme.colors.muted, modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 6.dp))
+        ChalnaText(stringResource(R.string.auto_stop), Modifier.padding(start = 8.dp, top = 18.dp, bottom = 6.dp), 14, ChalnaTheme.colors.muted)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(0, 15, 30, 60).forEach { seconds ->
                 ChoiceChip(if (seconds == 0) stringResource(R.string.no_limit) else pluralStringResource(R.plurals.seconds_value, seconds, seconds), state.autoStopSeconds == seconds) { d.setAutoStop(seconds) }
@@ -184,7 +189,7 @@ internal fun SettingsScreen(state: ChalnaUiState, d: UiDependencies, back: () ->
             AppearanceMode.entries.forEach { mode -> ChoiceChip(appearanceLabel(mode), state.appearance == mode) { d.setAppearance(mode) } }
         }
         Spacer(Modifier.height(8.dp)); ToggleRow(stringResource(R.string.haptics), state.haptics, d::setHaptics)
-        ChalnaText(stringResource(R.string.motion_effects), 14, ChalnaTheme.colors.muted, modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 6.dp))
+        ChalnaText(stringResource(R.string.motion_effects), Modifier.padding(start = 8.dp, top = 18.dp, bottom = 6.dp), 14, ChalnaTheme.colors.muted)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MotionMode.entries.forEach { mode -> ChoiceChip(motionLabel(mode), state.motion == mode) { d.setMotion(mode) } }
         }
@@ -198,7 +203,7 @@ internal fun SettingsScreen(state: ChalnaUiState, d: UiDependencies, back: () ->
             ChalnaIcon.MIC,
             !state.sound || state.microphoneGranted,
         ) { if (state.microphonePermanentlyDenied) d.openAppSettings() else d.requestMicrophone() }
-        SettingRow(stringResource(R.string.assistant), stringResource(if (state.assistantSelected) R.string.selected else R.string.action_needed), ChalnaIcon.ASSISTANT, state.assistantSelected, d::openAssistantSettings)
+        SettingRow(stringResource(R.string.assistant), stringResource(if (state.assistantSelected) R.string.status_selected else R.string.action_needed), ChalnaIcon.ASSISTANT, state.assistantSelected, d::openAssistantSettings)
         SettingRow(stringResource(R.string.notifications_optional), stringResource(if (state.notificationsGranted) R.string.allowed else R.string.optional), ChalnaIcon.BELL, state.notificationsGranted, d::openNotificationSettings)
     }; Hairline()
     SectionTitle(stringResource(R.string.support))
@@ -206,7 +211,7 @@ internal fun SettingsScreen(state: ChalnaUiState, d: UiDependencies, back: () ->
         SettingRow(stringResource(R.string.help), stringResource(R.string.help_short), ChalnaIcon.ASSISTANT) { navigate(ChalnaRoute.HELP) }
         SettingRow(stringResource(R.string.privacy), stringResource(R.string.privacy_short), ChalnaIcon.MARK) { navigate(ChalnaRoute.PRIVACY) }
     }
-    Spacer(Modifier.height(16.dp)); ChalnaText(stringResource(R.string.version_info, BuildConfig.VERSION_NAME), 12, ChalnaTheme.colors.muted, modifier = Modifier.fillMaxWidth(), align = TextAlign.Center)
+    Spacer(Modifier.height(16.dp)); ChalnaText(stringResource(R.string.version_info, BuildConfig.VERSION_NAME), Modifier.fillMaxWidth(), 12, ChalnaTheme.colors.muted, align = TextAlign.Center)
 }
 
 @Composable
@@ -221,14 +226,14 @@ internal fun GalleryScreen(state: ChalnaUiState, d: UiDependencies, back: () -> 
         }
         if (confirmBatchDelete) {
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ChalnaText(stringResource(R.string.delete_selected_confirm), 14, modifier = Modifier.weight(1f))
+                ChalnaText(stringResource(R.string.delete_selected_confirm), Modifier.weight(1f), 14)
                 Box(Modifier.weight(1f)) { SecondaryButton(stringResource(R.string.cancel)) { confirmBatchDelete = false } }
                 Spacer(Modifier.width(8.dp))
                 Box(Modifier.weight(1f)) { PrimaryButton(stringResource(R.string.delete)) { confirmBatchDelete = false; d.deleteSelectedMedia() } }
             }
         }
         state.operationMessage?.let {
-            ChalnaText(it, 13, ChalnaTheme.colors.danger, modifier = Modifier.padding(vertical = 6.dp))
+            ChalnaText(it, Modifier.padding(vertical = 6.dp), 13, ChalnaTheme.colors.danger)
         }
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             GalleryFilter.entries.forEach { filter -> ChoiceChip(filterLabel(filter), state.galleryFilter == filter) { d.setGalleryFilter(filter) } }
@@ -245,7 +250,7 @@ internal fun GalleryScreen(state: ChalnaUiState, d: UiDependencies, back: () -> 
             val grouped = visible.sortedByDescending { it.capturedAtMillis }.groupBy { dayKey(it.capturedAtMillis) }
             LazyVerticalGrid(columns = GridCells.Adaptive(148.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                 grouped.forEach { (day, media) ->
-                    item(span = { GridItemSpan(maxLineSpan) }) { ChalnaText(dayLabel(day), 14, ChalnaTheme.colors.muted, FontWeight.SemiBold, Modifier.padding(top = 14.dp, bottom = 4.dp)) }
+                    item(span = { GridItemSpan(maxLineSpan) }) { ChalnaText(dayLabel(day), Modifier.padding(top = 14.dp, bottom = 4.dp), 14, ChalnaTheme.colors.muted, FontWeight.SemiBold) }
                     items(media, key = { it.id }) { item -> MediaGridItem(item, d, item.id in selected, selected.isNotEmpty(), { d.toggleMediaSelection(item.id) }) { open(item.id) } }
                 }
             }
@@ -316,12 +321,12 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
         }
         if (controls) Column(Modifier.fillMaxWidth().background(Color.Black.copy(.82f)).padding(14.dp)) {
             player.message?.let {
-                ChalnaText(it, 13, Color(0xFFFF9B8B), modifier = Modifier.padding(bottom = 6.dp))
+                ChalnaText(it, Modifier.padding(bottom = 6.dp), 13, Color(0xFFFF9B8B))
             }
             Scrubber(player.positionMillis, player.durationMillis, d::seekPlayer)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(if (player.playing) ChalnaIcon.PAUSE else ChalnaIcon.PLAY, stringResource(if (player.playing) R.string.pause else R.string.play), onClick = d::togglePlayback)
-                ChalnaText("${formatDuration(player.positionMillis)} / ${formatDuration(player.durationMillis)}", 13, Color.White.copy(.78f), modifier = Modifier.weight(1f))
+                ChalnaText("${formatDuration(player.positionMillis)} / ${formatDuration(player.durationMillis)}", Modifier.weight(1f), 13, Color.White.copy(.78f))
                 IconButton(if (player.muted) ChalnaIcon.MUTED else ChalnaIcon.VOLUME, stringResource(if (player.muted) R.string.unmute else R.string.mute)) { d.setPlayerMuted(!player.muted) }
                 IconButton(ChalnaIcon.FULLSCREEN, stringResource(R.string.fullscreen), fullscreen) { fullscreen = !fullscreen }
             }
@@ -379,7 +384,7 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
 @Composable private fun PlayerDetails(item: MediaItemUi) {
     val context = LocalContext.current
     val storage = stringResource(if (item.destination == StorageDestinationUi.CHALNA_VAULT) R.string.chalna_vault else R.string.device_gallery)
-    val audio = stringResource(if (item.hasAudio) R.string.audio_included else R.string.audio_not_included)
+    val audio = item.hasAudio?.let { stringResource(if (it) R.string.audio_included else R.string.audio_not_included) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         DetailLine(R.string.detail_file, item.displayName)
         DetailLine(R.string.detail_date, formatMediaDate(item.capturedAtMillis))
@@ -387,7 +392,7 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
         if (item.width > 0 && item.height > 0) DetailLine(R.string.detail_resolution, "${item.width}×${item.height}")
         if (item.sizeBytes > 0) DetailLine(R.string.detail_size, Formatter.formatFileSize(context, item.sizeBytes))
         DetailLine(R.string.detail_storage, storage)
-        DetailLine(R.string.detail_audio, audio)
+        audio?.let { DetailLine(R.string.detail_audio, it) }
         DetailLine(R.string.detail_type, item.mimeType)
     }
 }
@@ -430,6 +435,10 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
 
 private object ThumbnailCache : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 16L).coerceAtMost(24L * 1024L * 1024L).toInt()) {
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
+}
+
+internal fun evictThumbnail(uri: String) {
+    ThumbnailCache.remove(uri)
 }
 
 @Composable private fun phaseTitle(phase: CapturePhase) = stringResource(when(phase){CapturePhase.READY->R.string.phase_ready;CapturePhase.STARTING->R.string.phase_starting;CapturePhase.RECORDING->R.string.phase_recording;CapturePhase.STOPPING->R.string.phase_stopping;CapturePhase.SAVED->R.string.phase_saved;CapturePhase.ERROR->R.string.phase_error})

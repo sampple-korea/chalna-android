@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import app.chalna.capture.domain.StorageDestination
 import java.io.File
 
@@ -70,7 +71,7 @@ class AndroidCaptureDestinationFactory(private val context: Context) : CaptureDe
         when (val target = output.target) {
             is CaptureOutputTarget.Vault -> runCatching { target.file.delete() }
             is CaptureOutputTarget.DeviceGallery -> cameraXOutputUri?.takeIf(String::isNotBlank)?.let { raw ->
-                runCatching { context.contentResolver.delete(android.net.Uri.parse(raw), null, null) }
+                runCatching { context.contentResolver.delete(raw.toUri(), null, null) }
             }
         }
     }

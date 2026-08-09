@@ -50,7 +50,7 @@ Before trigger: no provider acquisition, use-case binding, pending recording, au
 
 The app declares no `INTERNET` or `READ_MEDIA_VIDEO`; cleartext is disabled; backup is disabled. Device Gallery output crosses into user-visible MediaStore only when selected. Vault content remains app-private unless the user explicitly shares or exports it. Settings and the Chalna-created capture index remain local. Production contains no Diagnostics or VisualLab surface and never records assist data, screen content, unrelated media, app identity, location, or accounts.
 
-Media3 is pinned to stable 1.11.0 and limited to `media3-exoplayer` plus non-Material `media3-ui-compose`. No streaming extension, datasource network stack, download manager, media session, ads module, or Media3 Material UI is included. Player lifecycle and video surface ownership are separate from CameraX lifecycle ownership.
+Media3 is pinned to stable 1.11.0 and limited to `media3-exoplayer`. No Media3 UI module, streaming extension, datasource network stack, download manager, media session, or ads module is included. Chalna owns its Foundation-only controls; player lifecycle and video surface ownership remain separate from CameraX lifecycle ownership.
 
 ## Keyguard and Android restrictions
 

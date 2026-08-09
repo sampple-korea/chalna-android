@@ -25,6 +25,11 @@ import app.chalna.capture.media.AndroidCaptureDestinationFactory
 import app.chalna.capture.media.CaptureDestinationFactory
 import app.chalna.capture.media.CaptureOutputTarget
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -36,12 +41,14 @@ class CameraXCaptureEngine(
     private val lifecycleOwner: LifecycleOwner,
     private val settingsStore: SettingsStore,
     private val destinationFactory: CaptureDestinationFactory = AndroidCaptureDestinationFactory(context),
+    private val attemptStore: CaptureAttemptStore = CaptureAttemptStore(context),
 ) : CaptureEngine {
     private var provider: ProcessCameraProvider? = null
     private var recording: Recording? = null
     private var finalized: CompletableDeferred<LastCapture?>? = null
     private var startedAt = 0L
     @Volatile private var discardOnFinalize = false
+    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override suspend fun start(invocationId: String): Long {
         check(recording == null) { "Capture already active" }
@@ -74,14 +81,15 @@ class CameraXCaptureEngine(
             id = UUID.randomUUID().toString(),
             displayName = displayName,
         )
-        cameraProvider.unbindAll()
-        cameraProvider.bindToLifecycle(lifecycleOwner, selector, video)
-        CaptureTelemetryRegistry.mark("camera_bind_complete")
-        finalized = CompletableDeferred()
-        discardOnFinalize = false
         val started = CompletableDeferred<Long>()
         startedAt = 0L
         return try {
+            attemptStore.mark(output)
+            cameraProvider.unbindAll()
+            cameraProvider.bindToLifecycle(lifecycleOwner, selector, video)
+            CaptureTelemetryRegistry.mark("camera_bind_complete")
+            finalized = CompletableDeferred()
+            discardOnFinalize = false
             var pending = when (val target = output.target) {
                 is CaptureOutputTarget.DeviceGallery -> recorder.prepareRecording(context, target.options)
                 is CaptureOutputTarget.Vault -> recorder.prepareRecording(context, target.options)
@@ -100,11 +108,14 @@ class CameraXCaptureEngine(
                         cameraProvider.unbindAll()
                         val discard = discardOnFinalize
                         discardOnFinalize = false
+                        val completion = finalized
+                        val cameraXOutputUri = event.outputResults.outputUri.toString()
                         if (!event.hasError() && startedAt > 0 && !discard) {
-                            finalized?.complete(
-                                LastCapture(
+                            val durationMillis = System.currentTimeMillis() - startedAt
+                            cleanupScope.launch {
+                                val capture = LastCapture(
                                     output.safeContentUri ?: event.outputResults.outputUri.toString(),
-                                    System.currentTimeMillis() - startedAt,
+                                    durationMillis,
                                     startedAt,
                                     output.displayName,
                                     effectiveQuality.toCaptureQuality(),
@@ -113,13 +124,23 @@ class CameraXCaptureEngine(
                                     storageDestination = output.destination,
                                     privateRef = output.privateRef,
                                     sizeBytes = (output.target as? CaptureOutputTarget.Vault)?.file?.length()?.takeIf { it > 0 },
-                                ),
-                            )
+                                )
+                                try {
+                                    check(attemptStore.clear()) { "Capture recovery marker could not be cleared" }
+                                    completion?.complete(capture)
+                                } catch (failure: Throwable) {
+                                    destinationFactory.discard(output, cameraXOutputUri)
+                                    completion?.completeExceptionally(failure)
+                                }
+                            }
                         } else {
-                            destinationFactory.discard(output, event.outputResults.outputUri.toString())
                             val finalizeFailure = IllegalStateException("CameraX finalize error ${event.error}")
                             started.completeExceptionally(finalizeFailure)
-                            finalized?.completeExceptionally(finalizeFailure)
+                            cleanupScope.launch {
+                                destinationFactory.discard(output, cameraXOutputUri)
+                                attemptStore.clear()
+                                completion?.completeExceptionally(finalizeFailure)
+                            }
                         }
                     }
                 }
@@ -131,7 +152,10 @@ class CameraXCaptureEngine(
             runCatching { active?.stop() }
             runCatching { withTimeout(5_000) { finalized?.await() } }
             runCatching { active?.close() }
-            destinationFactory.discard(output, null)
+            withContext(Dispatchers.IO) {
+                destinationFactory.discard(output, null)
+                attemptStore.clear()
+            }
             provider?.unbindAll()
             throw failure
         }

@@ -7,6 +7,9 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.os.Environment
+import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import app.chalna.capture.domain.CaptureItem
 import app.chalna.capture.domain.CaptureQuality
 import app.chalna.capture.domain.StableCaptureId
@@ -25,7 +28,7 @@ class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway, C
         when (item.storageDestination) {
             StorageDestination.CHALNA_VAULT -> vaultFile(item)?.let { it.isFile && it.length() > 0 } == true
             StorageDestination.DEVICE_GALLERY -> runCatching {
-                resolver.query(Uri.parse(item.contentUri), arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
+                resolver.query(item.contentUri.toUri(), arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
                     it.moveToFirst() && !it.isNull(0) && it.getLong(0) >= 0
                 } ?: false
             }.getOrDefault(false)
@@ -36,7 +39,7 @@ class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway, C
         when (item.storageDestination) {
             StorageDestination.CHALNA_VAULT -> vaultFile(item)?.let { !it.exists() || it.delete() } == true
             StorageDestination.DEVICE_GALLERY -> runCatching {
-                resolver.delete(Uri.parse(item.contentUri), null, null) > 0
+                resolver.delete(item.contentUri.toUri(), null, null) > 0
             }.getOrDefault(false)
         }
     }
@@ -85,7 +88,7 @@ class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway, C
             MediaStore.Video.Media.WIDTH,
             MediaStore.Video.Media.HEIGHT,
         )
-        runCatching {
+        val deviceCaptures = runCatching {
             resolver.query(
                 MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 columns,
@@ -108,21 +111,47 @@ class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway, C
                                 sizeBytes = cursor.getLong(4).takeIf { it >= 0 },
                                 width = cursor.getInt(5).takeIf { it > 0 },
                                 height = cursor.getInt(6).takeIf { it > 0 },
+                                audioKnown = false,
                             ),
                         )
                     }
                 }
             } ?: emptyList()
         }.getOrDefault(emptyList())
+        val vaultCaptures = runCatching {
+            val movies = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: return@runCatching emptyList()
+            val vaultRoot = File(movies, AndroidCaptureDestinationFactory.VAULT_DIRECTORY)
+            vaultRoot.listFiles()
+                .orEmpty()
+                .asSequence()
+                .filter { it.isFile && it.length() > 0 && it.name.startsWith("CHALNA_") && it.extension.equals("mp4", true) }
+                .map { file ->
+                    val privateRef = "${AndroidCaptureDestinationFactory.VAULT_DIRECTORY}/${file.name}"
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file).toString()
+                    CaptureItem(
+                        id = StableCaptureId.from(StorageDestination.CHALNA_VAULT, privateRef),
+                        storageDestination = StorageDestination.CHALNA_VAULT,
+                        contentUri = uri,
+                        privateRef = privateRef,
+                        displayName = file.name,
+                        createdAtMillis = file.lastModified().coerceAtLeast(1),
+                        durationMillis = 0,
+                        quality = CaptureQuality.AUTO,
+                        sizeBytes = file.length(),
+                        audioKnown = false,
+                    )
+                }.toList()
+        }.getOrDefault(emptyList())
+        deviceCaptures + vaultCaptures
     }
 
     override suspend fun extract(item: CaptureItem): CaptureMetadata = withContext(Dispatchers.IO) {
         val retriever = MediaMetadataRetriever()
         try {
-            retriever.setDataSource(context, Uri.parse(item.contentUri))
+            retriever.setDataSource(context, item.contentUri.toUri())
             CaptureMetadata(
                 durationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull(),
-                sizeBytes = item.sizeBytes ?: querySize(Uri.parse(item.contentUri)),
+                sizeBytes = item.sizeBytes ?: querySize(item.contentUri.toUri()),
                 width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull(),
                 height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull(),
             )

@@ -8,7 +8,7 @@ This file records repository changes, not unverified release claims. Dates use I
 
 - Chalna-created capture library with filtering, selection, share/export/delete actions, and local in-app playback.
 - Explicit Device Gallery and Chalna Vault destinations. Device Gallery uses MediaStore; Vault uses app-private storage and does not imply encryption.
-- Stable AndroidX Media3 1.11.0 ExoPlayer and non-Material Compose UI support for local playback.
+- Stable AndroidX Media3 1.11.0 ExoPlayer with Chalna-owned Foundation controls for local playback.
 - Gallery, player-glow, and custom-icon screenshot coverage plus archived JVM test XML.
 
 ### Changed

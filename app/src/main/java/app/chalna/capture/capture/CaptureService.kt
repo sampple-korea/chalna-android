@@ -40,6 +40,7 @@ class CaptureService : Service(), LifecycleOwner {
     private lateinit var coordinator: CaptureCoordinator
     private lateinit var engine: CameraXCaptureEngine
     private lateinit var captureIndex: CaptureIndex
+    private lateinit var attemptStore: CaptureAttemptStore
     private var autoStopJob: Job? = null
 
     override fun onCreate() {
@@ -47,6 +48,7 @@ class CaptureService : Service(), LifecycleOwner {
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         settings = SettingsStore(this)
         captureIndex = CaptureIndex(FileCaptureIndexStore(this))
+        attemptStore = CaptureAttemptStore(this)
         engine = CameraXCaptureEngine(this, this, settings)
         coordinator = CaptureCoordinator(engine, onStateChanged = CaptureRuntime::publish)
     }
@@ -90,10 +92,16 @@ class CaptureService : Service(), LifecycleOwner {
             }
         }
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
+        val autoStopSeconds = settings.settings.value.autoStopSeconds
         scope.launch {
+            if (attemptStore.hasAttempt() && CaptureRuntime.state.value !is CaptureState.Starting &&
+                CaptureRuntime.state.value !is CaptureState.Recording && CaptureRuntime.state.value !is CaptureState.Saving
+            ) {
+                runCatching { attemptStore.recover(cancelStaleNotification = false) }
+            }
             val state = coordinator.dispatch(CaptureRequest(id, if (action == ACTION_STOP) CaptureCommand.STOP else CaptureCommand.TOGGLE))
             haptic(state)
-            if (state is CaptureState.Recording) scheduleAutoStop(state)
+            if (state is CaptureState.Recording) scheduleAutoStop(state, autoStopSeconds)
             if (state is CaptureState.Saved) {
                 autoStopJob?.cancel()
                 persistFinalized(state.capture)
@@ -153,9 +161,8 @@ class CaptureService : Service(), LifecycleOwner {
         getSystemService(Vibrator::class.java).vibrate(VibrationEffect.createWaveform(longArrayOf(0, 55, 45, 18), -1))
     }
 
-    private fun scheduleAutoStop(state: CaptureState.Recording) {
+    private fun scheduleAutoStop(state: CaptureState.Recording, seconds: Int) {
         autoStopJob?.cancel()
-        val seconds = settings.settings.value.autoStopSeconds
         if (seconds <= 0) return
         autoStopJob = scope.launch {
             delay(seconds * 1_000L)

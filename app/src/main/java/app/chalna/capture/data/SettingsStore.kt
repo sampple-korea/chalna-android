@@ -59,6 +59,7 @@ class SettingsStore(context: Context) {
                 sizeBytes = p[LAST_SIZE],
                 width = p[LAST_WIDTH],
                 height = p[LAST_HEIGHT],
+                audioKnown = p[LAST_AUDIO_KNOWN] ?: true,
             ).takeIf(LastCapture::isUsable)
         }.stateIn(scope, SharingStarted.Eagerly, null)
 
@@ -89,6 +90,7 @@ class SettingsStore(context: Context) {
             it.remove(LAST_SIZE)
             it.remove(LAST_WIDTH)
             it.remove(LAST_HEIGHT)
+            it.remove(LAST_AUDIO_KNOWN)
         } else {
             it[LAST_URI] = capture.uri
             it[LAST_DURATION] = capture.durationMillis
@@ -102,6 +104,7 @@ class SettingsStore(context: Context) {
             capture.sizeBytes?.let { value -> it[LAST_SIZE] = value } ?: it.remove(LAST_SIZE)
             capture.width?.let { value -> it[LAST_WIDTH] = value } ?: it.remove(LAST_WIDTH)
             capture.height?.let { value -> it[LAST_HEIGHT] = value } ?: it.remove(LAST_HEIGHT)
+            it[LAST_AUDIO_KNOWN] = capture.audioKnown
         }
     }
 
@@ -126,5 +129,6 @@ class SettingsStore(context: Context) {
         val LAST_SIZE = longPreferencesKey("last_capture_size")
         val LAST_WIDTH = intPreferencesKey("last_capture_width")
         val LAST_HEIGHT = intPreferencesKey("last_capture_height")
+        val LAST_AUDIO_KNOWN = booleanPreferencesKey("last_capture_audio_known")
     }
 }

@@ -5,7 +5,7 @@
     <string name="audio">오디오</string><string name="audio_setup_on">소리 포함 · 눌러서 허용</string><string name="audio_setup_off">꺼짐 · 눌러서 소리 포함</string>
     <string name="assistant">어시스턴트</string><string name="assistant_setup_detail">Android 설정에서 찰나 선택</string>
     <string name="notifications_optional">알림 · 선택</string><string name="notifications_optional_detail">녹화 상태와 중지 동작</string>
-    <string name="allowed">허용됨</string><string name="selected">선택됨</string><string name="optional">선택 사항</string><string name="action_needed">조치 필요</string>
+    <string name="allowed">허용됨</string><string name="status_selected">선택됨</string><string name="optional">선택 사항</string><string name="action_needed">조치 필요</string>
     <string name="gallery">갤러리</string><string name="settings">설정</string><string name="back">뒤로</string>
     <string name="phase_setup_required">설정 필요</string><string name="phase_ready">준비됨</string><string name="phase_starting">카메라 여는 중</string><string name="phase_recording">녹화 중</string><string name="phase_stopping">저장 중</string><string name="phase_saved">저장됨</string><string name="phase_error">오류</string>
     <string name="home_trigger_hint">Assistant를 호출하면 바로 녹화합니다.</string><string name="latest_capture">마지막 촬영</string><string name="untitled_video">이름 없는 영상</string>
@@ -31,7 +31,6 @@
     <string name="private_by_design">개인정보 및 앱 정보</string><string name="privacy_statement">영상은 선택한 저장 위치에 저장됩니다. 찰나는 인터넷 권한을 사용하지 않으며 영상을 업로드하지 않습니다.</string>
     <string name="explicit_trigger_only">촬영 동작</string><string name="explicit_trigger_detail">카메라는 Assistant를 호출한 뒤에만 켜집니다. 미리 촬영하거나 카메라를 계속 켜 두지 않습니다. 찰나 보관함 영상은 앱 삭제 시 함께 삭제되고 기기 갤러리 영상은 남습니다.</string>
     <string name="permissions_used">관련 접근 권한만 사용</string><string name="permissions_used_detail">카메라, 선택적 마이크, 선택적 알림. 위치, 연락처, 광범위 저장소, 오버레이, 접근성 서비스는 사용하지 않습니다.</string><string name="version_info">버전 %1$s</string>
-    <string name="glow_idle">찰나 준비됨</string><string name="glow_starting">촬영 시작 중</string><string name="glow_recording">녹화 중</string><string name="glow_stopping">촬영 저장 중</string><string name="glow_error">촬영 확인 필요</string>
     <string name="notification_channel_name">진행 중인 촬영</string><string name="notification_recording_title">찰나가 녹화 중입니다</string><string name="notification_recording_text">다시 Assistant를 호출하거나 중지를 누르세요.</string><string name="notification_saved_title">영상이 저장되었습니다</string><string name="notification_saved_text">찰나 갤러리에서 확인하세요.</string><string name="notification_error_title">찰나가 녹화를 시작하지 못했습니다</string>
     <string name="action_stop">중지</string><string name="action_open">찰나 열기</string><string name="action_settings">설정</string><string name="file_not_found">저장된 영상을 찾을 수 없습니다.</string><string name="no_video_viewer">영상을 열 수 있는 앱이 없습니다.</string>
     <string name="capture_error_permission">촬영 권한이 필요합니다.</string><string name="capture_error_camera">카메라를 사용할 수 없습니다.</string><string name="capture_error_storage">저장 공간이 부족합니다.</string>

@@ -18,16 +18,20 @@ import android.view.Surface
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem as PlaybackMediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import app.chalna.capture.R
 import app.chalna.capture.capture.CaptureRuntime
+import app.chalna.capture.capture.CaptureAttemptStore
 import app.chalna.capture.capture.CaptureService
 import app.chalna.capture.data.SettingsStore
 import app.chalna.capture.domain.CaptureItem
@@ -41,6 +45,7 @@ import app.chalna.capture.domain.ThemePreference
 import app.chalna.capture.gallery.GalleryRepositoryFactory
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,11 +66,16 @@ class ProductionUiDependencies(
     override val state: StateFlow<ChalnaUiState> = mutableState
     private val tick = MutableStateFlow(System.currentTimeMillis())
     private val galleryRepository = GalleryRepositoryFactory.create(activity, settingsStore)
+    private val attemptStore = CaptureAttemptStore(activity)
+    private val galleryInitialized = CompletableDeferred<Unit>()
     private val galleryRefreshMutex = Mutex()
     private var galleryRefreshJob: Job? = null
     private val permissionHistory = activity.getSharedPreferences(PERMISSION_HISTORY, 0)
-    private val player = ExoPlayer.Builder(activity).build()
+    private val player = ExoPlayer.Builder(activity).build().apply {
+        setAudioAttributes(AudioAttributes.DEFAULT, true)
+    }
     private var pendingOpenId: String? = null
+    private var pendingOpenPositionMillis: Long = 0
 
     private data class UiOverlay(
         val filter: GalleryFilter = GalleryFilter.ALL,
@@ -107,6 +117,10 @@ class ProductionUiDependencies(
                 override fun onEvents(player: Player, events: Player.Events) {
                     tick.value = System.currentTimeMillis()
                 }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    publishOperationError(R.string.player_open_failed)
+                }
             },
         )
         activity.lifecycle.addObserver(
@@ -127,16 +141,27 @@ class ProductionUiDependencies(
             }
         }
         activity.lifecycleScope.launch {
-            withContext(Dispatchers.IO) { galleryRepository.initialize() }
+            val captureState = CaptureRuntime.state.value
+            if (attemptStore.hasAttempt() && captureState !is CaptureState.Starting &&
+                captureState !is CaptureState.Recording && captureState !is CaptureState.Saving
+            ) {
+                runCatching { attemptStore.recover() }
+            }
+            withContext(Dispatchers.IO) { runCatching { galleryRepository.initialize() } }
+            galleryInitialized.complete(Unit)
             refreshGalleryInternal()
         }
         activity.lifecycleScope.launch {
-            settingsStore.lastCapture.collectLatest { refreshGalleryInternal() }
+            settingsStore.lastCapture.collectLatest {
+                galleryInitialized.await()
+                refreshGalleryInternal()
+            }
         }
         activity.lifecycleScope.launch {
             CaptureRuntime.state.collectLatest { capture ->
                 if (capture is CaptureState.Saved) {
                     overlay.value = overlay.value.copy(savedShownAtMillis = System.currentTimeMillis())
+                    galleryInitialized.await()
                     refreshGalleryInternal()
                 }
             }
@@ -329,7 +354,10 @@ class ProductionUiDependencies(
 
     override fun refreshGallery() {
         galleryRefreshJob?.cancel()
-        galleryRefreshJob = activity.lifecycleScope.launch { refreshGalleryInternal() }
+        galleryRefreshJob = activity.lifecycleScope.launch {
+            galleryInitialized.await()
+            refreshGalleryInternal()
+        }
     }
 
     override fun loadThumbnail(
@@ -338,7 +366,7 @@ class ProductionUiDependencies(
         cancellationSignal: CancellationSignal,
     ): Bitmap? {
         if (cancellationSignal.isCanceled) return null
-        val parsed = Uri.parse(uri)
+        val parsed = uri.toUri()
         val platformThumbnail = runCatching {
             activity.contentResolver.loadThumbnail(parsed, Size(sizePx, sizePx), cancellationSignal)
         }.getOrNull()
@@ -375,8 +403,10 @@ class ProductionUiDependencies(
     override fun deleteSelectedMedia() {
         val ids = overlay.value.selected
         if (ids.isEmpty()) return
+        val selectedUris = overlay.value.gallery.filter { it.id in ids }.associate { it.id to it.contentUri }
         activity.lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { galleryRepository.delete(ids) }
+            result.deletedIds.mapNotNull(selectedUris::get).forEach(::evictThumbnail)
             overlay.value = overlay.value.copy(selected = result.failedIds, operationMessage = null)
             refreshGalleryInternal()
             if (result.failedIds.isNotEmpty()) publishOperationError(R.string.gallery_delete_failed)
@@ -395,17 +425,23 @@ class ProductionUiDependencies(
         val item = overlay.value.gallery.firstOrNull { it.id == id }
             ?: state.value.lastCapture?.takeIf { it.id == id }
             ?: return
-        preparePlayer(item)
+        preparePlayer(item, 0)
     }
 
-    fun openCaptureWhenReady(id: String) {
+    fun openCaptureWhenReady(id: String, positionMillis: Long = 0) {
         if (id.isBlank()) return
         pendingOpenId = id
+        pendingOpenPositionMillis = positionMillis.coerceAtLeast(0)
         overlay.value.gallery.firstOrNull { it.id == id }?.let {
             pendingOpenId = null
-            preparePlayer(it)
+            val position = pendingOpenPositionMillis
+            pendingOpenPositionMillis = 0
+            preparePlayer(it, position)
         } ?: refreshGallery()
     }
+
+    fun currentPlayerBookmark(): Pair<String, Long>? =
+        overlay.value.playerId?.let { it to player.currentPosition.coerceAtLeast(0) }
 
     override fun closePlayer() {
         player.pause()
@@ -441,9 +477,13 @@ class ProductionUiDependencies(
 
     override fun deleteCurrentMedia() {
         val id = overlay.value.playerId ?: return
+        val uri = overlay.value.gallery.firstOrNull { it.id == id }?.contentUri
         activity.lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { galleryRepository.delete(setOf(id)) }
-            if (id in result.deletedIds) closePlayer() else publishOperationError(R.string.gallery_delete_failed)
+            if (id in result.deletedIds) {
+                uri?.let(::evictThumbnail)
+                closePlayer()
+            } else publishOperationError(R.string.gallery_delete_failed)
             refreshGalleryInternal()
         }
     }
@@ -464,7 +504,7 @@ class ProductionUiDependencies(
             runCatching {
                 activity.startActivity(
                     Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(Uri.parse(uri), VIDEO_MIME_TYPE)
+                        .setDataAndType(uri.toUri(), VIDEO_MIME_TYPE)
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
                 )
             }.onFailure { publishOperationError(R.string.no_video_viewer) }
@@ -482,6 +522,7 @@ class ProductionUiDependencies(
         }.map { it.toUi() }
         val current = overlay.value
         val availableIds = items.mapTo(mutableSetOf(), MediaItemUi::id)
+        current.gallery.filter { it.id !in availableIds }.forEach { evictThumbnail(it.contentUri) }
         val nextPlayer = current.playerId?.takeIf { it in availableIds }
         if (current.playerId != null && nextPlayer == null) {
             player.stop()
@@ -497,15 +538,18 @@ class ProductionUiDependencies(
         pendingOpenId?.let { id ->
             items.firstOrNull { it.id == id }?.let { item ->
                 pendingOpenId = null
-                preparePlayer(item)
+                val position = pendingOpenPositionMillis
+                pendingOpenPositionMillis = 0
+                preparePlayer(item, position)
             }
         }
     }
 
-    private fun preparePlayer(item: MediaItemUi) {
+    private fun preparePlayer(item: MediaItemUi, positionMillis: Long) {
         runCatching {
             player.setMediaItem(PlaybackMediaItem.fromUri(item.contentUri))
             player.prepare()
+            if (positionMillis > 0) player.seekTo(positionMillis)
             player.playWhenReady = false
             overlay.value = overlay.value.copy(playerId = item.id, selected = emptySet(), operationMessage = null)
         }.onFailure { publishOperationError(R.string.player_open_failed) }
@@ -580,7 +624,7 @@ class ProductionUiDependencies(
             !activity.shouldShowRequestPermissionRationale(permission)
 
     private fun markPermissionRequested(key: String) {
-        permissionHistory.edit().putBoolean(key, true).apply()
+        permissionHistory.edit { putBoolean(key, true) }
     }
 
     private fun granted(permission: String): Boolean =
@@ -605,7 +649,7 @@ class ProductionUiDependencies(
         capturedAtMillis = createdAtMillis,
         durationMillis = durationMillis,
         sizeBytes = sizeBytes ?: 0,
-        hasAudio = audioIncluded,
+        hasAudio = audioIncluded.takeIf { audioKnown },
         width = width ?: 0,
         height = height ?: 0,
     )

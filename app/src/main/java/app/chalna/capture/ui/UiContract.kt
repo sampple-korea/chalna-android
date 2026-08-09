@@ -21,7 +21,7 @@ data class MediaItemUi(
     val capturedAtMillis: Long,
     val durationMillis: Long = 0,
     val sizeBytes: Long = 0,
-    val hasAudio: Boolean = true,
+    val hasAudio: Boolean? = true,
     val width: Int = 0,
     val height: Int = 0,
 )

@@ -153,6 +153,7 @@ object CaptureIndexCodec {
                     item.sizeBytes?.toString().orEmpty(),
                     item.width?.toString().orEmpty(),
                     item.height?.toString().orEmpty(),
+                    if (item.audioKnown) "1" else "0",
                 ).joinToString("\t", transform = ::encodeField),
             ).append('\n')
         }
@@ -165,7 +166,7 @@ object CaptureIndexCodec {
         val items = lines.drop(1).mapNotNull { line ->
             runCatching {
                 val f = line.split('\t').map(::decodeField)
-                if (f.size != 12) return@runCatching null
+                if (f.size !in 12..13) return@runCatching null
                 CaptureItem(
                     id = f[0],
                     storageDestination = StorageDestination.valueOf(f[1]),
@@ -179,6 +180,7 @@ object CaptureIndexCodec {
                     sizeBytes = f[9].toLongOrNull(),
                     width = f[10].toIntOrNull(),
                     height = f[11].toIntOrNull(),
+                    audioKnown = f.getOrNull(12)?.let { it == "1" } ?: true,
                 ).takeIf(CaptureItem::isUsable)
             }.getOrNull()
         }

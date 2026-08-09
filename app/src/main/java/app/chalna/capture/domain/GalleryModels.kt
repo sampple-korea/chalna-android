@@ -16,6 +16,7 @@ data class CaptureItem(
     val sizeBytes: Long? = null,
     val width: Int? = null,
     val height: Int? = null,
+    val audioKnown: Boolean = true,
 ) {
     fun isUsable(): Boolean = id.isNotBlank() && contentUri.startsWith("content://") &&
         createdAtMillis > 0 && durationMillis >= 0
@@ -33,6 +34,7 @@ data class CaptureItem(
         sizeBytes = sizeBytes,
         width = width,
         height = height,
+        audioKnown = audioKnown,
     )
 
     companion object {
@@ -53,6 +55,7 @@ data class CaptureItem(
                 sizeBytes = capture.sizeBytes,
                 width = capture.width,
                 height = capture.height,
+                audioKnown = capture.audioKnown,
             )
         }
     }

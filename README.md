@@ -30,7 +30,7 @@ Assistant selection, keyguard delivery, power-button gestures, and background-st
 
 ## Build
 
-The project pins AGP 9.3.1, Gradle 9.5.0, Kotlin 2.3.21, Compose BOM 2026.06.00, CameraX 1.6.1, Media3 1.11.0, and Java 17 bytecode. Media3 is limited to ExoPlayer and its non-Material Compose UI primitives. Repository policy forbids local Android builds; GitHub Actions is the source of truth. Exact CI commands and evidence requirements are in [RELEASE.md](docs/RELEASE.md).
+The project pins AGP 9.3.1, Gradle 9.5.0, Kotlin 2.3.21, Compose BOM 2026.06.00, CameraX 1.6.1, Media3 1.11.0, and Java 17 bytecode. Media3 is limited to ExoPlayer; every playback control is implemented in Chalna's Foundation-only UI. Repository policy forbids local Android builds; GitHub Actions is the source of truth. Exact CI commands and evidence requirements are in [RELEASE.md](docs/RELEASE.md).
 
 ## Documentation
 

@@ -1,9 +1,9 @@
 package app.chalna.capture.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,7 +55,7 @@ class ChalnaUiTest {
         )
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithText("Ready").assertIsDisplayed()
-        compose.onNodeWithText("Diagnostics").assertDoesNotExist()
+        check(compose.onAllNodesWithText("Diagnostics").fetchSemanticsNodes().isEmpty())
     }
 
     @Test fun audioOffSetupNeverRequestsMicrophone() {

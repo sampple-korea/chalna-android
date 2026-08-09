@@ -1,6 +1,8 @@
 package app.chalna.capture.assistant
 
 import android.content.Intent
+import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionService
@@ -13,6 +15,11 @@ class ChalnaVoiceInteractionService : VoiceInteractionService() {
         setDisabledShowContext(
             VoiceInteractionSession.SHOW_WITH_ASSIST or VoiceInteractionSession.SHOW_WITH_SCREENSHOT,
         )
+        if (Build.VERSION.SDK_INT >= 36 &&
+            Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1
+        ) {
+            disableSystemInvocationEffect()
+        }
     }
 
     override fun onLaunchVoiceAssistFromKeyguard() {
@@ -25,5 +32,10 @@ class ChalnaVoiceInteractionService : VoiceInteractionService() {
 
     override fun onPrepareToShowSession(args: Bundle, flags: Int) {
         super.onPrepareToShowSession(args, flags)
+    }
+
+    @SuppressLint("NewApi")
+    private fun disableSystemInvocationEffect() {
+        runCatching { setInvocationEffectEnabled(false) }
     }
 }

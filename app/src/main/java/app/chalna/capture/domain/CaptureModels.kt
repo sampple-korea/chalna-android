@@ -70,6 +70,7 @@ data class LastCapture(
     val sizeBytes: Long? = null,
     val width: Int? = null,
     val height: Int? = null,
+    val audioKnown: Boolean = true,
 ) {
     fun isUsable(): Boolean = uri.startsWith("content://") && durationMillis >= 0 && createdAtMillis > 0
 }

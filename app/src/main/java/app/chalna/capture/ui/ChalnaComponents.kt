@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -35,6 +36,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -42,6 +44,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -55,23 +58,47 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.BasicText
 import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable internal fun ChalnaBackdrop(static: Boolean) {
-    val phase = if (static) 0f else {
+    val phase = if (static) remember { mutableFloatStateOf(0f) } else {
         val transition = rememberInfiniteTransition(label = "backdrop")
-        val value by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(16_000)), label = "backdropPhase")
-        value
+        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(16_000)), label = "backdropPhase")
     }
     val colors = ChalnaTheme.colors
-    Canvas(Modifier.fillMaxSize()) {
-        val a = phase * 6.283f
-        drawCircle(Brush.radialGradient(listOf(colors.accent.copy(.10f), Color.Transparent)), size.minDimension * .62f, Offset(size.width * (.18f + .05f*cos(a)), size.height*.14f))
-        drawCircle(Brush.radialGradient(listOf(colors.accent2.copy(.08f), Color.Transparent)), size.minDimension * .68f, Offset(size.width * (.80f + .04f*sin(a)), size.height*.78f))
-    }
+    Canvas(
+        Modifier.fillMaxSize().drawWithCache {
+            val coolField = Brush.radialGradient(
+                listOf(colors.accent.copy(.085f), colors.accent.copy(.022f), Color.Transparent),
+                center = Offset(size.width * .20f, size.height * .12f),
+                radius = size.minDimension * .76f,
+            )
+            val violetField = Brush.radialGradient(
+                listOf(colors.accent2.copy(.068f), colors.accent2.copy(.018f), Color.Transparent),
+                center = Offset(size.width * .78f, size.height * .78f),
+                radius = size.minDimension * .82f,
+            )
+            val centerField = Brush.radialGradient(
+                listOf(colors.surfaceHigh.copy(.20f), Color.Transparent),
+                center = center,
+                radius = size.minDimension * .60f,
+            )
+            onDrawBehind {
+                val angle = phase.value * 6.283f
+                withTransform({ translate(size.width * .025f * cos(angle), size.height * .018f * sin(angle)) }) {
+                    drawRect(coolField)
+                }
+                withTransform({ translate(-size.width * .020f * sin(angle), size.height * .016f * cos(angle)) }) {
+                    drawRect(violetField)
+                }
+                drawRect(centerField)
+            }
+        },
+    ) {}
 }
 
 @Composable internal fun Hairline() = Spacer(Modifier.fillMaxWidth().height(1.dp).background(ChalnaTheme.colors.outline.copy(.55f)))
@@ -90,10 +117,10 @@ private fun Modifier.composedClickable(role: Role?, enabled: Boolean, onClick: (
 @Composable
 internal fun ChalnaText(
     text: String,
+    modifier: Modifier = Modifier,
     size: Int = 15,
     color: Color = ChalnaTheme.colors.text,
     weight: FontWeight = FontWeight.Normal,
-    modifier: Modifier = Modifier,
     align: TextAlign? = null,
 ) = BasicText(
     text = text,
@@ -108,9 +135,18 @@ internal fun ChalnaText(
     ),
 )
 
-@Composable internal fun Heading(text: String, modifier: Modifier = Modifier) = ChalnaText(text, 26, weight = FontWeight.Bold, modifier = modifier.semantics { heading() })
-@Composable internal fun Body(text: String, modifier: Modifier = Modifier) = ChalnaText(text, 15, ChalnaTheme.colors.muted, modifier = modifier)
-@Composable internal fun SectionTitle(text: String) = ChalnaText(text, 13, ChalnaTheme.colors.accent, FontWeight.Bold, Modifier.padding(top = 20.dp, bottom = 8.dp).semantics { heading() })
+@Composable
+internal fun ChalnaText(
+    text: String,
+    size: Int,
+    color: Color = ChalnaTheme.colors.text,
+    weight: FontWeight = FontWeight.Normal,
+    align: TextAlign? = null,
+) = ChalnaText(text, Modifier, size, color, weight, align)
+
+@Composable internal fun Heading(text: String, modifier: Modifier = Modifier) = ChalnaText(text, modifier.semantics { heading() }, 26, weight = FontWeight.Bold)
+@Composable internal fun Body(text: String, modifier: Modifier = Modifier) = ChalnaText(text, modifier, 15, ChalnaTheme.colors.muted)
+@Composable internal fun SectionTitle(text: String) = ChalnaText(text, Modifier.padding(top = 20.dp, bottom = 8.dp).semantics { heading() }, 13, ChalnaTheme.colors.accent, FontWeight.Bold)
 
 @Composable internal fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) = Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
@@ -184,9 +220,9 @@ internal fun ChalnaText(
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ChalnaText(title, 16, modifier = Modifier.weight(1f))
+        ChalnaText(title, Modifier.weight(1f), 16)
         Box(Modifier.width(48.dp).height(28.dp).clip(CircleShape).background(if (checked) ChalnaTheme.colors.accent else ChalnaTheme.colors.outline).padding(4.dp)) {
-            Box(Modifier.offset(x = thumbOffset).size(20.dp).clip(CircleShape).background(if (checked) Color(0xFF071018) else ChalnaTheme.colors.muted))
+            Box(Modifier.offset { IntOffset(thumbOffset.roundToPx(), 0) }.size(20.dp).clip(CircleShape).background(if (checked) Color(0xFF071018) else ChalnaTheme.colors.muted))
         }
     }
 }

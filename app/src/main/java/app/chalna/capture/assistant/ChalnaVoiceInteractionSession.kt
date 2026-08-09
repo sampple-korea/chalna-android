@@ -13,12 +13,15 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
 import android.graphics.RectF
+import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.graphics.SweepGradient
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.service.voice.VoiceInteractionSession
 import android.view.View
+import android.view.RoundedCorner
 import android.view.animation.PathInterpolator
 import app.chalna.capture.capture.CaptureRuntime
 import app.chalna.capture.capture.CaptureService
@@ -38,10 +41,16 @@ class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInte
     private var dispatchedSession: String? = null
     private var pulseView: ChalnaInvocationGlowView? = null
     private var pendingPulse: InvocationPulseKind? = null
+    private var lastAnonymousShowAtMillis = Long.MIN_VALUE
 
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
         val platformSessionId = if (Build.VERSION.SDK_INT >= 34) args?.getString(KEY_SHOW_SESSION_ID) else null
+        val now = SystemClock.elapsedRealtime()
+        if (platformSessionId == null && lastAnonymousShowAtMillis != Long.MIN_VALUE &&
+            now - lastAnonymousShowAtMillis < ANONYMOUS_DUPLICATE_WINDOW_MILLIS
+        ) return
+        if (platformSessionId == null) lastAnonymousShowAtMillis = now
         val id = platformSessionId ?: "session-${UUID.randomUUID()}"
         if (dispatchedSession == id) return
         dispatchedSession = id
@@ -83,6 +92,10 @@ class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInte
         super.onDestroy()
     }
 
+    private companion object {
+        const val ANONYMOUS_DUPLICATE_WINDOW_MILLIS = 320L
+    }
+
 }
 
 internal enum class InvocationPulseKind { START, STOP, ERROR }
@@ -91,7 +104,9 @@ internal enum class InvocationPulseKind { START, STOP, ERROR }
  * Transient three-layer perimeter illumination. Geometry, shaders, matrices, and hotspot buffers
  * are cached per size; animation only mutates scalar phase/alpha values.
  */
-internal class ChalnaInvocationGlowView(context: Context, private val finished: () -> Unit = {}) : View(context) {
+internal class ChalnaInvocationGlowView(context: Context, private val finished: () -> Unit) : View(context) {
+        constructor(context: Context) : this(context, {})
+
         private val density = resources.displayMetrics.density
         private val edgePath = Path()
         private val edgeBounds = RectF()
@@ -118,6 +133,17 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         init {
             importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
             setLayerType(LAYER_TYPE_HARDWARE, null)
+            if (Build.VERSION.SDK_INT >= 31) {
+                atmospherePaint.setRenderEffect(
+                    RenderEffect.createBlurEffect(density * 13f, density * 13f, Shader.TileMode.CLAMP),
+                )
+                bloomPaint.setRenderEffect(
+                    RenderEffect.createBlurEffect(density * 4.5f, density * 4.5f, Shader.TileMode.CLAMP),
+                )
+                hotspotBloomPaint.setRenderEffect(
+                    RenderEffect.createBlurEffect(density * 6f, density * 6f, Shader.TileMode.CLAMP),
+                )
+            }
         }
 
         fun activate(requestedKind: InvocationPulseKind) {
@@ -129,7 +155,11 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             animator?.removeAllListeners()
             animator?.cancel()
             animator = ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 640L
+                duration = when (requestedKind) {
+                    InvocationPulseKind.START -> 650L
+                    InvocationPulseKind.STOP -> 570L
+                    InvocationPulseKind.ERROR -> 460L
+                }
                 interpolator = PathInterpolator(0.18f, 0.78f, 0.22f, 1f)
                 addUpdateListener { animation ->
                     progress = animation.animatedValue as Float
@@ -178,7 +208,18 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
             val opticalInset = max(1f, density * 0.8f)
             edgeBounds.set(opticalInset, opticalInset, width - opticalInset, height - opticalInset)
-            val corner = (resources.displayMetrics.density * 31f).coerceAtMost(edgeBounds.shortSide() * 0.13f)
+            val platformCorner = if (Build.VERSION.SDK_INT >= 31) {
+                listOf(
+                    RoundedCorner.POSITION_TOP_LEFT,
+                    RoundedCorner.POSITION_TOP_RIGHT,
+                    RoundedCorner.POSITION_BOTTOM_RIGHT,
+                    RoundedCorner.POSITION_BOTTOM_LEFT,
+                ).maxOfOrNull { rootWindowInsets?.getRoundedCorner(it)?.radius ?: 0 }?.toFloat() ?: 0f
+            } else {
+                0f
+            }
+            val corner = maxOf(resources.displayMetrics.density * 31f, platformCorner)
+                .coerceAtMost(edgeBounds.shortSide() * 0.18f)
             edgePath.reset()
             edgePath.addRoundRect(edgeBounds, corner, corner, Path.Direction.CW)
             pathMeasure.setPath(edgePath, true)
@@ -198,18 +239,20 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             val envelope = activation * decay
             val asymmetry = 0.78f + 0.22f * activation
             val boost = 1f + resolveBoost * 0.28f
+            val contraction = if (kind == InvocationPulseKind.STOP) 1f - progress * 0.18f else 1f
 
             rotateShaders(progress)
             atmospherePaint.alpha = (34f * envelope * asymmetry).toInt().coerceIn(0, 255)
-            bloomPaint.alpha = (112f * envelope * boost).toInt().coerceIn(0, 255)
+            bloomPaint.alpha = (112f * envelope * boost * contraction).toInt().coerceIn(0, 255)
             corePaint.alpha = (238f * envelope * boost).toInt().coerceIn(0, 255)
             canvas.drawPath(edgePath, atmospherePaint)
             canvas.drawPath(edgePath, bloomPaint)
             canvas.drawPath(edgePath, corePaint)
 
-            drawHotspot(canvas, (0.08f + progress * 0.93f) % 1f, envelope, 1f)
-            drawHotspot(canvas, (0.43f + progress * 0.57f) % 1f, envelope, 0.72f)
-            if (progress < 0.34f) drawHotspot(canvas, (0.74f + progress * 0.38f) % 1f, envelope, 0.52f)
+            val direction = if (kind == InvocationPulseKind.STOP) -1f else 1f
+            drawHotspot(canvas, (1.08f + direction * progress * 0.93f) % 1f, envelope, 1f)
+            drawHotspot(canvas, (1.43f + direction * progress * 0.57f) % 1f, envelope, 0.72f)
+            if (progress < 0.34f) drawHotspot(canvas, (1.74f + direction * progress * 0.38f) % 1f, envelope, 0.52f)
         }
 
         private fun drawHotspot(canvas: Canvas, fraction: Float, envelope: Float, energy: Float) {

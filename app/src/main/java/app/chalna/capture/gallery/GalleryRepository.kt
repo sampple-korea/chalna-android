@@ -131,11 +131,11 @@ class GalleryRepository(
         return ExportCapturesResult(exported, failed)
     }
 
-    suspend fun shareUris(ids: Set<String>): List<String> = index.list()
+    suspend fun shareUris(ids: Set<String>): List<String> = items()
         .filter { it.id in ids && it.contentUri.startsWith("content://") }
         .map(CaptureItem::contentUri)
 
-    suspend fun externalOpenUri(id: String): String? = index.list()
+    suspend fun externalOpenUri(id: String): String? = items()
         .firstOrNull { it.id == id && it.contentUri.startsWith("content://") }
         ?.contentUri
 
