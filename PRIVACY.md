@@ -1,6 +1,6 @@
 # Privacy notice
 
-Last updated: 2026-08-09. This notice describes intended Chalna 1.1.0 behavior; v1.1.0 binary verification is **Pending verification**.
+Last updated: 2026-08-10. This notice describes Chalna 1.1.1 behavior.
 
 ## Data used
 

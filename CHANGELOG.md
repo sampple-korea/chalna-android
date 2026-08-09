@@ -2,6 +2,14 @@
 
 This file records repository changes, not unverified release claims. Dates use ISO 8601.
 
+## [1.1.1] - 2026-08-10
+
+### Fixed
+
+- Restored Assistant-role qualification by publishing the required non-empty `recognitionService` metadata and a system-bound recognition-service component that rejects speech requests without activating audio.
+- Restored the VoiceInteractionSession service's dedicated process.
+- Added policy, instrumentation, API 34 role-assignment, and release-smoke checks that fail when Android no longer accepts Chalna as an Assistant role holder.
+
 ## [1.1.0] - 2026-08-10
 
 ### Added

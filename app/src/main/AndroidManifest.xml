@@ -73,7 +73,22 @@
         <service
             android:name=".assistant.ChalnaVoiceInteractionSessionService"
             android:exported="true"
-            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:process=":session" />
+
+        <service
+            android:name=".assistant.ChalnaRecognitionService"
+            android:directBootAware="false"
+            android:exported="true"
+            android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE"
+            android:process=":recognizer">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
 
         <service
             android:name=".capture.CaptureService"

@@ -6,7 +6,7 @@ on:
       version:
         description: SemVer without the v prefix
         required: true
-        default: 1.1.0
+        default: 1.1.1
         type: string
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test "$VERSION" = "1.1.0"
+          test "$VERSION" = "1.1.1"
           gh release verify --help >/dev/null
           gh release verify-asset --help >/dev/null
           if gh release view "v$VERSION" >/dev/null 2>&1; then
@@ -129,7 +129,7 @@ jobs:
           TARGET_SDK="$($APKANALYZER manifest target-sdk "$APK")"
           test "$APP_ID" = 'app.chalna.capture'
           test "$VERSION_NAME" = "$VERSION"
-          test "$VERSION_CODE" = '2'
+          test "$VERSION_CODE" = '3'
           "$BUILD_TOOLS/aapt2" dump permissions "$APK" | tee permissions.txt
           ! grep -q 'android.permission.INTERNET' permissions.txt
           ! grep -q 'android.permission.READ_MEDIA_VIDEO' permissions.txt
@@ -185,6 +185,7 @@ jobs:
           disable-animations: true
           script: |
             adb install -r "${{ steps.apk.outputs.apk }}"
+            bash scripts/verify-assistant-role.sh app.chalna.capture
             adb shell am start -W -n app.chalna.capture/app.chalna.capture.MainActivity
             test -n "$(adb shell pidof app.chalna.capture)"
       - name: Create complete draft release
@@ -195,7 +196,7 @@ jobs:
             "${{ steps.apk.outputs.apk }}" \
             "${{ steps.apk.outputs.checksum }}" \
             "${{ steps.apk.outputs.info }}" \
-            --draft --target "$GITHUB_SHA" --title "Chalna v$VERSION" --notes-file docs/RELEASE_NOTES_v1.1.0.md
+            --draft --target "$GITHUB_SHA" --title "Chalna v$VERSION" --notes-file docs/RELEASE_NOTES_v1.1.1.md
           test "$(gh release view "v$VERSION" --json assets --jq '.assets | length')" = '3'
           test "$(gh release view "v$VERSION" --json targetCommitish --jq .targetCommitish)" = "$GITHUB_SHA"
           test "$(gh release view "v$VERSION" --json assets --jq '[.assets[].name] | sort | join("\n")')" = "$(printf '%s\n' \
@@ -240,7 +241,7 @@ jobs:
           test "$REMOTE_CERT_SHA" = "$EXPECTED_RELEASE_CERT_SHA256"
           test "$($APKANALYZER manifest application-id "chalna-v${VERSION}-release.apk")" = 'app.chalna.capture'
           test "$($APKANALYZER manifest version-name "chalna-v${VERSION}-release.apk")" = "$VERSION"
-          test "$($APKANALYZER manifest version-code "chalna-v${VERSION}-release.apk")" = '2'
+          test "$($APKANALYZER manifest version-code "chalna-v${VERSION}-release.apk")" = '3'
           "$BUILD_TOOLS/aapt2" dump permissions "chalna-v${VERSION}-release.apk" > remote-permissions.txt
           ! grep -q 'android.permission.INTERNET' remote-permissions.txt
           ! grep -q 'android.permission.READ_MEDIA_VIDEO' remote-permissions.txt

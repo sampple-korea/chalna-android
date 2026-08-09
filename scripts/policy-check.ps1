@@ -5,6 +5,7 @@ $failures = [System.Collections.Generic.List[string]]::new()
 function Add-Failure([string]$message) { $failures.Add($message) }
 
 $manifest = Get-Content -Raw (Join-Path $root "app/src/main/AndroidManifest.xml")
+$voiceMetadata = Get-Content -Raw (Join-Path $root "app/src/main/res/xml/voice_interaction_service.xml")
 $forbiddenPermissions = @(
   "android.permission.INTERNET",
   "android.permission.READ_MEDIA_VIDEO",
@@ -26,6 +27,18 @@ foreach ($permission in $forbiddenPermissions) {
   if ($manifest.Contains($permission)) { Add-Failure "Forbidden permission: $permission" }
 }
 if ($manifest -match "BOOT_COMPLETED") { Add-Failure "Boot-triggered capture is forbidden" }
+if ($voiceMetadata -notmatch 'android:sessionService="[^\"]+"') {
+  Add-Failure "Assistant role metadata is missing sessionService"
+}
+if ($voiceMetadata -notmatch 'android:recognitionService="[^\"]+"') {
+  Add-Failure "Assistant role metadata is missing recognitionService"
+}
+if ($voiceMetadata -notmatch 'android:supportsAssist="true"') {
+  Add-Failure "Assistant role metadata must declare supportsAssist=true"
+}
+if ($manifest -notmatch 'android:name="\.assistant\.ChalnaRecognitionService"') {
+  Add-Failure "Assistant role recognition service component is missing"
+}
 
 $gradleText = (Get-ChildItem $root -Recurse -File -Include *.gradle,*.gradle.kts,*.toml | ForEach-Object { Get-Content -Raw $_.FullName }) -join "`n"
 $forbiddenDependencies = @(

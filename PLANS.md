@@ -1,13 +1,14 @@
-# Chalna v1.1.0 second-pass plan
+# Chalna v1.1.1 Assistant eligibility hotfix
 
 ## Goal
 
-Prepare a private, signed, immutable v1.1.0 update that adds local capture management and playback without expanding sensor triggers, network access, or broad media permissions. The package remains `app.chalna.capture`; the update is version name `1.1.0`, version code `2`.
+Publish a private, signed, immutable v1.1.1 hotfix that restores Android Assistant-role eligibility without regressing the v1.1 capture, storage, gallery, player, design, privacy, or signing contract. The package remains `app.chalna.capture`; the update is version name `1.1.1`, version code `3`.
 
 ## Baseline
 
 - Immutable v1.0.0 was published from commit `80dc98ccdc2587812e99270928531b6d40972be8` with package `app.chalna.capture`, version code `1`, and signer SHA-256 `E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9`.
-- v1.1.0 must remain installable as an update by preserving both application ID and signing identity.
+- Immutable v1.1.0 exposed a role-qualification regression: its voice-interaction metadata omitted `recognitionService`, while Android RoleController requires non-null session service, recognition service, and `supportsAssist=true` metadata before listing a VoiceInteractionService as an Assistant candidate.
+- v1.1.1 must remain installable as an update by preserving both application ID and signing identity.
 - Android compilation, dependency resolution, tests, emulator work, APK inspection, and release packaging run only on GitHub-hosted CI.
 
 ## Second-pass scope
@@ -32,6 +33,10 @@ Prepare a private, signed, immutable v1.1.0 update that adds local capture manag
 - Grant the release job only `contents: write` and `attestations: read`, then retry immutable-release verification for at most 12 attempts with 10-second intervals to tolerate bounded GitHub attestation propagation; fail if verification remains unavailable.
 
 ## Exit criteria
+
+- The APK declares a valid, system-bound recognition-service component. It rejects speech requests without recording audio because Chalna is not a speech assistant.
+- API 34 UI QA and signed-release smoke tests assign `android.app.role.ASSISTANT` to the installed package without bypassing role qualification, then verify both secure service mappings.
+- The immutable v1.1.0 tag and assets remain untouched; v1.1.1 uses a new tag and versioned assets.
 
 - Android CI [31322147848](https://github.com/sampple-korea/chalna-android/actions/runs/31322147848) is green: policy, formatting, static analysis, resolved dependency inspection, lint, 32 JVM tests, and debug APK passed.
 - UI QA [31322147867](https://github.com/sampple-korea/chalna-android/actions/runs/31322147867) is green: 44 connected tests, an independent 38-frame deterministic screenshot pass, required artifact checks, and install/launch smoke passed.

@@ -25,7 +25,7 @@ Capture index ── gallery/filter/selection ── local Media3 player
                                           └── explicit share/export/delete
 ```
 
-The voice interaction components are exported only for system binding and protected by `BIND_VOICE_INTERACTION`; the capture service is not exported. The always-resident voice service must stay lightweight. CameraX creation/binding and microphone access belong only in the post-trigger capture path. Gallery browsing and playback of already-saved media cannot call the capture path.
+The voice interaction components are exported only for system binding and protected by `BIND_VOICE_INTERACTION`; the capture service is not exported. Android's Assistant RoleController also requires voice-interaction metadata to name a recognition service. `ChalnaRecognitionService` is protected by `BIND_SPEECH_RECOGNITION_SERVICE`, is not selectable as a standalone recognizer, rejects every recognition request, and never opens the microphone. It exists only to satisfy the platform role contract; Chalna does not listen for speech. The always-resident voice service must stay lightweight. CameraX creation/binding and microphone access belong only in the post-trigger capture path. Gallery browsing and playback of already-saved media cannot call the capture path.
 
 ## State machine
 

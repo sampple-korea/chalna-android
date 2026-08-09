@@ -73,6 +73,7 @@ jobs:
             ./gradlew --no-daemon --stacktrace :app:connectedDebugAndroidTest
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            bash scripts/verify-assistant-role.sh app.chalna.capture.debug
             adb shell am instrument -w -r -e class app.chalna.capture.ui.ChalnaScreenshotTest app.chalna.capture.debug.test/androidx.test.runner.AndroidJUnitRunner | tee screenshot-instrumentation.txt
             grep -q '^OK (' screenshot-instrumentation.txt
             ! grep -q 'FAILURES!!!' screenshot-instrumentation.txt
