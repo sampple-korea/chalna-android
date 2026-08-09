@@ -4,7 +4,5 @@
     android:sessionService="app.chalna.capture.assistant.ChalnaVoiceInteractionSessionService"
     android:settingsActivity="app.chalna.capture.MainActivity"
     android:supportsAssist="true"
-    android:supportsAssistGesture="true"
     android:supportsLaunchVoiceAssistFromKeyguard="true"
     android:supportsLocalInteraction="false" />
-
