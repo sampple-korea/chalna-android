@@ -49,6 +49,7 @@ jobs:
           arch: x86_64
           profile: pixel_2
           target: aosp_atd
+          disk-size: 2048M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
