@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +43,7 @@ object ChalnaTheme {
     val colors: ChalnaColors @Composable get() = LocalChalnaColors.current
 }
 
+@OptIn(ExperimentalTextApi::class)
 val ChalnaFontFamily = FontFamily(
     Font(R.font.noto_sans_kr_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
     Font(R.font.noto_sans_kr_variable, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
