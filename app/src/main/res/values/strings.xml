@@ -51,4 +51,5 @@
     <plurals name="seconds_value"><item quantity="one">%1$d sec</item><item quantity="other">%1$d sec</item></plurals>
     <string name="open_video">Open video</string><string name="diagnostic_real_video_warning">This test uses the production capture path and saves a real short video.</string><string name="confirm_capture">Start test capture</string><string name="cancel">Cancel</string><string name="copy_diagnostics">Copy diagnostics</string>
     <string name="notification_saved_title">Video saved</string><string name="notification_saved_text">Movies/Chalna</string><string name="notification_error_title">Chalna could not start recording</string>
+    <string name="setup_required">Setup required</string><string name="review_setup">Review setup</string><string name="file_not_found">The saved video can no longer be found.</string>
 </resources>

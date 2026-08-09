@@ -23,6 +23,7 @@ data class ChalnaUiState(
     val microphoneGranted: Boolean = false,
     val notificationsGranted: Boolean = false,
     val powerSaver: Boolean = false,
+    val ready: Boolean = true,
     val diagnosticLines: List<String> = emptyList(),
 )
 
@@ -45,4 +46,5 @@ interface UiDependencies {
     fun openLastCapture()
     fun copyDiagnostics()
     fun clearDiagnostics()
+    fun reviewSetup()
 }

@@ -17,6 +17,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import app.chalna.capture.BuildConfig
 import app.chalna.capture.capture.CaptureRuntime
 import app.chalna.capture.capture.CaptureService
@@ -31,8 +33,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ProductionUiDependencies(
     private val activity: ComponentActivity,
@@ -44,7 +50,10 @@ class ProductionUiDependencies(
     private val diagnosticsVisible = MutableStateFlow(true)
 
     private val cameraPermission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshSnapshot() }
-    private val microphonePermission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshSnapshot() }
+    private val microphonePermission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) updateSettings { copy(audioEnabled = true) }
+        refreshSnapshot()
+    }
     private val notificationPermission = activity.registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { refreshSnapshot() }
@@ -60,6 +69,17 @@ class ProductionUiDependencies(
             }
         }
         activity.lifecycleScope.launch {
+            activity.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                settingsStore.lastCapture.filterNotNull().collectLatest { capture ->
+                    val exists = withContext(Dispatchers.IO) { LastCaptureValidator(activity.contentResolver).exists(capture) }
+                    if (!exists) {
+                        settingsStore.saveLastCapture(null)
+                        CaptureRuntime.publish(CaptureState.Failed(activity.getString(app.chalna.capture.R.string.file_not_found)))
+                    }
+                }
+            }
+        }
+        activity.lifecycleScope.launch {
             combine(settingsStore.settings, settingsStore.lastCapture, CaptureRuntime.state, tick, diagnosticsVisible) { settings, lastCapture, capture, now, showDiagnostics ->
                 val roleManager = activity.getSystemService(RoleManager::class.java)
                 val assistantSelected = roleManager.isRoleAvailable(RoleManager.ROLE_ASSISTANT) &&
@@ -67,6 +87,7 @@ class ProductionUiDependencies(
                 val cameraGranted = granted(Manifest.permission.CAMERA)
                 val microphoneGranted = granted(Manifest.permission.RECORD_AUDIO)
                 val notificationsGranted = Build.VERSION.SDK_INT < 33 || granted(Manifest.permission.POST_NOTIFICATIONS)
+                val ready = cameraGranted && notificationsGranted && assistantSelected && (!settings.audioEnabled || microphoneGranted)
                 val phase = when (capture) {
                     CaptureState.Idle -> CapturePhase.READY
                     is CaptureState.Starting -> CapturePhase.STARTING
@@ -116,6 +137,7 @@ class ProductionUiDependencies(
                     microphoneGranted = microphoneGranted,
                     notificationsGranted = notificationsGranted,
                     powerSaver = activity.getSystemService(PowerManager::class.java).isPowerSaveMode,
+                    ready = ready,
                     diagnosticLines = diagnostics,
                 )
             }.collect { mutableState.value = it }
@@ -164,7 +186,10 @@ class ProductionUiDependencies(
     }
 
     override fun setHaptics(value: Boolean) = updateSettings { copy(hapticsEnabled = value) }
-    override fun setSound(value: Boolean) = updateSettings { copy(audioEnabled = value) }
+    override fun setSound(value: Boolean) {
+        if (value && !granted(Manifest.permission.RECORD_AUDIO)) requestMicrophone()
+        else updateSettings { copy(audioEnabled = value) }
+    }
     override fun setAutoStop(seconds: Int) = updateSettings { copy(autoStopSeconds = seconds) }
     override fun setReducedMotion(value: Boolean) = updateSettings {
         copy(motion = if (value) MotionPreference.REDUCED else MotionPreference.SYSTEM)
@@ -194,6 +219,7 @@ class ProductionUiDependencies(
         CaptureRuntime.clearDiagnostics()
         diagnosticsVisible.value = false
     }
+    override fun reviewSetup() = updateSettings { copy(setupComplete = false) }
 
     private fun updateSettings(transform: app.chalna.capture.domain.CaptureSettings.() -> app.chalna.capture.domain.CaptureSettings) {
         activity.lifecycleScope.launch { settingsStore.update { it.transform() } }

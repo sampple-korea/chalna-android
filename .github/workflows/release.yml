@@ -27,10 +27,6 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ github.event.inputs.version }}
-      CHALNA_RELEASE_STORE_PASSWORD: ${{ secrets.CHALNA_RELEASE_STORE_PASSWORD }}
-      CHALNA_RELEASE_KEY_ALIAS: ${{ secrets.CHALNA_RELEASE_KEY_ALIAS }}
-      CHALNA_RELEASE_KEY_PASSWORD: ${{ secrets.CHALNA_RELEASE_KEY_PASSWORD }}
-      CHALNA_RELEASE_CERT_SHA256: ${{ secrets.CHALNA_RELEASE_CERT_SHA256 }}
       CHALNA_KEYSTORE_PATH: ${{ github.workspace }}/.release/chalna-release.p12
     steps:
       - name: Validate version and release tooling
@@ -66,6 +62,10 @@ jobs:
         shell: bash
         env:
           KEYSTORE_B64: ${{ secrets.CHALNA_RELEASE_KEYSTORE_B64 }}
+          CHALNA_RELEASE_STORE_PASSWORD: ${{ secrets.CHALNA_RELEASE_STORE_PASSWORD }}
+          CHALNA_RELEASE_KEY_ALIAS: ${{ secrets.CHALNA_RELEASE_KEY_ALIAS }}
+          CHALNA_RELEASE_KEY_PASSWORD: ${{ secrets.CHALNA_RELEASE_KEY_PASSWORD }}
+          CHALNA_RELEASE_CERT_SHA256: ${{ secrets.CHALNA_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
           test -n "$KEYSTORE_B64"
@@ -80,6 +80,10 @@ jobs:
             -storepass "$CHALNA_RELEASE_STORE_PASSWORD" -alias "$CHALNA_RELEASE_KEY_ALIAS" >/dev/null
       - name: Policy, tests, and signed release build
         shell: bash
+        env:
+          CHALNA_RELEASE_STORE_PASSWORD: ${{ secrets.CHALNA_RELEASE_STORE_PASSWORD }}
+          CHALNA_RELEASE_KEY_ALIAS: ${{ secrets.CHALNA_RELEASE_KEY_ALIAS }}
+          CHALNA_RELEASE_KEY_PASSWORD: ${{ secrets.CHALNA_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           pwsh ./scripts/policy-check.ps1
@@ -88,6 +92,8 @@ jobs:
       - name: Validate signed APK and create metadata
         id: apk
         shell: bash
+        env:
+          CHALNA_RELEASE_CERT_SHA256: ${{ secrets.CHALNA_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
           APK_IN="app/build/outputs/apk/release/app-release.apk"

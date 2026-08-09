@@ -55,4 +55,5 @@ internal class FakeUiDependencies(initial: ChalnaUiState) : UiDependencies {
     override fun openLastCapture() = Unit
     override fun copyDiagnostics() = Unit
     override fun clearDiagnostics() = Unit
+    override fun reviewSetup() { state.value = state.value.copy(setupComplete = false) }
 }

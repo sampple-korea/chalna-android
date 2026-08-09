@@ -39,6 +39,7 @@ class CameraXCaptureEngine(
     private var recording: Recording? = null
     private var finalized: CompletableDeferred<LastCapture?>? = null
     private var startedAt = 0L
+    @Volatile private var discardOnFinalize = false
 
     override suspend fun start(invocationId: String): Long {
         CaptureRuntime.record("engine_start_request")
@@ -77,6 +78,7 @@ class CameraXCaptureEngine(
         }
         val output = MediaStoreOutputOptions.Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI).setContentValues(values).build()
         finalized = CompletableDeferred()
+        discardOnFinalize = false
         val started = CompletableDeferred<Long>()
         startedAt = 0L
         var pending = recorder.prepareRecording(context, output)
@@ -92,7 +94,9 @@ class CameraXCaptureEngine(
                     CaptureRuntime.record("video_record_event_finalize")
                     recording = null
                     cameraProvider.unbindAll()
-                    if (!event.hasError() && startedAt > 0) {
+                    val discard = discardOnFinalize
+                    discardOnFinalize = false
+                    if (!event.hasError() && startedAt > 0 && !discard) {
                         finalized?.complete(
                             LastCapture(
                                 event.outputResults.outputUri.toString(),
@@ -113,7 +117,15 @@ class CameraXCaptureEngine(
                 }
             }
         }
-        return withTimeout(10_000) { started.await() }
+        return try {
+            withTimeout(10_000) { started.await() }
+        } catch (failure: Throwable) {
+            discardOnFinalize = true
+            recording?.stop()
+            runCatching { withTimeout(5_000) { finalized?.await() } }
+            provider?.unbindAll()
+            throw failure
+        }
     }
 
     override suspend fun stop(): LastCapture? {
@@ -125,6 +137,7 @@ class CameraXCaptureEngine(
     }
 
     fun release() {
+        discardOnFinalize = true
         recording?.close()
         recording = null
         provider?.unbindAll()

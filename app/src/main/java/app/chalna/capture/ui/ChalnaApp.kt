@@ -197,7 +197,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
         IconButton(stringResource(R.string.settings)) { navigate(Route.CAPTURE) }
     }
     Spacer(Modifier.height(32.dp))
-    Aura(Modifier.align(Alignment.CenterHorizontally), phase = s.phase, reducedMotion = s.reducedMotion || s.powerSaver)
+    Aura(Modifier.align(Alignment.CenterHorizontally), phase = if (s.ready) s.phase else null, reducedMotion = s.reducedMotion || s.powerSaver)
     Spacer(Modifier.height(24.dp))
     TextLabel(phaseTitle(s), 30, ChalnaTheme.colors.text, FontWeight.Bold, Modifier.fillMaxWidth(), TextAlign.Center)
     if (s.phase == CapturePhase.RECORDING || s.phase == CapturePhase.STOPPING) TextLabel(formatDuration(s.durationSeconds), 20, ChalnaTheme.colors.muted, FontWeight.Medium, Modifier.fillMaxWidth(), TextAlign.Center)
@@ -208,6 +208,8 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
         StopButton(stringResource(R.string.stop_capture), onClick = d::toggleCapture)
     } else if (s.phase == CapturePhase.SAVED) {
         PrimaryButton(stringResource(R.string.open_video), onClick = d::openLastCapture)
+    } else if (!s.ready) {
+        PrimaryButton(stringResource(R.string.review_setup), onClick = d::reviewSetup)
     } else {
         StatusRail(s)
     }
@@ -348,5 +350,5 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 @SuppressLint("ModifierParameter")
 @Composable private fun TextLabel(text: String, size: Int, color: Color, weight: FontWeight = FontWeight.Normal, modifier: Modifier = Modifier, align: TextAlign = TextAlign.Start) = androidx.compose.foundation.text.BasicText(text, modifier, style = androidx.compose.ui.text.TextStyle(color = color, fontFamily = ChalnaFontFamily, fontSize = size.sp, fontWeight = weight, fontFeatureSettings = "tnum", lineHeight = (size * 1.4).sp, textAlign = align))
 private fun Modifier.clickableNoRipple(enabled: Boolean = true, click: () -> Unit) = clickable(MutableInteractionSource(), indication = null, enabled = enabled, role = Role.Button, onClick = click)
-@Composable private fun phaseTitle(s: ChalnaUiState) = stringResource(when(s.phase) { CapturePhase.READY -> R.string.phase_ready; CapturePhase.STARTING -> R.string.phase_starting; CapturePhase.RECORDING -> R.string.phase_recording; CapturePhase.STOPPING -> R.string.phase_stopping; CapturePhase.SAVED -> R.string.phase_saved; CapturePhase.ERROR -> R.string.phase_error })
+@Composable private fun phaseTitle(s: ChalnaUiState) = stringResource(if (!s.ready) R.string.setup_required else when(s.phase) { CapturePhase.READY -> R.string.phase_ready; CapturePhase.STARTING -> R.string.phase_starting; CapturePhase.RECORDING -> R.string.phase_recording; CapturePhase.STOPPING -> R.string.phase_stopping; CapturePhase.SAVED -> R.string.phase_saved; CapturePhase.ERROR -> R.string.phase_error })
 private fun formatDuration(seconds: Long) = "%02d:%02d".format(seconds / 60, seconds % 60)

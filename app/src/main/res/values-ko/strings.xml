@@ -33,4 +33,5 @@
     <plurals name="seconds_value"><item quantity="other">%1$d초</item></plurals>
     <string name="open_video">영상 열기</string><string name="diagnostic_real_video_warning">이 테스트는 실제 촬영 경로를 사용하며 짧은 영상을 저장합니다.</string><string name="confirm_capture">테스트 촬영 시작</string><string name="cancel">취소</string><string name="copy_diagnostics">진단 정보 복사</string>
     <string name="notification_saved_title">영상이 저장되었습니다</string><string name="notification_saved_text">Movies/Chalna</string><string name="notification_error_title">찰나가 녹화를 시작하지 못했습니다</string>
+    <string name="setup_required">설정이 필요합니다</string><string name="review_setup">설정 확인</string><string name="file_not_found">저장된 영상을 찾을 수 없습니다.</string>
 </resources>

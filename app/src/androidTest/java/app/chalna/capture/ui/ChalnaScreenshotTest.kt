@@ -87,4 +87,5 @@ private class ScreenshotDependencies(initial: ChalnaUiState) : UiDependencies {
     override fun openLastCapture() = Unit
     override fun copyDiagnostics() = Unit
     override fun clearDiagnostics() = Unit
+    override fun reviewSetup() = Unit
 }
