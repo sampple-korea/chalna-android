@@ -15,19 +15,20 @@ data class ChalnaColors(
     val accent: Color,
     val accent2: Color,
     val positive: Color,
+    val warning: Color,
     val danger: Color,
     val outline: Color,
 )
 
 val NightColors = ChalnaColors(
     Color(0xFF080A12), Color(0xD9151925), Color(0xFF222738), Color(0xFFF7F5FF),
-    Color(0xFFA9A9BA), Color(0xFFB7A1FF), Color(0xFF70E2D2), Color(0xFF86E6A7),
-    Color(0xFFFF7D8E), Color(0xFF3B4052),
+    Color(0xFFA9A9BA), Color(0xFF58D7FF), Color(0xFF896EFF), Color(0xFF64D5B0),
+    Color(0xFFFFB35E), Color(0xFFFF657F), Color(0xFF3B4052),
 )
 val MistColors = ChalnaColors(
     Color(0xFFF4F2F8), Color(0xE6FFFFFF), Color(0xFFFFFFFF), Color(0xFF171520),
-    Color(0xFF686372), Color(0xFF684FD1), Color(0xFF0B8E83), Color(0xFF19733E),
-    Color(0xFFB4233D), Color(0xFFD8D3E0),
+    Color(0xFF686372), Color(0xFF325FC4), Color(0xFF684FD1), Color(0xFF19733E),
+    Color(0xFFA85800), Color(0xFFB4233D), Color(0xFFD8D3E0),
 )
 
 val LocalChalnaColors = staticCompositionLocalOf { NightColors }

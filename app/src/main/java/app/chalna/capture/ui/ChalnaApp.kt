@@ -32,7 +32,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
@@ -121,14 +120,21 @@ private fun FluidBackdrop(static: Boolean) {
 private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
     var step by rememberSaveable { mutableIntStateOf(0) }
     BackHandler(enabled = step > 0) { step-- }
-    val titles = listOf(R.string.setup_title_1, R.string.setup_title_2, R.string.setup_title_3, R.string.setup_title_4)
-    val bodies = listOf(R.string.setup_body_1, R.string.setup_body_2, R.string.setup_body_3, R.string.setup_body_4)
+    val titles = listOf(R.string.setup_title_1, R.string.setup_title_2, R.string.setup_title_3, R.string.setup_title_4, R.string.setup_title_5)
+    val bodies = listOf(R.string.setup_body_1, R.string.setup_body_2, R.string.setup_body_3, R.string.setup_body_4, R.string.setup_body_5)
+    val canContinue = when (step) {
+        0 -> state.cameraGranted
+        1 -> state.microphoneGranted || !state.sound
+        2 -> state.notificationsGranted
+        3 -> state.assistantSelected
+        else -> state.cameraGranted && (state.microphoneGranted || !state.sound) && state.notificationsGranted && state.assistantSelected
+    }
     ScreenColumn {
         TextLabel(stringResource(R.string.app_name), 14, ChalnaTheme.colors.accent, FontWeight.Bold)
         Spacer(Modifier.height(28.dp))
         StepDots(step)
         Spacer(Modifier.height(28.dp))
-        Aura(Modifier.align(Alignment.CenterHorizontally), active = step == 3, reducedMotion = state.reducedMotion)
+        Aura(Modifier.align(Alignment.CenterHorizontally), phase = if (step == 4) CapturePhase.READY else null, reducedMotion = state.reducedMotion)
         Spacer(Modifier.height(32.dp))
         AnimatedContent(step, label = "setup") { value ->
             Column {
@@ -137,27 +143,31 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
                 Body(stringResource(bodies[value]))
                 Spacer(Modifier.height(24.dp))
                 when (value) {
-                    1 -> PermissionRows(state, d)
-                    2 -> ActionCard(R.string.open_assistant_settings, R.string.assistant_settings_hint, state.assistantSelected, d::openAssistantSettings)
-                    3 -> SummaryCard(state)
+                    0 -> ActionCard(R.string.allow_camera, R.string.camera_permission_hint, state.cameraGranted, d::requestCamera)
+                    1 -> AudioPermission(state, d)
+                    2 -> ActionCard(R.string.allow_notifications, R.string.notifications_hint, state.notificationsGranted, d::requestNotifications)
+                    3 -> ActionCard(R.string.open_assistant_settings, R.string.assistant_settings_hint, state.assistantSelected, d::openAssistantSettings)
+                    4 -> SummaryCard(state)
                 }
             }
         }
         Spacer(Modifier.weight(1f))
-        PrimaryButton(stringResource(if (step == 3) R.string.finish else R.string.continue_label), enabled = step != 1 || (state.cameraGranted && (state.microphoneGranted || !state.sound) && state.notificationsGranted)) {
-            if (step == 3) d.finishSetup() else step++
+        PrimaryButton(stringResource(if (step == 4) R.string.finish else R.string.continue_label), enabled = canContinue) {
+            if (step == 4) d.finishSetup() else step++
         }
     }
 }
 
-@Composable private fun PermissionRows(s: ChalnaUiState, d: UiDependencies) {
-    ActionCard(R.string.camera_microphone, R.string.camera_microphone_hint, s.cameraGranted && (s.microphoneGranted || !s.sound), d::requestCameraAndMicrophone)
+@Composable private fun AudioPermission(s: ChalnaUiState, d: UiDependencies) {
+    ActionCard(R.string.allow_microphone, R.string.microphone_permission_hint, s.microphoneGranted, d::requestMicrophone)
     if (!s.microphoneGranted && s.sound) {
         Spacer(Modifier.height(10.dp))
         SecondaryButton(stringResource(R.string.use_without_audio)) { d.setSound(false) }
     }
-    Spacer(Modifier.height(12.dp))
-    ActionCard(R.string.notifications, R.string.notifications_hint, s.notificationsGranted, d::requestNotifications)
+    if (!s.sound) {
+        Spacer(Modifier.height(10.dp))
+        TextLabel(stringResource(R.string.audio_disabled_ready), 14, ChalnaTheme.colors.positive)
+    }
 }
 
 @Composable private fun SummaryCard(s: ChalnaUiState) = GlassCard {
@@ -187,7 +197,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
         IconButton(stringResource(R.string.settings)) { navigate(Route.CAPTURE) }
     }
     Spacer(Modifier.height(32.dp))
-    Aura(Modifier.align(Alignment.CenterHorizontally), active = s.phase == CapturePhase.RECORDING, reducedMotion = s.reducedMotion || s.powerSaver)
+    Aura(Modifier.align(Alignment.CenterHorizontally), phase = s.phase, reducedMotion = s.reducedMotion || s.powerSaver)
     Spacer(Modifier.height(24.dp))
     TextLabel(phaseTitle(s), 30, ChalnaTheme.colors.text, FontWeight.Bold, Modifier.fillMaxWidth(), TextAlign.Center)
     if (s.phase == CapturePhase.RECORDING || s.phase == CapturePhase.STOPPING) TextLabel(formatDuration(s.durationSeconds), 20, ChalnaTheme.colors.muted, FontWeight.Medium, Modifier.fillMaxWidth(), TextAlign.Center)
@@ -195,7 +205,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
     s.errorMessage?.let { TextLabel(it, 14, ChalnaTheme.colors.danger, modifier = Modifier.fillMaxWidth(), align = TextAlign.Center) }
     Spacer(Modifier.height(22.dp))
     if (s.phase == CapturePhase.RECORDING) {
-        PrimaryButton(stringResource(R.string.stop_capture), onClick = d::toggleCapture)
+        StopButton(stringResource(R.string.stop_capture), onClick = d::toggleCapture)
     } else if (s.phase == CapturePhase.SAVED) {
         PrimaryButton(stringResource(R.string.open_video), onClick = d::openLastCapture)
     } else {
@@ -269,7 +279,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 }
 
 @Composable private fun AboutScreen(back: () -> Unit) = DetailScreen(R.string.about_privacy, back) {
-    Aura(Modifier.align(Alignment.CenterHorizontally).size(110.dp), false, true)
+    Aura(Modifier.align(Alignment.CenterHorizontally).size(110.dp), CapturePhase.READY, true)
     Spacer(Modifier.height(18.dp)); Heading(stringResource(R.string.app_name))
     Body(stringResource(R.string.version_info, BuildConfig.VERSION_NAME))
     Spacer(Modifier.height(24.dp)); Section(R.string.privacy)
@@ -285,7 +295,8 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 
 @Composable private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) = Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 20.dp), content = content)
 
-@Composable private fun Aura(modifier: Modifier = Modifier, active: Boolean, reducedMotion: Boolean) {
+@Composable private fun Aura(modifier: Modifier = Modifier, phase: CapturePhase?, reducedMotion: Boolean) {
+    val active = phase == CapturePhase.RECORDING
     val pulse = if (active && !reducedMotion) {
         val transition = rememberInfiniteTransition(label = "aura")
         val value by transition.animateFloat(.82f, 1f, infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "pulse")
@@ -293,17 +304,30 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
     } else .82f
     val c = ChalnaTheme.colors
     val description = stringResource(if (active) R.string.aura_recording else R.string.aura_idle)
+    val ringColors = when (phase) {
+        CapturePhase.RECORDING -> listOf(c.accent, Color(0xFFFF76AF), c.danger, c.accent2, c.accent)
+        CapturePhase.STOPPING -> listOf(c.accent2, c.positive, c.accent2)
+        CapturePhase.ERROR -> listOf(c.warning, c.danger, c.warning)
+        null -> listOf(c.outline, c.muted.copy(alpha = .55f), c.outline)
+        else -> listOf(c.accent, c.accent2, c.accent)
+    }
+    val atmosphere = when (phase) {
+        CapturePhase.ERROR -> c.warning
+        CapturePhase.RECORDING -> c.danger
+        null -> c.outline
+        else -> c.accent
+    }
     Canvas(modifier.size(184.dp).semantics { contentDescription = description }) {
         val radius = size.minDimension / 2
-        drawCircle(Brush.radialGradient(listOf(c.accent.copy(.08f), c.accent.copy(.42f), Color.Transparent)), radius * pulse)
-        drawCircle(Brush.sweepGradient(listOf(c.accent, c.accent2, c.accent)), radius * .57f, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round))
+        drawCircle(Brush.radialGradient(listOf(atmosphere.copy(.08f), atmosphere.copy(.38f), Color.Transparent)), radius * pulse)
+        drawCircle(Brush.sweepGradient(ringColors), radius * .57f, style = Stroke(5.dp.toPx(), cap = StrokeCap.Round))
         drawCircle(c.surfaceHigh, radius * .43f)
-        val path = Path().apply { moveTo(center.x - radius*.12f, center.y); lineTo(center.x, center.y-radius*.14f); lineTo(center.x+radius*.16f, center.y+radius*.15f) }
-        drawPath(path, c.text, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
+        drawArc(c.text, 205f, 112f, false, Offset(center.x - radius * .16f, center.y - radius * .16f), Size(radius * .32f, radius * .32f), style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
+        drawCircle(c.text, radius * .025f, Offset(center.x + radius * .18f, center.y - radius * .05f))
     }
 }
 
-@Composable private fun StepDots(step: Int) = Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { repeat(4) { Box(Modifier.height(4.dp).width(if (it == step) 34.dp else 12.dp).clip(CircleShape).background(if (it <= step) ChalnaTheme.colors.accent else ChalnaTheme.colors.outline)) } }
+@Composable private fun StepDots(step: Int) = Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { repeat(5) { Box(Modifier.height(4.dp).width(if (it == step) 34.dp else 12.dp).clip(CircleShape).background(if (it <= step) ChalnaTheme.colors.accent else ChalnaTheme.colors.outline)) } }
 @Composable private fun GlassCard(content: @Composable ColumnScope.() -> Unit) = Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(ChalnaTheme.colors.surface).border(1.dp, ChalnaTheme.colors.outline, RoundedCornerShape(22.dp)).padding(18.dp), content = content)
 @Composable private fun ActionCard(title: Int, body: Int, done: Boolean, click: () -> Unit) = GlassCard { Row(Modifier.clickableNoRipple(click = click).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { TextLabel(stringResource(title), 16, ChalnaTheme.colors.text, FontWeight.SemiBold); Body(stringResource(body)) }; StatusDot(done) } }
 @Composable private fun InfoCard(title: Int, body: Int, vararg args: Any) { Spacer(Modifier.height(10.dp)); GlassCard { TextLabel(stringResource(title), 16, ChalnaTheme.colors.text, FontWeight.SemiBold); Spacer(Modifier.height(4.dp)); Body(stringResource(body, *args)) } }
@@ -315,7 +339,8 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 @Composable private fun Toggle(on: Boolean) = Box(Modifier.width(48.dp).height(28.dp).clip(CircleShape).background(if(on) ChalnaTheme.colors.accent else ChalnaTheme.colors.outline).padding(3.dp), contentAlignment = if(on) Alignment.CenterEnd else Alignment.CenterStart) { Box(Modifier.size(22.dp).clip(CircleShape).background(Color.White)) }
 @Composable private fun Chevron() { val muted = ChalnaTheme.colors.muted; Canvas(Modifier.size(48.dp).padding(17.dp)) { drawLine(muted, Offset(size.width*.3f, 0f), Offset(size.width*.75f,size.height*.5f), 2.dp.toPx(), StrokeCap.Round); drawLine(muted, Offset(size.width*.75f,size.height*.5f), Offset(size.width*.3f,size.height), 2.dp.toPx(), StrokeCap.Round) } }
 @Composable private fun IconButton(description: String, click: () -> Unit) = Box(Modifier.size(48.dp).clip(CircleShape).background(ChalnaTheme.colors.surface).clickableNoRipple(click = click).semantics { contentDescription = description; role = Role.Button }, Alignment.Center) { TextLabel(if(description == stringResource(R.string.back)) "‹" else "⋯", 28, ChalnaTheme.colors.text, FontWeight.Normal) }
-@Composable private fun PrimaryButton(label: String, enabled: Boolean = true, onClick: () -> Unit) = Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp)).background(if(enabled) Brush.linearGradient(listOf(ChalnaTheme.colors.accent, ChalnaTheme.colors.accent2)) else Brush.linearGradient(listOf(ChalnaTheme.colors.outline, ChalnaTheme.colors.outline))).clickableNoRipple(enabled, onClick).semantics { role = Role.Button }, Alignment.Center) { TextLabel(label, 16, Color.White, FontWeight.Bold) }
+@Composable private fun PrimaryButton(label: String, enabled: Boolean = true, onClick: () -> Unit) = Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp)).background(if(enabled) ChalnaTheme.colors.accent2 else ChalnaTheme.colors.outline).clickableNoRipple(enabled, onClick).semantics { role = Role.Button }, Alignment.Center) { TextLabel(label, 16, Color.White, FontWeight.Bold) }
+@Composable private fun StopButton(label: String, onClick: () -> Unit) = Box(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(RoundedCornerShape(18.dp)).background(ChalnaTheme.colors.danger).clickableNoRipple(click = onClick).semantics { role = Role.Button }, Alignment.Center) { TextLabel(label, 16, Color.White, FontWeight.Bold) }
 @Composable private fun SecondaryButton(label: String, onClick: () -> Unit) = Box(Modifier.fillMaxWidth().heightIn(min = 52.dp).clip(RoundedCornerShape(18.dp)).border(1.dp, ChalnaTheme.colors.outline, RoundedCornerShape(18.dp)).clickableNoRipple(click = onClick), Alignment.Center) { TextLabel(label, 15, ChalnaTheme.colors.text, FontWeight.SemiBold) }
 @Composable private fun Heading(text: String) = TextLabel(text, 27, ChalnaTheme.colors.text, FontWeight.Bold, Modifier.semantics { heading() })
 @Composable private fun Section(id: Int) = TextLabel(stringResource(id), 14, ChalnaTheme.colors.accent, FontWeight.Bold)

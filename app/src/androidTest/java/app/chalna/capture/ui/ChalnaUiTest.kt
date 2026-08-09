@@ -14,7 +14,7 @@ class ChalnaUiTest {
     @Test fun setupDoesNotRequestHardwareBeforeUserAction() {
         val fake = FakeUiDependencies(ChalnaUiState(reducedMotion = true))
         compose.setContent { ChalnaApp(fake) }
-        compose.onNodeWithText("Capture at the moment you ask").assertIsDisplayed()
+        compose.onNodeWithText("Camera access").assertIsDisplayed()
         check(fake.hardwareRequestCount == 0)
         check(fake.toggleCount == 0)
     }
@@ -40,7 +40,8 @@ internal class FakeUiDependencies(initial: ChalnaUiState) : UiDependencies {
     var hardwareRequestCount = 0
     var toggleCount = 0
     override fun toggleCapture() { toggleCount++ }
-    override fun requestCameraAndMicrophone() { hardwareRequestCount++ }
+    override fun requestCamera() { hardwareRequestCount++ }
+    override fun requestMicrophone() { hardwareRequestCount++ }
     override fun requestNotifications() = Unit
     override fun openAssistantSettings() = Unit
     override fun finishSetup() { state.value = state.value.copy(setupComplete = true) }

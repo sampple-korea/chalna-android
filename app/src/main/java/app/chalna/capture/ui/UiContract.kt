@@ -12,10 +12,10 @@ data class ChalnaUiState(
     val durationSeconds: Long = 0,
     val lastSavedName: String? = null,
     val errorMessage: String? = null,
-    val quality: VideoQuality = VideoQuality.FHD,
+    val quality: VideoQuality = VideoQuality.AUTO,
     val appearance: AppearanceMode = AppearanceMode.SYSTEM,
     val haptics: Boolean = true,
-    val sound: Boolean = false,
+    val sound: Boolean = true,
     val autoStopSeconds: Int = 0,
     val reducedMotion: Boolean = false,
     val assistantSelected: Boolean = false,
@@ -30,7 +30,8 @@ data class ChalnaUiState(
 interface UiDependencies {
     val state: StateFlow<ChalnaUiState>
     fun toggleCapture()
-    fun requestCameraAndMicrophone()
+    fun requestCamera()
+    fun requestMicrophone()
     fun requestNotifications()
     fun openAssistantSettings()
     fun finishSetup()

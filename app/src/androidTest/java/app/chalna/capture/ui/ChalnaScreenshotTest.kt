@@ -24,7 +24,11 @@ class ChalnaScreenshotTest {
         val fake = ScreenshotDependencies(state)
         compose.setContent { ChalnaApp(fake) }
         compose.waitForIdle()
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val bitmap = runCatching { compose.onRoot().captureToImage().asAndroidBitmap() }
+            .getOrElse {
+                Thread.sleep(500)
+                compose.onRoot().captureToImage().asAndroidBitmap()
+            }
         val directory = File(
             InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
             "screenshots",
@@ -38,7 +42,8 @@ class ChalnaScreenshotTest {
 private class ScreenshotDependencies(initial: ChalnaUiState) : UiDependencies {
     override val state = MutableStateFlow(initial)
     override fun toggleCapture() = Unit
-    override fun requestCameraAndMicrophone() = Unit
+    override fun requestCamera() = Unit
+    override fun requestMicrophone() = Unit
     override fun requestNotifications() = Unit
     override fun openAssistantSettings() = Unit
     override fun finishSetup() = Unit

@@ -1,16 +1,21 @@
 <resources>
     <string name="app_name">Chalna</string>
     <string name="local_private">Local capture · private by design</string>
-    <string name="setup_title_1">Capture at the moment you ask</string>
-    <string name="setup_body_1">Chalna starts only after an Assistant invocation, notification action, or a diagnostics confirmation. There is no pre-capture.</string>
-    <string name="setup_title_2">Allow capture access</string>
-    <string name="setup_body_2">Camera and microphone are needed to record. Notifications keep an active recording visible and controllable.</string>
-    <string name="setup_title_3">Choose Chalna as your Assistant</string>
-    <string name="setup_body_3">Open Android settings, select Chalna as the digital assistant app, then return here.</string>
-    <string name="setup_title_4">Ready for the first moment</string>
-    <string name="setup_body_4">Review your setup. You can change quality, appearance, and feedback later.</string>
+    <string name="setup_title_1">Camera access</string>
+    <string name="setup_body_1">Camera permission is required to start video after an Assistant invocation. The camera stays off before your trigger.</string>
+    <string name="setup_title_2">Include sound</string>
+    <string name="setup_body_2">Allow microphone access to save ambient sound, or continue with audio disabled.</string>
+    <string name="setup_title_3">Recording status</string>
+    <string name="setup_body_3">Notifications keep an active recording visible and provide an immediate stop action.</string>
+    <string name="setup_title_4">Change the default Assistant</string>
+    <string name="setup_body_4">Chalna will replace Gemini or your current voice assistant for the device Assistant gesture. You can switch back in Android settings.</string>
+    <string name="setup_title_5">Setup complete</string>
+    <string name="setup_body_5">Invoke the device Assistant action to start recording. Invoke it again to stop and save.</string>
     <string name="continue_label">Continue</string><string name="finish">Finish setup</string>
     <string name="camera_microphone">Camera and microphone</string><string name="camera_microphone_hint">Used only during an explicit capture</string>
+    <string name="allow_camera">Allow camera access</string><string name="camera_permission_hint">Required for video capture after your trigger</string>
+    <string name="allow_microphone">Allow microphone access</string><string name="microphone_permission_hint">Used only when audio is enabled</string>
+    <string name="allow_notifications">Allow notifications</string><string name="audio_disabled_ready">Audio is off. Microphone permission is not required.</string>
     <string name="notifications">Notifications</string><string name="notifications_hint">Shows recording status and a stop action</string>
     <string name="open_assistant_settings">Open Assistant settings</string><string name="assistant_settings_hint">Select Chalna, then come back</string>
     <string name="assistant_selected">Chalna selected as Assistant</string><string name="ready">Ready</string><string name="action_needed">Action needed</string>

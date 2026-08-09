@@ -43,9 +43,8 @@ class ProductionUiDependencies(
     private val tick = MutableStateFlow(System.currentTimeMillis())
     private val diagnosticsVisible = MutableStateFlow(true)
 
-    private val capturePermissions = activity.registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { refreshSnapshot() }
+    private val cameraPermission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshSnapshot() }
+    private val microphonePermission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshSnapshot() }
     private val notificationPermission = activity.registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { refreshSnapshot() }
@@ -128,14 +127,9 @@ class ProductionUiDependencies(
         CaptureService.dispatch(activity, action, "activity-${UUID.randomUUID()}")
     }
 
-    override fun requestCameraAndMicrophone() {
-        val permissions = if (settingsStore.settings.value.audioEnabled) {
-            arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
-        } else {
-            arrayOf(Manifest.permission.CAMERA)
-        }
-        capturePermissions.launch(permissions)
-    }
+    override fun requestCamera() = cameraPermission.launch(Manifest.permission.CAMERA)
+
+    override fun requestMicrophone() = microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
 
     override fun requestNotifications() {
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)

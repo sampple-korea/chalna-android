@@ -1,11 +1,13 @@
 <resources>
     <string name="app_name">찰나</string>
     <string name="local_private">로컬 촬영 · 처음부터 비공개</string>
-    <string name="setup_title_1">부르는 그 순간부터 촬영</string><string name="setup_body_1">찰나는 어시스턴트 호출, 알림 동작, 또는 진단 확인 뒤에만 시작합니다. 미리 촬영하지 않습니다.</string>
-    <string name="setup_title_2">촬영 권한 허용</string><string name="setup_body_2">카메라와 마이크는 녹화에 필요합니다. 알림은 진행 중인 녹화를 항상 보이고 멈출 수 있게 합니다.</string>
-    <string name="setup_title_3">찰나를 어시스턴트로 선택</string><string name="setup_body_3">Android 설정을 열어 디지털 어시스턴트 앱으로 찰나를 선택한 뒤 돌아오세요.</string>
-    <string name="setup_title_4">첫 찰나를 위한 준비 완료</string><string name="setup_body_4">설정을 확인하세요. 화질, 화면, 피드백은 나중에 바꿀 수 있습니다.</string>
-    <string name="continue_label">계속</string><string name="finish">설정 완료</string><string name="camera_microphone">카메라 및 마이크</string><string name="camera_microphone_hint">명시적으로 촬영할 때만 사용</string>
+    <string name="setup_title_1">카메라 접근</string><string name="setup_body_1">Assistant 호출 후 영상을 시작하려면 카메라 권한이 필요합니다. 호출 전에는 카메라를 켜지 않습니다.</string>
+    <string name="setup_title_2">영상에 소리 담기</string><string name="setup_body_2">주변 소리를 함께 저장하려면 마이크를 허용하세요. 오디오 없이도 사용할 수 있습니다.</string>
+    <string name="setup_title_3">녹화 상태 알림</string><string name="setup_body_3">화면을 보지 않아도 녹화 상태를 확인하고 즉시 중지할 수 있도록 알림을 사용합니다.</string>
+    <string name="setup_title_4">기본 어시스턴트 변경</string><string name="setup_body_4">찰나를 선택하면 Gemini 또는 기존 음성 비서 대신 찰나가 실행됩니다. Android 설정에서 언제든 되돌릴 수 있습니다.</string>
+    <string name="setup_title_5">준비 완료</string><string name="setup_body_5">기기의 Assistant 호출 동작으로 녹화를 시작하세요. 다시 호출하면 종료하고 저장합니다.</string>
+    <string name="continue_label">계속</string><string name="finish">홈으로</string><string name="camera_microphone">카메라 및 마이크</string><string name="camera_microphone_hint">명시적으로 촬영할 때만 사용</string>
+    <string name="allow_camera">카메라 권한 허용</string><string name="camera_permission_hint">호출 후 영상 촬영에 필요</string><string name="allow_microphone">마이크 권한 허용</string><string name="microphone_permission_hint">오디오를 켰을 때만 사용</string><string name="allow_notifications">알림 허용</string><string name="audio_disabled_ready">오디오가 꺼졌습니다. 마이크 권한 없이 사용할 수 있습니다.</string>
     <string name="notifications">알림</string><string name="notifications_hint">녹화 상태와 중지 동작 표시</string><string name="open_assistant_settings">어시스턴트 설정 열기</string><string name="assistant_settings_hint">찰나를 선택한 뒤 돌아오세요</string>
     <string name="assistant_selected">찰나가 어시스턴트로 선택됨</string><string name="ready">준비됨</string><string name="action_needed">조치 필요</string><string name="settings">설정</string><string name="back">뒤로</string>
     <string name="capture_settings">촬영 설정</string><string name="capture_settings_hint">화질과 촬영 동작</string><string name="appearance_feedback">화면 및 피드백</string><string name="appearance_feedback_hint">테마, 움직임, 진동, 소리</string>
