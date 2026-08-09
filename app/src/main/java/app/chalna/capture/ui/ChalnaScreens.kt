@@ -8,6 +8,7 @@ import android.text.format.Formatter
 import android.os.CancellationSignal
 import android.view.Surface
 import android.view.TextureView
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -54,7 +55,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -283,8 +284,9 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
     var detailsVisible by rememberSaveable { mutableStateOf(false) }
     var controls by rememberSaveable { mutableStateOf(true) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
-    val activity = LocalContext.current as? Activity
-    val touchExploration = LocalAccessibilityManager.current?.isTouchExplorationEnabled == true
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val touchExploration = context.getSystemService(AccessibilityManager::class.java).isTouchExplorationEnabled
     DisposableEffect(fullscreen, activity) {
         activity?.window?.let { window ->
             val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -310,7 +312,7 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
                 Modifier.fillMaxWidth().aspectRatio(videoRatio).align(Alignment.Center)
             }
             PlayerSurface(d, videoModifier)
-            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { controls = !controls } })
+            Box(Modifier.fillMaxSize().testTag("player_touch_surface").pointerInput(Unit) { detectTapGestures { controls = !controls } })
         }
         if (controls) Column(Modifier.fillMaxWidth().background(Color.Black.copy(.82f)).padding(14.dp)) {
             player.message?.let {

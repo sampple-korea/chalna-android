@@ -84,7 +84,7 @@ private fun VisualLab() = Column(
     }
     SectionTitle(stringResource(R.string.lab_large_font))
     val density = LocalDensity.current
-    CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
+    CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
         GlassCard { Heading(stringResource(R.string.setup_title)); Body(stringResource(R.string.setup_body)); Spacer(Modifier.height(10.dp)); SettingRow(stringResource(R.string.assistant), stringResource(R.string.assistant_setup_detail), ChalnaIcon.ASSISTANT, false) {} }
     }
     SectionTitle(stringResource(R.string.lab_capture_timing))
