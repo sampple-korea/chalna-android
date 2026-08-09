@@ -75,10 +75,11 @@ class GalleryRepository(
         }
 
         val metadataUpdates = mutableListOf<CaptureItem>()
+        val extractor = metadata
         val enriched = available.map { item ->
-            if (metadata == null || (item.durationMillis > 0 && item.sizeBytes != null && item.width != null && item.height != null)) item
+            if (extractor == null || (item.durationMillis > 0 && item.sizeBytes != null && item.width != null && item.height != null)) item
             else runCatching {
-                val value = metadata.extract(item)
+                val value = extractor.extract(item)
                 item.copy(
                     durationMillis = value.durationMillis ?: item.durationMillis,
                     sizeBytes = value.sizeBytes ?: item.sizeBytes,

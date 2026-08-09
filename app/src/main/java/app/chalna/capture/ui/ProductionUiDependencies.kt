@@ -479,7 +479,7 @@ class ProductionUiDependencies(
     private suspend fun refreshGalleryInternal() {
         val items = withContext(Dispatchers.IO) {
             galleryRefreshMutex.withLock { galleryRepository.items(GalleryQuery()) }
-        }.map(CaptureItem::toUi)
+        }.map { it.toUi() }
         val current = overlay.value
         val availableIds = items.mapTo(mutableSetOf(), MediaItemUi::id)
         val nextPlayer = current.playerId?.takeIf { it in availableIds }

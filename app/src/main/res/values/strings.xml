@@ -19,7 +19,7 @@
     <string name="save_to">Storage location</string><string name="device_gallery">Device gallery</string><string name="chalna_vault">Chalna vault</string>
     <string name="device_gallery_storage_detail">Available in regular gallery apps.</string><string name="vault_storage_detail">Kept inside Chalna. Removed when the app is uninstalled.</string><string name="existing_videos_not_moved">Existing videos are not moved.</string>
     <plurals name="seconds_value"><item quantity="one">%1$d sec</item><item quantity="other">%1$d sec</item></plurals>
-    <string name="appearance_feedback">Experience</string><string name="night">Night</string><string name="mist">Mist</string><string name="system">Follow system</string><string name="haptics">Haptics</string><string name="reduced_motion">Reduced motion</string>
+    <string name="appearance_feedback">Experience</string><string name="night">Night</string><string name="mist">Mist</string><string name="system">Follow system</string><string name="haptics">Haptics</string>
     <string name="motion_effects">Motion &amp; light effects</string><string name="motion_system">Follow system</string><string name="motion_full">Full</string><string name="motion_reduced">Reduced</string>
     <string name="access_setup">System</string><string name="support">App</string><string name="microphone">Microphone</string><string name="audio_off">Not needed while audio is off</string>
     <string name="help">Help</string><string name="help_short">Assistant and device guidance</string>

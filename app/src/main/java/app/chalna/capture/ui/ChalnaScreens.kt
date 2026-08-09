@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.app.Activity
 import android.graphics.SurfaceTexture
 import android.util.LruCache
+import android.text.format.Formatter
 import android.os.CancellationSignal
 import android.view.Surface
 import android.view.TextureView
@@ -48,15 +49,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -111,13 +119,13 @@ internal fun HomeScreen(state: ChalnaUiState, d: UiDependencies, navigate: (Chal
         if (!state.ready && state.phase == CapturePhase.READY) stringResource(R.string.phase_setup_required) else phaseTitle(state.phase),
         28,
         weight = FontWeight.Bold,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
         align = TextAlign.Center,
     )
     if (state.phase == CapturePhase.RECORDING || state.phase == CapturePhase.STOPPING) {
         ChalnaText(formatDuration(state.durationSeconds * 1000), 18, ChalnaTheme.colors.muted, FontWeight.Medium, Modifier.fillMaxWidth(), TextAlign.Center)
     }
-    state.errorMessage?.let { ChalnaText(it, 14, ChalnaTheme.colors.danger, modifier = Modifier.fillMaxWidth(), align = TextAlign.Center) }
+    state.errorMessage?.let { ChalnaText(it, 14, ChalnaTheme.colors.danger, modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Assertive }, align = TextAlign.Center) }
     Spacer(Modifier.height(22.dp))
     when {
         state.phase == CapturePhase.RECORDING -> PrimaryButton(stringResource(R.string.stop_capture), onClick = d::toggleCapture)
@@ -276,6 +284,7 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
     var controls by rememberSaveable { mutableStateOf(true) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     val activity = LocalContext.current as? Activity
+    val touchExploration = LocalAccessibilityManager.current?.isTouchExplorationEnabled == true
     DisposableEffect(fullscreen, activity) {
         activity?.window?.let { window ->
             val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -284,7 +293,7 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
         onDispose { activity?.window?.let { WindowCompat.getInsetsController(it, it.decorView).show(WindowInsetsCompat.Type.systemBars()) } }
     }
     LaunchedEffect(controls, player.playing, more, confirmDelete) {
-        if (controls && player.playing && !more && !confirmDelete) { delay(2_500); controls = false }
+        if (controls && player.playing && !more && !confirmDelete && !touchExploration) { delay(2_500); controls = false }
     }
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         if (controls) Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -351,7 +360,11 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
 
 @Composable private fun Scrubber(position: Long, duration: Long, seek: (Long) -> Unit) {
     val fraction = if (duration <= 0) 0f else (position.toFloat()/duration).coerceIn(0f,1f)
-    BoxWithConstraints(Modifier.fillMaxWidth().height(48.dp).pointerInput(duration) { detectTapGestures { offset -> if(duration>0) seek((duration*(offset.x/size.width).coerceIn(0f,1f)).toLong()) } }.semantics { contentDescription = "${formatDuration(position)} / ${formatDuration(duration)}" }) {
+    BoxWithConstraints(Modifier.fillMaxWidth().height(48.dp).pointerInput(duration) { detectTapGestures { offset -> if(duration>0) seek((duration*(offset.x/size.width).coerceIn(0f,1f)).toLong()) } }.semantics {
+        contentDescription = "${formatDuration(position)} / ${formatDuration(duration)}"
+        progressBarRangeInfo = ProgressBarRangeInfo(position.toFloat(), 0f..duration.coerceAtLeast(1).toFloat())
+        setProgress { target -> seek(target.toLong().coerceIn(0, duration)); true }
+    }) {
         val accent = ChalnaTheme.colors.accent
         androidx.compose.foundation.Canvas(Modifier.width(maxWidth).fillMaxHeight()) {
             val y = size.height/2f; drawLine(Color.White.copy(.28f), androidx.compose.ui.geometry.Offset(0f,y), androidx.compose.ui.geometry.Offset(size.width,y), 3.dp.toPx(), StrokeCap.Round)
@@ -362,6 +375,7 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
 }
 
 @Composable private fun PlayerDetails(item: MediaItemUi) {
+    val context = LocalContext.current
     val storage = stringResource(if (item.destination == StorageDestinationUi.CHALNA_VAULT) R.string.chalna_vault else R.string.device_gallery)
     val audio = stringResource(if (item.hasAudio) R.string.audio_included else R.string.audio_not_included)
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -369,7 +383,7 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
         DetailLine(R.string.detail_date, formatMediaDate(item.capturedAtMillis))
         if (item.durationMillis > 0) DetailLine(R.string.detail_duration, formatDuration(item.durationMillis))
         if (item.width > 0 && item.height > 0) DetailLine(R.string.detail_resolution, "${item.width}×${item.height}")
-        if (item.sizeBytes > 0) DetailLine(R.string.detail_size, "%.1f MB".format(item.sizeBytes / 1048576.0))
+        if (item.sizeBytes > 0) DetailLine(R.string.detail_size, Formatter.formatFileSize(context, item.sizeBytes))
         DetailLine(R.string.detail_storage, storage)
         DetailLine(R.string.detail_audio, audio)
         DetailLine(R.string.detail_type, item.mimeType)

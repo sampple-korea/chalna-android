@@ -1,6 +1,7 @@
 package app.chalna.capture.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -30,7 +31,7 @@ class ChalnaUiTest {
         val fake = FakeUiDependencies(ChalnaUiState(setupComplete = true, ready = true, reducedMotion = true))
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithContentDescription("Settings").performClick()
-        compose.onNodeWithText("Capture").assertIsDisplayed(); compose.onNodeWithText("Access & setup").assertIsDisplayed()
+        compose.onNodeWithText("Capture").assertIsDisplayed(); compose.onNodeWithText("System").assertIsDisplayed()
     }
 
     @Test fun galleryLongPressSelectionHasBatchActions() {
@@ -39,14 +40,46 @@ class ChalnaUiTest {
         compose.onNodeWithContentDescription("Gallery").performClick()
         compose.onNodeWithContentDescription("Share").assertIsDisplayed(); compose.onNodeWithContentDescription("Delete").assertIsDisplayed()
     }
+
+    @Test fun productionHomeHasNoDiagnosticsAndNotificationDenialDoesNotBlockReady() {
+        val fake = FakeUiDependencies(
+            ChalnaUiState(
+                setupComplete = true,
+                ready = true,
+                cameraGranted = true,
+                microphoneGranted = true,
+                assistantSelected = true,
+                notificationsGranted = false,
+                reducedMotion = true,
+            ),
+        )
+        compose.setContent { ChalnaApp(fake) }
+        compose.onNodeWithText("Ready").assertIsDisplayed()
+        compose.onNodeWithText("Diagnostics").assertDoesNotExist()
+    }
+
+    @Test fun audioOffSetupNeverRequestsMicrophone() {
+        val fake = FakeUiDependencies(
+            ChalnaUiState(
+                sound = false,
+                cameraGranted = true,
+                assistantSelected = true,
+                reducedMotion = true,
+            ),
+        )
+        compose.setContent { ChalnaApp(fake) }
+        compose.onNodeWithText("Finish setup").performClick()
+        check(fake.hardwareRequestCount == 0)
+        check(fake.microphoneRequestCount == 0)
+    }
 }
 
 internal class FakeUiDependencies(initial: ChalnaUiState) : UiDependencies {
     override val state = MutableStateFlow(initial)
-    var hardwareRequestCount = 0; var toggleCount = 0
+    var hardwareRequestCount = 0; var microphoneRequestCount = 0; var toggleCount = 0
     override fun toggleCapture() { toggleCount++ }
     override fun requestCamera() { hardwareRequestCount++ }
-    override fun requestMicrophone() { hardwareRequestCount++ }
+    override fun requestMicrophone() { hardwareRequestCount++; microphoneRequestCount++ }
     override fun requestNotifications() = Unit
     override fun openAssistantSettings() = Unit
     override fun finishSetup() { state.value = state.value.copy(setupComplete = true) }
@@ -56,6 +89,7 @@ internal class FakeUiDependencies(initial: ChalnaUiState) : UiDependencies {
     override fun setSound(value: Boolean) { state.value = state.value.copy(sound = value) }
     override fun setAutoStop(seconds: Int) { state.value = state.value.copy(autoStopSeconds = seconds) }
     override fun setReducedMotion(value: Boolean) { state.value = state.value.copy(reducedMotion = value) }
+    override fun setMotion(value: MotionMode) { state.value = state.value.copy(motion = value, reducedMotion = value == MotionMode.REDUCED) }
     override fun openLastCapture() = Unit
     override fun reviewSetup() { state.value = state.value.copy(setupComplete = false) }
 }

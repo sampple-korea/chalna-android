@@ -15,7 +15,9 @@ object GalleryRepositoryFactory {
             media = media,
             lastCapture = object : LastCaptureAccess {
                 override fun current(): LastCapture? = settings.lastCapture.value
-                override suspend fun save(capture: LastCapture?) = settings.saveLastCapture(capture)
+                override suspend fun save(capture: LastCapture?) {
+                    settings.saveLastCapture(capture)
+                }
             },
             metadata = CachingMetadataExtractor(media),
         )

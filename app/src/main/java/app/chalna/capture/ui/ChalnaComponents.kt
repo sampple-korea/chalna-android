@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
@@ -103,7 +104,7 @@ internal fun ChalnaText(
         lineHeight = (size * 1.38f).sp,
         fontFamily = ChalnaFontFamily,
         fontWeight = weight,
-        textAlign = align,
+        textAlign = align ?: TextAlign.Start,
     ),
 )
 
@@ -148,14 +149,20 @@ internal fun ChalnaText(
         .clickableNoRipple(Role.Button, onClick = onClick), contentAlignment = Alignment.Center,
 ) { ChalnaText(text, 15, weight = FontWeight.SemiBold) }
 
-@Composable internal fun SettingRow(title: String, detail: String, icon: ChalnaIcon, active: Boolean? = null, onClick: () -> Unit) = Row(
-    Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(RoundedCornerShape(16.dp)).clickableNoRipple(Role.Button, onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp),
-    verticalAlignment = Alignment.CenterVertically,
-) {
-    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { ChalnaIconCanvas(icon, Modifier.size(21.dp), ChalnaTheme.colors.accent) }
-    Spacer(Modifier.width(12.dp))
-    Column(Modifier.weight(1f)) { ChalnaText(title, 16, weight = FontWeight.SemiBold); ChalnaText(detail, 13, ChalnaTheme.colors.muted) }
-    if (active != null) StatusPill(active)
+@Composable internal fun SettingRow(title: String, detail: String, icon: ChalnaIcon, active: Boolean? = null, onClick: () -> Unit) {
+    val status = active?.let { androidx.compose.ui.res.stringResource(if (it) app.chalna.capture.R.string.allowed else app.chalna.capture.R.string.action_needed) }
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(RoundedCornerShape(16.dp))
+            .clickableNoRipple(Role.Button, onClick = onClick)
+            .semantics { status?.let { stateDescription = it } }
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { ChalnaIconCanvas(icon, Modifier.size(21.dp), ChalnaTheme.colors.accent) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) { ChalnaText(title, 16, weight = FontWeight.SemiBold); ChalnaText(detail, 13, ChalnaTheme.colors.muted) }
+        if (active != null) StatusPill(active)
+    }
 }
 
 @Composable internal fun StatusPill(done: Boolean) = Box(
@@ -186,7 +193,17 @@ internal fun ChalnaText(
 
 @Composable internal fun ChalnaIconCanvas(icon: ChalnaIcon, modifier: Modifier = Modifier, color: Color = ChalnaTheme.colors.text) = Canvas(modifier) {
     val w = size.width; val h = size.height; val stroke = Stroke(width = size.minDimension * .085f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-    fun line(vararg p: Offset) { val path = Path().apply { moveTo(p[0].x, p[0].y); p.drop(1).forEach { lineTo(it.x, it.y) } }; drawPath(path, color, style = stroke) }
+    fun linePath(points: List<Offset>) {
+        val path = Path().apply {
+            moveTo(points.first().x, points.first().y)
+            points.drop(1).forEach { lineTo(it.x, it.y) }
+        }
+        drawPath(path, color, style = stroke)
+    }
+    fun line(a: Offset, b: Offset) = linePath(listOf(a, b))
+    fun line(a: Offset, b: Offset, c: Offset) = linePath(listOf(a, b, c))
+    fun line(a: Offset, b: Offset, c: Offset, d: Offset) = linePath(listOf(a, b, c, d))
+    fun line(a: Offset, b: Offset, c: Offset, d: Offset, e: Offset) = linePath(listOf(a, b, c, d, e))
     when (icon) {
         ChalnaIcon.MARK -> { drawArc(color, 38f, 286f, false, Offset(w*.14f,h*.14f), Size(w*.72f,h*.72f), style=stroke); drawCircle(color,w*.07f,Offset(w*.82f,h*.26f)) }
         ChalnaIcon.GALLERY -> { drawRoundRect(color.copy(.12f), cornerRadius=androidx.compose.ui.geometry.CornerRadius(w*.14f)); drawRoundRect(color, cornerRadius=androidx.compose.ui.geometry.CornerRadius(w*.14f), style=stroke); line(Offset(w*.14f,h*.76f),Offset(w*.40f,h*.50f),Offset(w*.57f,h*.65f),Offset(w*.78f,h*.40f),Offset(w*.90f,h*.53f)); drawCircle(color,w*.07f,Offset(w*.32f,h*.31f)) }
@@ -211,4 +228,7 @@ internal fun ChalnaText(
     }
 }
 
-internal fun formatDuration(ms: Long): String { val total=ms/1000; return "%02d:%02d".format(total/60,total%60) }
+internal fun formatDuration(ms: Long): String {
+    val total = (ms / 1_000).coerceAtLeast(0)
+    return "${(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}"
+}

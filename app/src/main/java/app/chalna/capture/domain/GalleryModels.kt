@@ -62,7 +62,14 @@ object StableCaptureId {
     fun from(destination: StorageDestination, reference: String): String {
         val bytes = MessageDigest.getInstance("SHA-256")
             .digest("${destination.name}:$reference".toByteArray(StandardCharsets.UTF_8))
-        return bytes.take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val digits = "0123456789abcdef"
+        return buildString(32) {
+            bytes.take(16).forEach { byte ->
+                val value = byte.toInt() and 0xff
+                append(digits[value ushr 4])
+                append(digits[value and 0x0f])
+            }
+        }
     }
 }
 

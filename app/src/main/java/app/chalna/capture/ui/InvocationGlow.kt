@@ -17,11 +17,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
-import app.chalna.capture.R
-import androidx.compose.ui.res.stringResource
 
 /** Transient invocation signal: cached atmosphere, chromatic bloom, then a hot core. */
 @Composable
@@ -55,15 +52,8 @@ internal fun InvocationGlow(
     } else 1f
     val strength = deterministicProgress ?: reveal
     val colors = ChalnaTheme.colors
-    val description = stringResource(when (phase) {
-        CapturePhase.RECORDING -> R.string.glow_recording
-        CapturePhase.STARTING -> R.string.glow_starting
-        CapturePhase.STOPPING -> R.string.glow_stopping
-        CapturePhase.ERROR -> R.string.glow_error
-        else -> R.string.glow_idle
-    })
     Canvas(
-        modifier.semantics { contentDescription = description }.drawWithCache {
+        modifier.clearAndSetSemantics { }.drawWithCache {
             val radius = size.minDimension / 2f
             val atmosphere = when (phase) {
                 CapturePhase.ERROR -> colors.danger

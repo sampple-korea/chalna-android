@@ -14,7 +14,7 @@
     <string name="auto_stop">자동 종료</string><string name="no_limit">제한 없음</string><plurals name="seconds_value"><item quantity="other">%1$d초</item></plurals>
     <string name="save_to">저장 위치</string><string name="device_gallery">기기 갤러리</string><string name="chalna_vault">찰나 보관함</string>
     <string name="device_gallery_storage_detail">일반 갤러리 앱에서도 볼 수 있습니다.</string><string name="vault_storage_detail">찰나 앱 안에서 보관합니다. 앱을 삭제하면 함께 삭제됩니다.</string><string name="existing_videos_not_moved">기존 영상은 이동하지 않습니다.</string>
-    <string name="appearance_feedback">경험</string><string name="night">Night</string><string name="mist">Mist</string><string name="system">시스템</string><string name="haptics">햅틱</string><string name="reduced_motion">움직임 줄이기</string>
+    <string name="appearance_feedback">경험</string><string name="night">Night</string><string name="mist">Mist</string><string name="system">시스템</string><string name="haptics">햅틱</string>
     <string name="motion_effects">움직임 및 빛 효과</string><string name="motion_system">시스템 설정</string><string name="motion_full">전체</string><string name="motion_reduced">줄임</string>
     <string name="access_setup">시스템</string><string name="support">앱</string><string name="microphone">마이크 권한</string><string name="audio_off">오디오가 꺼져 있어 필요 없음</string><string name="help">도움말 및 호환성</string><string name="help_short">사용 방법과 기기별 차이</string><string name="privacy">개인정보 및 정보</string><string name="privacy_short">저장과 권한 안내</string>
     <string name="filter_all">전체</string><string name="gallery_empty_title">아직 촬영한 영상이 없습니다</string><string name="gallery_empty_body">Assistant를 호출하면 첫 영상이 여기에 나타납니다.</string><plurals name="items_selected"><item quantity="other">%1$d개 선택</item></plurals>

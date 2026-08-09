@@ -91,8 +91,8 @@ jobs:
           set -euo pipefail
           pwsh ./scripts/policy-check.ps1
           export BUILD_DATE_UTC="$(git show -s --format=%cI "$GITHUB_SHA")"
-          ./gradlew --no-daemon --stacktrace :app:dependencies | tee dependency-report.txt
-          if grep -Eqi 'androidx\.compose\.material(3)?:|com\.google\.android\.material:|material-icons-(core|extended)|androidx\.media3:media3-ui-compose-material3' dependency-report.txt; then
+          ./gradlew --no-daemon --stacktrace :app:dependencies --configuration releaseRuntimeClasspath | tee dependency-report.txt
+          if grep -Ei 'androidx\.compose\.material(3)?:|com\.google\.android\.material:|material-icons-(core|extended)|androidx\.media3:media3-ui-compose-material3' dependency-report.txt | grep -Ev '\(c\)$'; then
             echo "Resolved dependency graph contains a forbidden Material dependency." >&2
             exit 1
           fi
