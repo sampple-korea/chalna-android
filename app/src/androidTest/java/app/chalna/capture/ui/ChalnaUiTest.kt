@@ -12,7 +12,7 @@ class ChalnaUiTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun setupDoesNotRequestHardwareBeforeUserAction() {
-        val fake = FakeUiDependencies(ChalnaUiState())
+        val fake = FakeUiDependencies(ChalnaUiState(reducedMotion = true))
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithText("Capture at the moment you ask").assertIsDisplayed()
         check(fake.hardwareRequestCount == 0)
@@ -20,7 +20,7 @@ class ChalnaUiTest {
     }
 
     @Test fun recordingStateOffersExplicitStop() {
-        val fake = FakeUiDependencies(ChalnaUiState(setupComplete = true, phase = CapturePhase.RECORDING, durationSeconds = 65))
+        val fake = FakeUiDependencies(ChalnaUiState(setupComplete = true, phase = CapturePhase.RECORDING, durationSeconds = 65, reducedMotion = true))
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithText("01:05").assertIsDisplayed()
         compose.onNodeWithText("Stop recording").performClick()
@@ -28,7 +28,7 @@ class ChalnaUiTest {
     }
 
     @Test fun appearanceDestinationIsReachable() {
-        val fake = FakeUiDependencies(ChalnaUiState(setupComplete = true))
+        val fake = FakeUiDependencies(ChalnaUiState(setupComplete = true, reducedMotion = true))
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithText("Appearance & feedback").performClick()
         compose.onNodeWithText("Reduced motion").assertIsDisplayed()

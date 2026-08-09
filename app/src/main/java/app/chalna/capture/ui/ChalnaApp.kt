@@ -84,8 +84,11 @@ fun ChalnaApp(dependencies: UiDependencies) {
 private fun EdgePulse(static: Boolean) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle.currentStateAsState().value
     val animate = !static && lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    val transition = rememberInfiniteTransition(label = "edgePulse")
-    val alpha by transition.animateFloat(.28f, if (animate) .82f else .28f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "edgeAlpha")
+    val alpha = if (animate) {
+        val transition = rememberInfiniteTransition(label = "edgePulse")
+        val value by transition.animateFloat(.28f, .82f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "edgeAlpha")
+        value
+    } else .28f
     val colors = ChalnaTheme.colors
     Canvas(Modifier.fillMaxSize()) {
         drawRect(
@@ -101,8 +104,11 @@ private fun EdgePulse(static: Boolean) {
 private fun FluidBackdrop(static: Boolean) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle.currentStateAsState().value
     val animate = !static && lifecycle.isAtLeast(Lifecycle.State.RESUMED)
-    val transition = rememberInfiniteTransition(label = "fluid")
-    val phase by transition.animateFloat(0f, if (animate) 1f else 0f, infiniteRepeatable(tween(16000), RepeatMode.Restart), label = "phase")
+    val phase = if (animate) {
+        val transition = rememberInfiniteTransition(label = "fluid")
+        val value by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(16000), RepeatMode.Restart), label = "phase")
+        value
+    } else 0f
     val c = ChalnaTheme.colors
     Canvas(Modifier.fillMaxSize().blur(42.dp)) {
         val a = phase * 6.283f
@@ -280,8 +286,11 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 @Composable private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) = Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 20.dp), content = content)
 
 @Composable private fun Aura(modifier: Modifier = Modifier, active: Boolean, reducedMotion: Boolean) {
-    val transition = rememberInfiniteTransition(label = "aura")
-    val pulse by transition.animateFloat(.82f, if (active && !reducedMotion) 1f else .82f, infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "pulse")
+    val pulse = if (active && !reducedMotion) {
+        val transition = rememberInfiniteTransition(label = "aura")
+        val value by transition.animateFloat(.82f, 1f, infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "pulse")
+        value
+    } else .82f
     val c = ChalnaTheme.colors
     val description = stringResource(if (active) R.string.aura_recording else R.string.aura_idle)
     Canvas(modifier.size(184.dp).semantics { contentDescription = description }) {
