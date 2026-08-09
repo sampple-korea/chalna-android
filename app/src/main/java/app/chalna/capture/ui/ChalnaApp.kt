@@ -36,8 +36,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import android.annotation.SuppressLint
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -61,7 +64,8 @@ private enum class Route { HOME, CAPTURE, APPEARANCE, DIAGNOSTICS, HELP, ABOUT }
 fun ChalnaApp(dependencies: UiDependencies) {
     val state by dependencies.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val systemDark = (context.resources.configuration.uiMode and 0x30) == 0x20
+    val configuration = LocalConfiguration.current
+    val systemDark = (configuration.uiMode and 0x30) == 0x20
     val colors = when (state.appearance) {
         AppearanceMode.NIGHT -> NightColors
         AppearanceMode.MIST -> MistColors
@@ -206,7 +210,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
     Section(R.string.video_quality)
     VideoQuality.entries.forEach { quality -> ChoiceRow(stringResource(when (quality) { VideoQuality.AUTO -> R.string.quality_auto; VideoQuality.FHD -> R.string.quality_fhd; VideoQuality.HD -> R.string.quality_hd }), s.quality == quality) { d.setQuality(quality) } }
     Spacer(Modifier.height(20.dp)); Section(R.string.auto_stop)
-    listOf(0, 15, 30, 60).forEach { seconds -> ChoiceRow(stringResource(if (seconds == 0) R.string.no_limit else R.string.seconds_value, seconds), s.autoStopSeconds == seconds) { d.setAutoStop(seconds) } }
+    listOf(0, 15, 30, 60).forEach { seconds -> ChoiceRow(if (seconds == 0) stringResource(R.string.no_limit) else pluralStringResource(R.plurals.seconds_value, seconds, seconds), s.autoStopSeconds == seconds) { d.setAutoStop(seconds) } }
     Spacer(Modifier.height(20.dp)); Section(R.string.capture_behavior)
     InfoCard(R.string.explicit_trigger_only, R.string.explicit_trigger_detail)
     InfoCard(R.string.media_storage, R.string.media_storage_detail)
@@ -248,7 +252,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 ) {
     TextLabel(stringResource(if (s.sound) R.string.audio_on else R.string.audio_off), 13, ChalnaTheme.colors.muted)
     TextLabel(stringResource(when (s.quality) { VideoQuality.AUTO -> R.string.quality_auto; VideoQuality.FHD -> R.string.quality_fhd; VideoQuality.HD -> R.string.quality_hd }), 13, ChalnaTheme.colors.muted)
-    TextLabel(stringResource(if (s.autoStopSeconds == 0) R.string.no_limit else R.string.seconds_value, s.autoStopSeconds), 13, ChalnaTheme.colors.muted)
+    TextLabel(if (s.autoStopSeconds == 0) stringResource(R.string.no_limit) else pluralStringResource(R.plurals.seconds_value, s.autoStopSeconds, s.autoStopSeconds), 13, ChalnaTheme.colors.muted)
 }
 
 @Composable private fun HelpScreen(back: () -> Unit) = DetailScreen(R.string.help_compatibility, back) {
@@ -307,6 +311,7 @@ private fun SetupFlow(state: ChalnaUiState, d: UiDependencies) {
 @Composable private fun Heading(text: String) = TextLabel(text, 27, ChalnaTheme.colors.text, FontWeight.Bold, Modifier.semantics { heading() })
 @Composable private fun Section(id: Int) = TextLabel(stringResource(id), 14, ChalnaTheme.colors.accent, FontWeight.Bold)
 @Composable private fun Body(text: String) = TextLabel(text, 15, ChalnaTheme.colors.muted)
+@SuppressLint("ModifierParameter")
 @Composable private fun TextLabel(text: String, size: Int, color: Color, weight: FontWeight = FontWeight.Normal, modifier: Modifier = Modifier, align: TextAlign = TextAlign.Start) = androidx.compose.foundation.text.BasicText(text, modifier, style = androidx.compose.ui.text.TextStyle(color = color, fontSize = size.sp, fontWeight = weight, lineHeight = (size * 1.4).sp, textAlign = align))
 private fun Modifier.clickableNoRipple(enabled: Boolean = true, click: () -> Unit) = clickable(MutableInteractionSource(), indication = null, enabled = enabled, role = Role.Button, onClick = click)
 @Composable private fun phaseTitle(s: ChalnaUiState) = stringResource(when(s.phase) { CapturePhase.READY -> R.string.phase_ready; CapturePhase.STARTING -> R.string.phase_starting; CapturePhase.RECORDING -> R.string.phase_recording; CapturePhase.STOPPING -> R.string.phase_stopping; CapturePhase.SAVED -> R.string.phase_saved; CapturePhase.ERROR -> R.string.phase_error })

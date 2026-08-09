@@ -4,4 +4,3 @@
     <foreground android:drawable="@drawable/ic_chalna_mark" />
     <monochrome android:drawable="@drawable/ic_notification_chalna" />
 </adaptive-icon>
-

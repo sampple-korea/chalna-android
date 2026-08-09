@@ -15,6 +15,7 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import app.chalna.capture.BuildConfig
 import app.chalna.capture.capture.CaptureRuntime
@@ -175,7 +176,7 @@ class ProductionUiDependencies(
         val capture = (CaptureRuntime.state.value as? CaptureState.Saved)?.capture ?: return
         activity.startActivity(
             Intent(Intent.ACTION_VIEW)
-                .setDataAndType(android.net.Uri.parse(capture.uri), "video/mp4")
+                .setDataAndType(capture.uri.toUri(), "video/mp4")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
         )
     }

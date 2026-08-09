@@ -6,11 +6,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import app.chalna.capture.R
 import app.chalna.capture.capture.CaptureService
 import app.chalna.capture.domain.LastCapture
+import androidx.core.net.toUri
 
 object CaptureNotifications {
     const val CHANNEL_ID = "active_capture"
@@ -26,7 +26,7 @@ object CaptureNotifications {
         val stop = PendingIntent.getService(context, 1, CaptureService.intent(context, CaptureService.ACTION_STOP), immutableUpdate())
         val openIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
         val open = PendingIntent.getActivity(context, 2, openIntent, immutableUpdate())
-        val settings = PendingIntent.getActivity(context, 3, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(android.net.Uri.parse("package:${context.packageName}")), immutableUpdate())
+        val settings = PendingIntent.getActivity(context, 3, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData("package:${context.packageName}".toUri()), immutableUpdate())
         return Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_chalna)
             .setContentTitle(context.getString(R.string.notification_recording_title))
@@ -41,7 +41,7 @@ object CaptureNotifications {
 
     fun saved(context: Context, capture: LastCapture): Notification {
         ensureChannel(context)
-        val uri = android.net.Uri.parse(capture.uri)
+        val uri = capture.uri.toUri()
         val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "video/mp4").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         val open = PendingIntent.getActivity(context, 4, view, immutableUpdate())
         return Notification.Builder(context, CHANNEL_ID)
@@ -57,7 +57,7 @@ object CaptureNotifications {
     fun error(context: Context, message: String): Notification {
         ensureChannel(context)
         val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            .setData(android.net.Uri.parse("package:${context.packageName}"))
+            .setData("package:${context.packageName}".toUri())
         val settings = PendingIntent.getActivity(context, 5, settingsIntent, immutableUpdate())
         return Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_chalna)
@@ -69,5 +69,5 @@ object CaptureNotifications {
             .build()
     }
 
-    private fun immutableUpdate() = PendingIntent.FLAG_UPDATE_CURRENT or if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+    private fun immutableUpdate() = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 }
