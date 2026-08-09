@@ -13,6 +13,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
 import android.graphics.RectF
+import android.graphics.RadialGradient
 import android.graphics.RenderEffect
 import android.graphics.RenderNode
 import android.graphics.Shader
@@ -113,6 +114,7 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         private val edgeBounds = RectF()
         private val pathMeasure = PathMeasure()
         private val shaderMatrix = Matrix()
+        private val hotspotShaderMatrix = Matrix()
         private val hotspotPosition = FloatArray(2)
         private val hotspotTangent = FloatArray(2)
         private val atmospherePaint = strokePaint(22f, 22)
@@ -126,6 +128,7 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         private var atmosphereShader: SweepGradient? = null
         private var bloomShader: SweepGradient? = null
         private var coreShader: SweepGradient? = null
+        private var hotspotShader: RadialGradient? = null
         private var progress = 0f
         private var resolveBoost = 0f
         private var kind = InvocationPulseKind.START
@@ -198,6 +201,8 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             atmospherePaint.shader = null
             bloomPaint.shader = null
             corePaint.shader = null
+            hotspotBloomPaint.shader = null
+            hotspotShader = null
             atmosphereNode.discardDisplayList()
             bloomNode.discardDisplayList()
         }
@@ -257,13 +262,12 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         private fun drawHotspot(canvas: Canvas, fraction: Float, envelope: Float, energy: Float) {
             if (!pathMeasure.getPosTan(measuredLength * fraction, hotspotPosition, hotspotTangent)) return
             val palette = palette(kind)
-            hotspotBloomPaint.color = palette.hot
-            hotspotBloomPaint.alpha = (22f * envelope * energy).toInt().coerceIn(0, 255)
+            hotspotShaderMatrix.setTranslate(hotspotPosition[0], hotspotPosition[1])
+            hotspotShader?.setLocalMatrix(hotspotShaderMatrix)
+            hotspotBloomPaint.alpha = (185f * envelope * energy).toInt().coerceIn(0, 255)
             hotspotCorePaint.color = Color.WHITE
             hotspotCorePaint.alpha = (230f * envelope * energy).toInt().coerceIn(0, 255)
-            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (11f + 3f * resolveBoost), hotspotBloomPaint)
-            hotspotBloomPaint.alpha = (38f * envelope * energy).toInt().coerceIn(0, 255)
-            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (5f + 1.5f * resolveBoost), hotspotBloomPaint)
+            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (14f + 3f * resolveBoost), hotspotBloomPaint)
             canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * 1.25f, hotspotCorePaint)
         }
 
@@ -296,9 +300,22 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             atmosphereShader = SweepGradient(centerX, centerY, palette.atmosphere, palette.positions)
             bloomShader = SweepGradient(centerX, centerY, palette.bloom, palette.positions)
             coreShader = SweepGradient(centerX, centerY, palette.core, palette.positions)
+            hotspotShader = RadialGradient(
+                0f,
+                0f,
+                density * 17f,
+                intArrayOf(
+                    Color.argb(112, Color.red(palette.hot), Color.green(palette.hot), Color.blue(palette.hot)),
+                    Color.argb(38, Color.red(palette.hot), Color.green(palette.hot), Color.blue(palette.hot)),
+                    Color.TRANSPARENT,
+                ),
+                floatArrayOf(0f, .34f, 1f),
+                Shader.TileMode.CLAMP,
+            )
             atmospherePaint.shader = atmosphereShader
             bloomPaint.shader = bloomShader
             corePaint.shader = coreShader
+            hotspotBloomPaint.shader = hotspotShader
         }
 
         private fun rotateShaders(phase: Float) {

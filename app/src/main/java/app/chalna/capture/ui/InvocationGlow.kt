@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -87,6 +88,7 @@ internal fun InvocationGlow(
                     else -> listOf(colors.accent, Color(0xFF5F8BFF), colors.accent2, colors.accent)
                 },
             )
+            val opticalBlend = if (colors.background.luminance() > .5f) BlendMode.SrcOver else BlendMode.Screen
             onDrawBehind {
                 if (active || strength > .01f) {
                     val energy = strength.coerceAtLeast(0f)
@@ -99,14 +101,14 @@ internal fun InvocationGlow(
                             ringRadius,
                             alpha = (.38f * energy).coerceIn(0f, 1f),
                             style = Stroke(12.dp.toPx(), cap = StrokeCap.Round),
-                            blendMode = BlendMode.Screen,
+                            blendMode = opticalBlend,
                         )
                         drawCircle(
                             bloom,
                             ringRadius,
                             alpha = (.92f * energy).coerceIn(0f, 1f),
                             style = Stroke(2.2.dp.toPx(), cap = StrokeCap.Round),
-                            blendMode = BlendMode.Screen,
+                            blendMode = opticalBlend,
                         )
                     }
                     drawCircle(colors.surface.copy(alpha = (.82f * energy).coerceIn(0f, .82f)), radius * .41f * breathing)
@@ -125,7 +127,7 @@ internal fun InvocationGlow(
                             size = androidx.compose.ui.geometry.Size(radius * .60f, radius * .60f),
                             alpha = (.78f * energy).coerceIn(0f, 1f),
                             style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
-                            blendMode = BlendMode.Screen,
+                            blendMode = opticalBlend,
                         )
                     }
                     drawCircle(colors.background.copy(alpha = .82f), radius * .16f)

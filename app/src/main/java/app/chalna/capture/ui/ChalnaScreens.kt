@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -324,7 +325,10 @@ internal fun PlayerScreen(player: PlayerUiState, d: UiDependencies, back: () -> 
             PlayerSurface(d, videoModifier)
             Box(Modifier.fillMaxSize().testTag("player_touch_surface").pointerInput(Unit) { detectTapGestures { controls = !controls } })
         }
-        if (controls) Column(Modifier.fillMaxWidth().background(Color.Black.copy(.82f)).padding(14.dp)) {
+        if (controls) Column(
+            Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState())
+                .background(Color.Black.copy(.82f)).padding(14.dp),
+        ) {
             player.message?.let {
                 ChalnaText(it, Modifier.padding(bottom = 6.dp), 13, Color(0xFFFF9B8B))
             }
