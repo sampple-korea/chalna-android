@@ -39,11 +39,13 @@ class CameraXCaptureEngine(
     private var startedAt = 0L
 
     override suspend fun start(invocationId: String): Long {
+        CaptureRuntime.record("engine_start_request")
         check(recording == null) { "Capture already active" }
         check(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) { "Camera permission required" }
         val settings = settingsStore.settings.value
         if (settings.audioEnabled) check(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) { "Microphone permission required" }
         val cameraProvider = awaitProvider()
+        CaptureRuntime.record("camera_provider_ready")
         val selector = CameraSelector.DEFAULT_BACK_CAMERA
         check(cameraProvider.hasCamera(selector)) { "Rear camera unavailable" }
         val qualities = when (settings.preferredQuality) {
@@ -59,6 +61,7 @@ class CameraXCaptureEngine(
         val video = VideoCapture.withOutput(recorder)
         cameraProvider.unbindAll()
         cameraProvider.bindToLifecycle(lifecycleOwner, selector, video)
+        CaptureRuntime.record("camera_bind_complete")
         val displayName = CaptureFileNames.video(System.currentTimeMillis())
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
@@ -75,9 +78,11 @@ class CameraXCaptureEngine(
             when (event) {
                 is VideoRecordEvent.Start -> {
                     startedAt = System.currentTimeMillis()
+                    CaptureRuntime.record("video_record_event_start")
                     started.complete(startedAt)
                 }
                 is VideoRecordEvent.Finalize -> {
+                    CaptureRuntime.record("video_record_event_finalize")
                     recording = null
                     cameraProvider.unbindAll()
                     if (!event.hasError() && startedAt > 0) {
@@ -105,6 +110,7 @@ class CameraXCaptureEngine(
     }
 
     override suspend fun stop(): LastCapture? {
+        CaptureRuntime.record("stop_request")
         val active = recording ?: return null
         val result = finalized ?: return null
         active.stop()

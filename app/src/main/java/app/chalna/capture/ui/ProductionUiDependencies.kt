@@ -21,6 +21,7 @@ import app.chalna.capture.BuildConfig
 import app.chalna.capture.capture.CaptureRuntime
 import app.chalna.capture.capture.CaptureService
 import app.chalna.capture.data.SettingsStore
+import app.chalna.capture.data.LastCaptureValidator
 import app.chalna.capture.domain.CaptureQuality
 import app.chalna.capture.domain.CaptureState
 import app.chalna.capture.domain.MotionPreference
@@ -60,7 +61,7 @@ class ProductionUiDependencies(
             }
         }
         activity.lifecycleScope.launch {
-            combine(settingsStore.settings, CaptureRuntime.state, tick, diagnosticsVisible) { settings, capture, now, showDiagnostics ->
+            combine(settingsStore.settings, settingsStore.lastCapture, CaptureRuntime.state, tick, diagnosticsVisible) { settings, lastCapture, capture, now, showDiagnostics ->
                 val roleManager = activity.getSystemService(RoleManager::class.java)
                 val assistantSelected = roleManager.isRoleAvailable(RoleManager.ROLE_ASSISTANT) &&
                     roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)
@@ -87,7 +88,7 @@ class ProductionUiDependencies(
                     CaptureQuality.FHD -> VideoQuality.FHD
                     CaptureQuality.HD -> VideoQuality.HD
                 }
-                val diagnostics = if (!showDiagnostics) emptyList() else listOf(
+                val environment = listOf(
                     "state=${capture.javaClass.simpleName}",
                     "cameraPermission=$cameraGranted",
                     "microphone=${if (settings.audioEnabled) microphoneGranted else "audioOff"}",
@@ -95,11 +96,15 @@ class ProductionUiDependencies(
                     "assistantRole=$assistantSelected",
                     "version=${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 )
+                val markers = CaptureRuntime.diagnosticSnapshot().takeLast(12).map {
+                    "${it.name} @ ${it.elapsedRealtimeMillis}ms"
+                }
+                val diagnostics = if (showDiagnostics) environment + markers else emptyList()
                 ChalnaUiState(
                     setupComplete = settings.setupComplete,
                     phase = phase,
                     durationSeconds = elapsed,
-                    lastSavedName = (capture as? CaptureState.Saved)?.capture?.displayName?.ifBlank { null },
+                    lastSavedName = ((capture as? CaptureState.Saved)?.capture ?: lastCapture)?.displayName?.ifBlank { null },
                     errorMessage = (capture as? CaptureState.Failed)?.message,
                     quality = quality,
                     appearance = appearance,
@@ -173,12 +178,17 @@ class ProductionUiDependencies(
 
     override fun runDiagnosticCapture() = toggleCapture()
     override fun openLastCapture() {
-        val capture = (CaptureRuntime.state.value as? CaptureState.Saved)?.capture ?: return
-        activity.startActivity(
+        val capture = (CaptureRuntime.state.value as? CaptureState.Saved)?.capture ?: settingsStore.lastCapture.value ?: return
+        if (!LastCaptureValidator(activity.contentResolver).exists(capture)) {
+            activity.lifecycleScope.launch { settingsStore.saveLastCapture(null) }
+            CaptureRuntime.publish(CaptureState.Failed("Saved video can no longer be found"))
+            return
+        }
+        runCatching { activity.startActivity(
             Intent(Intent.ACTION_VIEW)
                 .setDataAndType(capture.uri.toUri(), "video/mp4")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-        )
+        ) }.onFailure { CaptureRuntime.publish(CaptureState.Failed("No video viewer is available")) }
     }
 
     override fun copyDiagnostics() {
@@ -186,7 +196,10 @@ class ProductionUiDependencies(
         activity.getSystemService(ClipboardManager::class.java)
             .setPrimaryClip(ClipData.newPlainText("Chalna diagnostics", text))
     }
-    override fun clearDiagnostics() { diagnosticsVisible.value = false }
+    override fun clearDiagnostics() {
+        CaptureRuntime.clearDiagnostics()
+        diagnosticsVisible.value = false
+    }
 
     private fun updateSettings(transform: app.chalna.capture.domain.CaptureSettings.() -> app.chalna.capture.domain.CaptureSettings) {
         activity.lifecycleScope.launch { settingsStore.update { it.transform() } }

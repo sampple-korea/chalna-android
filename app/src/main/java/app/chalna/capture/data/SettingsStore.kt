@@ -5,11 +5,13 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.chalna.capture.domain.CaptureQuality
 import app.chalna.capture.domain.CaptureSettings
 import app.chalna.capture.domain.MotionPreference
 import app.chalna.capture.domain.ThemePreference
+import app.chalna.capture.domain.LastCapture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +40,20 @@ class SettingsStore(context: Context) {
             )
         }.stateIn(scope, SharingStarted.Eagerly, CaptureSettings())
 
+    val lastCapture: StateFlow<LastCapture?> = store.data
+        .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
+        .map { p ->
+            val uri = p[LAST_URI] ?: return@map null
+            LastCapture(
+                uri = uri,
+                durationMillis = p[LAST_DURATION] ?: 0,
+                createdAtMillis = p[LAST_CREATED] ?: 0,
+                displayName = p[LAST_NAME].orEmpty(),
+                quality = p[LAST_QUALITY]?.let { runCatching { CaptureQuality.valueOf(it) }.getOrNull() } ?: CaptureQuality.AUTO,
+                audioIncluded = p[LAST_AUDIO] ?: false,
+            ).takeIf(LastCapture::isUsable)
+        }.stateIn(scope, SharingStarted.Eagerly, null)
+
     suspend fun update(value: CaptureSettings) = store.edit {
         it[AUDIO] = value.audioEnabled
         it[QUALITY] = value.preferredQuality.name
@@ -50,6 +66,24 @@ class SettingsStore(context: Context) {
 
     suspend fun update(transform: (CaptureSettings) -> CaptureSettings) = update(transform(settings.value))
 
+    suspend fun saveLastCapture(capture: LastCapture?) = store.edit {
+        if (capture == null) {
+            it.remove(LAST_URI)
+            it.remove(LAST_DURATION)
+            it.remove(LAST_CREATED)
+            it.remove(LAST_NAME)
+            it.remove(LAST_QUALITY)
+            it.remove(LAST_AUDIO)
+        } else {
+            it[LAST_URI] = capture.uri
+            it[LAST_DURATION] = capture.durationMillis
+            it[LAST_CREATED] = capture.createdAtMillis
+            it[LAST_NAME] = capture.displayName
+            it[LAST_QUALITY] = capture.quality.name
+            it[LAST_AUDIO] = capture.audioIncluded
+        }
+    }
+
     private companion object {
         val AUDIO = booleanPreferencesKey("audio_enabled")
         val QUALITY = stringPreferencesKey("preferred_quality")
@@ -58,5 +92,11 @@ class SettingsStore(context: Context) {
         val THEME = stringPreferencesKey("theme")
         val MOTION = stringPreferencesKey("motion")
         val SETUP_COMPLETE = booleanPreferencesKey("setup_complete")
+        val LAST_URI = stringPreferencesKey("last_capture_uri")
+        val LAST_DURATION = longPreferencesKey("last_capture_duration")
+        val LAST_CREATED = longPreferencesKey("last_capture_created")
+        val LAST_NAME = stringPreferencesKey("last_capture_name")
+        val LAST_QUALITY = stringPreferencesKey("last_capture_quality")
+        val LAST_AUDIO = booleanPreferencesKey("last_capture_audio")
     }
 }

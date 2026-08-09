@@ -16,6 +16,7 @@ class CaptureCoordinator(
 ) {
     private val mutex = Mutex()
     private val handled = LinkedHashSet<String>()
+    private var lastFinalizedAtMillis = Long.MIN_VALUE
     @Volatile var state: CaptureState = CaptureState.Idle
         private set
     @Volatile var lastCapture: LastCapture? = null
@@ -25,7 +26,12 @@ class CaptureCoordinator(
         if (!remember(request.invocationId)) return state
         when (request.command) {
             CaptureCommand.TOGGLE -> when (state) {
-                CaptureState.Idle, is CaptureState.Failed, is CaptureState.Saved -> start(request.invocationId)
+                CaptureState.Idle, is CaptureState.Failed -> start(request.invocationId)
+                is CaptureState.Saved -> if (clockMillis() - lastFinalizedAtMillis >= POST_FINALIZE_GUARD_MILLIS) {
+                    start(request.invocationId)
+                } else {
+                    state
+                }
                 is CaptureState.Recording -> stop(request.invocationId)
                 is CaptureState.Starting, is CaptureState.Stopping, is CaptureState.Saving -> state
             }
@@ -54,6 +60,7 @@ class CaptureCoordinator(
             val saved = engine.stop()?.takeIf(LastCapture::isUsable)
                 ?: error("Recording could not be finalized")
             lastCapture = saved
+            lastFinalizedAtMillis = clockMillis()
             CaptureState.Saved(saved)
         } catch (t: Throwable) {
             CaptureState.Failed(t.message ?: t.javaClass.simpleName)
@@ -71,5 +78,9 @@ class CaptureCoordinator(
         handled += id
         while (handled.size > dedupeCapacity) handled.remove(handled.first())
         return true
+    }
+
+    private companion object {
+        const val POST_FINALIZE_GUARD_MILLIS = 750L
     }
 }

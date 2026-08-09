@@ -13,6 +13,7 @@ import android.graphics.SweepGradient
 import android.animation.ValueAnimator
 import android.os.Build
 import app.chalna.capture.capture.CaptureService
+import app.chalna.capture.capture.CaptureRuntime
 import java.util.UUID
 
 class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInteractionSession(appContext) {
@@ -24,6 +25,7 @@ class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInte
         val id = platformSessionId ?: "session-${UUID.randomUUID()}"
         if (dispatchedSession != id) {
             dispatchedSession = id
+            CaptureRuntime.record("assistant_callback")
             CaptureService.dispatch(appContext, id)
         }
     }

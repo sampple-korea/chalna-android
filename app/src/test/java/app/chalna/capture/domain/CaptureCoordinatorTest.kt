@@ -25,6 +25,19 @@ class CaptureCoordinatorTest {
         assertEquals(0, engine.stops)
     }
 
+    @Test fun simultaneousStopAndToggleDoesNotRestartAfterFinalize() = runTest {
+        var now = 1_000L
+        val engine = Engine()
+        val subject = CaptureCoordinator(engine, { now })
+        subject.dispatch(CaptureRequest("start", CaptureCommand.TOGGLE))
+        subject.dispatch(CaptureRequest("notification-stop", CaptureCommand.STOP))
+        subject.dispatch(CaptureRequest("assistant-near-stop", CaptureCommand.TOGGLE))
+        assertEquals(1, engine.starts)
+        now += 751
+        subject.dispatch(CaptureRequest("intentional-later-start", CaptureCommand.TOGGLE))
+        assertEquals(2, engine.starts)
+    }
+
     @Test fun blankInvocationIgnored() = runTest {
         val engine = Engine()
         val subject = CaptureCoordinator(engine)

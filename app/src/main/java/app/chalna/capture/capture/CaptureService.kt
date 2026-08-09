@@ -47,6 +47,7 @@ class CaptureService : Service(), LifecycleOwner {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        CaptureRuntime.record("service_receive")
         val action = intent?.action
         if (action != ACTION_TOGGLE && action != ACTION_STOP) {
             stopSelfResult(startId)
@@ -54,12 +55,35 @@ class CaptureService : Service(), LifecycleOwner {
         }
         val id = intent?.getStringExtra(EXTRA_INVOCATION_ID) ?: UUID.randomUUID().toString()
         if (action == ACTION_TOGGLE && !hasRequiredPermissions()) {
-            CaptureRuntime.publish(CaptureState.Failed("Required camera, audio, or notification permission is missing"))
+            val message = "Required camera, audio, or notification permission is missing"
+            CaptureRuntime.publish(CaptureState.Failed(message))
             errorHaptic()
+            if (hasNotificationPermission()) {
+                getSystemService(NotificationManager::class.java).notify(
+                    CaptureNotifications.NOTIFICATION_ID,
+                    CaptureNotifications.error(this, message),
+                )
+            }
             stopSelfResult(startId)
             return START_NOT_STICKY
         }
-        if (action == ACTION_TOGGLE) beginForeground()
+        if (action == ACTION_TOGGLE) {
+            try {
+                beginForeground()
+            } catch (failure: RuntimeException) {
+                val message = failure.message ?: "Foreground capture could not start"
+                CaptureRuntime.publish(CaptureState.Failed(message))
+                errorHaptic()
+                if (hasNotificationPermission()) {
+                    getSystemService(NotificationManager::class.java).notify(
+                        CaptureNotifications.NOTIFICATION_ID,
+                        CaptureNotifications.error(this, message),
+                    )
+                }
+                stopSelfResult(startId)
+                return START_NOT_STICKY
+            }
+        }
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         scope.launch {
             val state = coordinator.dispatch(CaptureRequest(id, if (action == ACTION_STOP) CaptureCommand.STOP else CaptureCommand.TOGGLE))
@@ -67,6 +91,7 @@ class CaptureService : Service(), LifecycleOwner {
             if (state is CaptureState.Recording) scheduleAutoStop(state)
             if (state is CaptureState.Saved) {
                 autoStopJob?.cancel()
+                settings.saveLastCapture(state.capture)
                 getSystemService(NotificationManager::class.java).notify(
                     CaptureNotifications.NOTIFICATION_ID,
                     CaptureNotifications.saved(this@CaptureService, state.capture),
@@ -131,6 +156,7 @@ class CaptureService : Service(), LifecycleOwner {
             coordinator.dispatch(CaptureRequest("auto-${state.invocationId}", CaptureCommand.STOP)).also(::haptic)
             val final = coordinator.state
             if (final is CaptureState.Saved) {
+                settings.saveLastCapture(final.capture)
                 getSystemService(NotificationManager::class.java).notify(
                     CaptureNotifications.NOTIFICATION_ID,
                     CaptureNotifications.saved(this@CaptureService, final.capture),
