@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -136,9 +137,27 @@ class ChalnaScreenshotTest {
             ) { content() }
         }
         compose.waitForIdle(); compose.prepare(); compose.waitForIdle()
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val bitmap = captureRootWithRetry()
         val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screenshots").apply { mkdirs() }
         FileOutputStream(File(directory, "$name.png")).use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+    }
+
+    private fun captureRootWithRetry(): Bitmap {
+        var lastTimeout: ComposeTimeoutException? = null
+        repeat(SCREENSHOT_CAPTURE_ATTEMPTS) {
+            try {
+                return compose.onRoot().captureToImage().asAndroidBitmap()
+            } catch (timeout: ComposeTimeoutException) {
+                lastTimeout = timeout
+                compose.waitForIdle()
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            }
+        }
+        throw requireNotNull(lastTimeout)
+    }
+
+    private companion object {
+        const val SCREENSHOT_CAPTURE_ATTEMPTS = 3
     }
 }
 
