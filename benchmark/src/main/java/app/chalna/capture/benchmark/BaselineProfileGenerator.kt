@@ -16,6 +16,7 @@ class BaselineProfileGenerator {
         rule.collect(
             packageName = TARGET_PACKAGE,
             includeInStartupProfile = true,
+            filterPredicate = { profileRule -> profileRule.contains(APP_PROFILE_PREFIX) },
         ) {
             pressHome()
             startActivityAndWait()
@@ -25,5 +26,6 @@ class BaselineProfileGenerator {
 
     private companion object {
         const val TARGET_PACKAGE = "app.chalna.capture"
+        const val APP_PROFILE_PREFIX = "Lapp/chalna/capture/"
     }
 }

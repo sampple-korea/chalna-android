@@ -15,13 +15,13 @@ role_output_file="$(mktemp)"
 trap 'rm -f "$role_output_file"' EXIT
 role_status=1
 for attempt in $(seq 1 10); do
-  set +e
-  adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name" >"$role_output_file" 2>&1
-  role_status=$?
-  set -e
-  if (( role_status == 0 )); then
+  if adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name" >"$role_output_file" 2>&1; then
+    role_status=0
     break
+  else
+    role_status=$?
   fi
+  printf 'Assistant role attempt %s/10 exited %s\n' "$attempt" "$role_status" >&2
   if (( attempt < 10 )); then
     sleep 2
   fi

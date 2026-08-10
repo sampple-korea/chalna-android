@@ -44,9 +44,12 @@
 
 ## Completion evidence ledger
 
-- Pending: implementation commits and source audit.
-- Pending: Android CI, UI QA, benchmark, security, update-install, 16KB and release run IDs.
-- Pending: inspected screenshots, perceptual diffs, traces, benchmark JSON and APK size comparison.
+- Implemented: default-process Assistant/capture authority, command actor, monotonic timing, CameraX recovery/finalize validation, Room migration, paged Gallery/trash/export, lazy Player, Quick Tile, refined UI/Glow/icons, and release/security automation. Final post-profile source audit remains.
+- Android CI [31360756670](https://github.com/sampple-korea/chalna-android/actions/runs/31360756670) passed policy, formatting, Detekt, lint, JVM tests, dependency inspection, and debug APK at commit `dbcaec4146c1575d38bb8a4618d075acf0c37dd0`; a final run is required after profile integration.
+- UI QA [31360756701](https://github.com/sampple-korea/chalna-android/actions/runs/31360756701) passed API 34 instrumentation, 39 deterministic screenshot goldens, accessibility smoke, and API 35/36 role qualification. API 29/33 exposed a shell verifier bug that propagated the first transient `cmd role` exit before diagnostics; the verifier now uses an explicit conditional retry and must be rerun.
+- Benchmark [31359761909](https://github.com/sampple-korea/chalna-android/actions/runs/31359761909) passed cold/warm startup regression gates. Profile run [31360756727](https://github.com/sampple-korea/chalna-android/actions/runs/31360756727) generated a valid unobfuscated startup profile, then failed because the workflow assumed a separate baseline artifact for a startup-only CUJ. The corrected workflow filters app rules and uses the documented startup-rule subset as baseline input when Benchmark 1.4 emits only the startup artifact.
+- Inspected: 39 API 34 Korean screenshots across Home, Setup, Gallery, Player, Settings, Glow keyframes, large font, Night/Mist, tall/cutout simulation, and adaptive icon masks. The committed goldens compare with zero pixel/perceptual difference on the verified run.
+- Security [31360756671](https://github.com/sampple-korea/chalna-android/actions/runs/31360756671) completed CodeQL successfully; final SBOM/security and post-change run remain required.
 - Pending: v1.2.0 APK/AAB metadata, checksums, signer match, immutable release and re-downloaded asset verification.
 
 ---

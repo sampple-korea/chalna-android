@@ -52,8 +52,17 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew --no-daemon --stacktrace :benchmark:connectedProfileAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
-            find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-baseline-prof.txt' -size +0c -exec cp '{}' generated-baseline-prof.txt ';' -quit
-            find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c -exec cp '{}' generated-startup-prof.txt ';' -quit
+            STARTUP_PROFILE="$(find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c -print -quit)"
+            BASELINE_PROFILE="$(find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-baseline-prof.txt' -size +0c -print -quit)"
+            test -n "$STARTUP_PROFILE"
+            cp "$STARTUP_PROFILE" generated-startup-prof.txt
+            if test -n "$BASELINE_PROFILE"; then
+              cp "$BASELINE_PROFILE" generated-baseline-prof.txt
+            else
+              # Benchmark 1.4 can emit only the startup artifact for a startup-only CUJ.
+              # Those rules are also valid baseline rules, per the official API contract.
+              cp "$STARTUP_PROFILE" generated-baseline-prof.txt
+            fi
             test -s generated-baseline-prof.txt
             test -s generated-startup-prof.txt
             test "$(wc -l < generated-baseline-prof.txt)" -ge 20
