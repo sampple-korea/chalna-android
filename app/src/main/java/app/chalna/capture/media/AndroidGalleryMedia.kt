@@ -1,56 +1,131 @@
 package app.chalna.capture.media
 
-import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
-import android.os.Environment
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import app.chalna.capture.domain.CaptureItem
 import app.chalna.capture.domain.CaptureQuality
+import app.chalna.capture.domain.CaptureRecordState
 import app.chalna.capture.domain.StableCaptureId
 import app.chalna.capture.domain.StorageDestination
 import app.chalna.capture.gallery.CaptureMetadata
-import app.chalna.capture.gallery.CaptureMetadataExtractor
 import app.chalna.capture.gallery.GalleryMediaGateway
+import app.chalna.capture.gallery.TrashMediaResult
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway, CaptureMetadataExtractor {
+class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway {
     private val resolver get() = context.contentResolver
+    private val providerAuthority = "${context.packageName}.files"
 
     override suspend fun exists(item: CaptureItem): Boolean = withContext(Dispatchers.IO) {
         when (item.storageDestination) {
             StorageDestination.CHALNA_VAULT -> vaultFile(item)?.let { it.isFile && it.length() > 0 } == true
-            StorageDestination.DEVICE_GALLERY -> runCatching {
-                resolver.query(item.contentUri.toUri(), arrayOf(OpenableColumns.SIZE), null, null, null)?.use {
-                    it.moveToFirst() && !it.isNull(0) && it.getLong(0) >= 0
-                } ?: false
-            }.getOrDefault(false)
+            StorageDestination.DEVICE_GALLERY -> validMediaStoreUri(item.contentUri)?.let(::queryPositiveSize) == true
         }
     }
 
-    override suspend fun delete(item: CaptureItem): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun validate(item: CaptureItem): CaptureItem? = withContext(Dispatchers.IO) {
+        val uri = when (item.storageDestination) {
+            StorageDestination.CHALNA_VAULT -> {
+                val file = vaultFile(item)?.takeIf { it.isFile && it.length() > 0 } ?: return@withContext null
+                FileProvider.getUriForFile(context, providerAuthority, file)
+            }
+            StorageDestination.DEVICE_GALLERY -> validMediaStoreUri(item.contentUri)
+                ?.takeIf(::queryPositiveSize) ?: return@withContext null
+        }
+        val metadata = extract(uri, item.sizeBytes)
+        if (metadata.durationMillis?.let { it > 0 } != true || metadata.sizeBytes?.let { it > 0 } != true) {
+            return@withContext null
+        }
+        item.copy(
+            contentUri = uri.toString(),
+            durationMillis = metadata.durationMillis,
+            sizeBytes = metadata.sizeBytes,
+            width = metadata.width,
+            height = metadata.height,
+            rotationDegrees = metadata.rotationDegrees,
+            codec = metadata.codec,
+            frameRate = metadata.frameRate,
+            bitrate = metadata.bitrate,
+            audioIncluded = metadata.audioIncluded ?: item.audioIncluded,
+            audioKnown = metadata.audioIncluded != null,
+            mimeType = metadata.mimeType ?: VIDEO_MIME_TYPE,
+            metadataKnown = true,
+            state = if (item.state == CaptureRecordState.TRASHED) item.state else CaptureRecordState.READY,
+        )
+    }
+
+    override suspend fun moveToTrash(item: CaptureItem, trashedAtEpochMillis: Long): TrashMediaResult =
+        withContext(Dispatchers.IO) {
+            when (item.storageDestination) {
+                StorageDestination.CHALNA_VAULT -> moveVaultToTrash(item)
+                StorageDestination.DEVICE_GALLERY -> {
+                    if (Build.VERSION.SDK_INT < 30) return@withContext TrashMediaResult.PermanentDeleteRequired
+                    val uri = validMediaStoreUri(item.contentUri) ?: return@withContext TrashMediaResult.Failed
+                    val values = ContentValues().apply {
+                        put(MediaStore.MediaColumns.IS_TRASHED, 1)
+                        put(MediaStore.MediaColumns.DATE_EXPIRES, (trashedAtEpochMillis / 1_000L) + TRASH_RETENTION_SECONDS)
+                    }
+                    if (resolver.update(uri, values, null, null) == 1) {
+                        TrashMediaResult.Trashed(item)
+                    } else {
+                        TrashMediaResult.Failed
+                    }
+                }
+            }
+        }
+
+    override suspend fun restore(item: CaptureItem): CaptureItem? = withContext(Dispatchers.IO) {
         when (item.storageDestination) {
-            StorageDestination.CHALNA_VAULT -> vaultFile(item)?.let { !it.exists() || it.delete() } == true
-            StorageDestination.DEVICE_GALLERY -> runCatching {
-                resolver.delete(item.contentUri.toUri(), null, null) > 0
-            }.getOrDefault(false)
+            StorageDestination.CHALNA_VAULT -> restoreVault(item)
+            StorageDestination.DEVICE_GALLERY -> {
+                if (Build.VERSION.SDK_INT < 30) return@withContext null
+                val uri = validMediaStoreUri(item.contentUri) ?: return@withContext null
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_TRASHED, 0)
+                    putNull(MediaStore.MediaColumns.DATE_EXPIRES)
+                }
+                item.takeIf { resolver.update(uri, values, null, null) == 1 }
+            }
+        }
+    }
+
+    override suspend fun deletePermanently(item: CaptureItem): Boolean = withContext(Dispatchers.IO) {
+        when (item.storageDestination) {
+            StorageDestination.CHALNA_VAULT -> {
+                val file = vaultFile(item) ?: return@withContext false
+                !file.exists() || file.delete()
+            }
+            StorageDestination.DEVICE_GALLERY -> {
+                val uri = validMediaStoreUri(item.contentUri) ?: return@withContext false
+                resolver.delete(uri, null, null) > 0 || !queryPositiveSize(uri)
+            }
         }
     }
 
     override suspend fun exportVaultToDeviceGallery(item: CaptureItem): CaptureItem = withContext(Dispatchers.IO) {
-        require(item.storageDestination == StorageDestination.CHALNA_VAULT) { "Only Vault captures can be exported" }
+        require(item.storageDestination == StorageDestination.CHALNA_VAULT && item.state != CaptureRecordState.TRASHED) {
+            "Only active Vault captures can be exported"
+        }
         val source = requireNotNull(vaultFile(item)?.takeIf(File::isFile)) { "Vault capture is missing" }
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, item.displayName)
-            put(MediaStore.Video.Media.MIME_TYPE, AndroidCaptureDestinationFactory.VIDEO_MIME_TYPE)
+            put(MediaStore.Video.Media.MIME_TYPE, VIDEO_MIME_TYPE)
             put(MediaStore.Video.Media.RELATIVE_PATH, AndroidCaptureDestinationFactory.DEVICE_RELATIVE_PATH)
+            put(MediaStore.Video.Media.DATE_TAKEN, item.createdAtMillis)
             put(MediaStore.Video.Media.IS_PENDING, 1)
         }
         val uri = requireNotNull(resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)) {
@@ -71,105 +146,125 @@ class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway, C
                 contentUri = uri.toString(),
                 privateRef = null,
                 sizeBytes = source.length(),
+                state = CaptureRecordState.READY,
+                trashedAtMillis = null,
+                exportedFromId = item.id,
+                exportedCopyId = null,
             )
-        } catch (failure: Throwable) {
+        } catch (cancellation: CancellationException) {
+            runCatching { resolver.delete(uri, null, null) }
+            throw cancellation
+        } catch (failure: Exception) {
             runCatching { resolver.delete(uri, null, null) }
             throw failure
         }
     }
 
-    override suspend fun discoverKnownDeviceCaptures(): List<CaptureItem> = withContext(Dispatchers.IO) {
-        val columns = arrayOf(
-            MediaStore.Video.Media._ID,
-            MediaStore.Video.Media.DISPLAY_NAME,
-            MediaStore.Video.Media.DATE_ADDED,
-            MediaStore.Video.Media.DURATION,
-            MediaStore.Video.Media.SIZE,
-            MediaStore.Video.Media.WIDTH,
-            MediaStore.Video.Media.HEIGHT,
-        )
-        val deviceCaptures = runCatching {
-            resolver.query(
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                columns,
-                "${MediaStore.Video.Media.RELATIVE_PATH}=? AND ${MediaStore.Video.Media.DISPLAY_NAME} GLOB ?",
-                arrayOf("${AndroidCaptureDestinationFactory.DEVICE_RELATIVE_PATH}/", "CHALNA_*.mp4"),
-                null,
-            )?.use { cursor ->
-                buildList {
-                    while (cursor.moveToNext()) {
-                        val uri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cursor.getLong(0))
-                        add(
-                            CaptureItem(
-                                id = StableCaptureId.from(StorageDestination.DEVICE_GALLERY, uri.toString()),
-                                storageDestination = StorageDestination.DEVICE_GALLERY,
-                                contentUri = uri.toString(),
-                                displayName = cursor.getString(1).orEmpty(),
-                                createdAtMillis = cursor.getLong(2).coerceAtLeast(1) * 1_000L,
-                                durationMillis = cursor.getLong(3).coerceAtLeast(0),
-                                quality = CaptureQuality.AUTO,
-                                sizeBytes = cursor.getLong(4).takeIf { it >= 0 },
-                                width = cursor.getInt(5).takeIf { it > 0 },
-                                height = cursor.getInt(6).takeIf { it > 0 },
-                                audioKnown = false,
-                            ),
-                        )
-                    }
-                }
-            } ?: emptyList()
-        }.getOrDefault(emptyList())
-        val vaultCaptures = runCatching {
-            val movies = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: return@runCatching emptyList()
-            val vaultRoot = File(movies, AndroidCaptureDestinationFactory.VAULT_DIRECTORY)
-            vaultRoot.listFiles()
-                .orEmpty()
-                .asSequence()
-                .filter { it.isFile && it.length() > 0 && it.name.startsWith("CHALNA_") && it.extension.equals("mp4", true) }
-                .map { file ->
-                    val privateRef = "${AndroidCaptureDestinationFactory.VAULT_DIRECTORY}/${file.name}"
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file).toString()
-                    CaptureItem(
-                        id = StableCaptureId.from(StorageDestination.CHALNA_VAULT, privateRef),
-                        storageDestination = StorageDestination.CHALNA_VAULT,
-                        contentUri = uri,
-                        privateRef = privateRef,
-                        displayName = file.name,
-                        createdAtMillis = file.lastModified().coerceAtLeast(1),
-                        durationMillis = 0,
-                        quality = CaptureQuality.AUTO,
-                        sizeBytes = file.length(),
-                        audioKnown = false,
-                    )
-                }.toList()
-        }.getOrDefault(emptyList())
-        deviceCaptures + vaultCaptures
-    }
-
-    override suspend fun extract(item: CaptureItem): CaptureMetadata = withContext(Dispatchers.IO) {
+    fun extract(uri: Uri, knownSize: Long? = null): CaptureMetadata {
         val retriever = MediaMetadataRetriever()
         try {
-            retriever.setDataSource(context, item.contentUri.toUri())
-            CaptureMetadata(
+            retriever.setDataSource(context, uri)
+            val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
+            return CaptureMetadata(
                 durationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull(),
-                sizeBytes = item.sizeBytes ?: querySize(item.contentUri.toUri()),
+                sizeBytes = knownSize?.takeIf { it > 0 } ?: querySize(uri),
                 width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull(),
                 height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull(),
+                rotationDegrees = rotation,
+                codec = if (Build.VERSION.SDK_INT >= 30) {
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_CODEC_MIME_TYPE)
+                } else {
+                    null
+                },
+                frameRate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)?.toFloatOrNull(),
+                bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull(),
+                audioIncluded = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)?.let { it == "yes" },
+                mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE),
             )
         } finally {
             retriever.release()
         }
     }
 
+    private fun moveVaultToTrash(item: CaptureItem): TrashMediaResult {
+        val source = vaultFile(item)?.takeIf(File::isFile) ?: return TrashMediaResult.Failed
+        if (source.parentFile?.name == TRASH_DIRECTORY) return TrashMediaResult.Trashed(item)
+        val trash = File(requireNotNull(vaultRoot()), TRASH_DIRECTORY).also { if (!it.exists()) check(it.mkdirs()) }
+        val target = File(trash, "${item.id}_${source.name}")
+        if (!moveFile(source, target)) return TrashMediaResult.Failed
+        val privateRef = "${AndroidCaptureDestinationFactory.VAULT_DIRECTORY}/$TRASH_DIRECTORY/${target.name}"
+        val uri = FileProvider.getUriForFile(context, providerAuthority, target)
+        return TrashMediaResult.Trashed(item.copy(contentUri = uri.toString(), privateRef = privateRef))
+    }
+
+    private fun restoreVault(item: CaptureItem): CaptureItem? {
+        val source = vaultFile(item)?.takeIf(File::isFile) ?: return null
+        if (source.parentFile?.name != TRASH_DIRECTORY) return item
+        val root = vaultRoot() ?: return null
+        val originalName = source.name.removePrefix("${item.id}_")
+        val target = uniqueFile(root, originalName)
+        if (!moveFile(source, target)) return null
+        val privateRef = "${AndroidCaptureDestinationFactory.VAULT_DIRECTORY}/${target.name}"
+        return item.copy(
+            contentUri = FileProvider.getUriForFile(context, providerAuthority, target).toString(),
+            privateRef = privateRef,
+            displayName = target.name,
+        )
+    }
+
+    private fun moveFile(source: File, target: File): Boolean = try {
+        Files.move(source.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        true
+    } catch (_: AtomicMoveNotSupportedException) {
+        runCatching { Files.move(source.toPath(), target.toPath()) }.isSuccess
+    } catch (_: Exception) {
+        false
+    }
+
+    private fun uniqueFile(directory: File, preferredName: String): File {
+        val base = preferredName.substringBeforeLast('.', preferredName)
+        val extension = preferredName.substringAfterLast('.', "mp4")
+        var candidate = File(directory, preferredName)
+        var index = 1
+        while (candidate.exists()) {
+            candidate = File(directory, "${base}_$index.$extension")
+            index++
+        }
+        return candidate
+    }
+
+    private fun queryPositiveSize(uri: Uri): Boolean = runCatching {
+        resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            cursor.moveToFirst() && !cursor.isNull(0) && cursor.getLong(0) > 0
+        } ?: false
+    }.getOrDefault(false)
+
     private fun querySize(uri: Uri): Long? = runCatching {
         resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
+            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0).takeIf { it > 0 } else null
         }
     }.getOrNull()
 
+    private fun validMediaStoreUri(raw: String): Uri? = runCatching { raw.toUri() }.getOrNull()?.takeIf { uri ->
+        uri.scheme == "content" && uri.authority == MediaStore.AUTHORITY &&
+            uri.pathSegments.firstOrNull() in setOf("external", "external_primary")
+    }
+
+    private fun vaultRoot(): File? = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+        ?.let { File(it, AndroidCaptureDestinationFactory.VAULT_DIRECTORY) }
+        ?.canonicalFile
+
     private fun vaultFile(item: CaptureItem): File? {
-        val ref = item.privateRef ?: return null
-        val root = context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)?.canonicalFile ?: return null
-        val candidate = File(root, ref).canonicalFile
-        return candidate.takeIf { it.path.startsWith(root.path + File.separator) }
+        val reference = item.privateRef ?: return null
+        val movies = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)?.canonicalFile ?: return null
+        val allowed = File(movies, AndroidCaptureDestinationFactory.VAULT_DIRECTORY).canonicalFile
+        val candidate = File(movies, reference).canonicalFile
+        return candidate.takeIf { it.path.startsWith(allowed.path + File.separator) && !Files.isSymbolicLink(it.toPath()) }
+    }
+
+    private companion object {
+        const val VIDEO_MIME_TYPE = "video/mp4"
+        const val TRASH_DIRECTORY = ".trash"
+        const val TRASH_RETENTION_SECONDS = 30L * 24L * 60L * 60L
     }
 }

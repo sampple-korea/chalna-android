@@ -6,9 +6,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GalleryModelsTest {
-    private val oldDevice = item("old", 100, StorageDestination.DEVICE_GALLERY)
-    private val newDevice = item("new", 300, StorageDestination.DEVICE_GALLERY)
-    private val vault = item("vault", 200, StorageDestination.CHALNA_VAULT)
+    private val oldDevice = item("11111111-1111-1111-1111-111111111111", 100, StorageDestination.DEVICE_GALLERY)
+    private val newDevice = item("22222222-2222-2222-2222-222222222222", 300, StorageDestination.DEVICE_GALLERY)
+    private val vault = item("33333333-3333-3333-3333-333333333333", 200, StorageDestination.CHALNA_VAULT)
 
     @Test fun storageDefaultRemainsBackwardCompatibleDeviceGallery() {
         assertEquals(StorageDestination.DEVICE_GALLERY, CaptureSettings().storageDestination)
@@ -27,31 +27,27 @@ class GalleryModelsTest {
         assertEquals(StorageDestination.CHALNA_VAULT, live.storageDestination)
     }
 
-    @Test fun newestAndDateDestinationFiltersCompose() {
+    @Test fun newestDestinationAndScopeFiltersCompose() {
         val result = GalleryFilter.apply(
             listOf(oldDevice, newDevice, vault),
-            GalleryQuery(
-                destination = StorageDestination.DEVICE_GALLERY,
-                fromMillisInclusive = 50,
-                toMillisExclusive = 300,
-            ),
+            GalleryQuery(destination = StorageDestination.DEVICE_GALLERY),
         )
-        assertEquals(listOf("old"), result.map(CaptureItem::id))
-        assertEquals(listOf("new", "vault", "old"), GalleryFilter.apply(listOf(oldDevice, vault, newDevice), GalleryQuery()).map(CaptureItem::id))
+        assertEquals(listOf(newDevice.id, oldDevice.id), result.map(CaptureItem::id))
+        assertEquals(listOf(newDevice.id, vault.id, oldDevice.id), GalleryFilter.apply(listOf(oldDevice, vault, newDevice), GalleryQuery()).map(CaptureItem::id))
     }
 
     @Test fun oldestSortIsStable() {
-        assertEquals(listOf("old", "vault", "new"), GalleryFilter.apply(listOf(newDevice, oldDevice, vault), GalleryQuery(GallerySort.OLDEST_FIRST)).map(CaptureItem::id))
+        assertEquals(listOf(oldDevice.id, vault.id, newDevice.id), GalleryFilter.apply(listOf(newDevice, oldDevice, vault), GalleryQuery(GallerySort.OLDEST_FIRST)).map(CaptureItem::id))
     }
 
     @Test fun selectionToggleSelectAllRetainAndClearArePure() {
         val empty = GallerySelection()
-        val toggled = empty.toggle("old")
+        val toggled = empty.toggle(oldDevice.id)
         val all = toggled.selectAll(listOf(newDevice, vault))
-        assertEquals(setOf("old", "new", "vault"), all.selectedIds)
-        assertEquals(setOf("new"), all.retainAvailable(listOf(newDevice)).selectedIds)
+        assertEquals(setOf(oldDevice.id, newDevice.id, vault.id), all.selectedIds)
+        assertEquals(setOf(newDevice.id), all.retainAvailable(listOf(newDevice)).selectedIds)
         assertTrue(all.clear().selectedIds.isEmpty())
-        assertFalse(empty.selectedIds.contains("old"))
+        assertFalse(empty.selectedIds.contains(oldDevice.id))
     }
 
     private fun item(id: String, created: Long, destination: StorageDestination) = CaptureItem(
