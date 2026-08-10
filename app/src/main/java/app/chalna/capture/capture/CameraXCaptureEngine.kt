@@ -259,13 +259,17 @@ class CameraXCaptureEngine(
             is VideoRecordEvent.Status -> {
                 val stats = event.recordingStats
                 CaptureTelemetryRegistry.mark(request.invocationId, "first_status")
-                onProgress(
-                    CaptureProgress(
-                        recordedDurationNanos = stats.recordedDurationNanos.coerceAtLeast(0),
-                        bytesRecorded = stats.numBytesRecorded.coerceAtLeast(0),
-                        storageCritical = storage.critical(request.settings.storageDestination),
-                    ),
-                )
+                val durationNanos = stats.recordedDurationNanos.coerceAtLeast(0)
+                val bytesRecorded = stats.numBytesRecorded.coerceAtLeast(0)
+                callbackScope.launch {
+                    onProgress(
+                        CaptureProgress(
+                            recordedDurationNanos = durationNanos,
+                            bytesRecorded = bytesRecorded,
+                            storageCritical = storage.critical(request.settings.storageDestination),
+                        ),
+                    )
+                }
             }
             is VideoRecordEvent.Finalize -> finalize(request, output, effectiveQuality, event, started)
             else -> Unit
