@@ -349,21 +349,13 @@ class CameraXCaptureEngine(
                     ).toLastCapture()
             runCatching { attemptStore.updateStage(CaptureAttemptStage.MEDIA_SAVED) }
             CaptureTelemetryRegistry.mark(request.invocationId, "output_validated")
+            // CameraX can report a terminal error after producing a complete, parseable MP4.
+            // Validated user media wins over the transport status: preserve and index it, while
+            // retaining the error as bounded local telemetry for support diagnostics.
             if (event.hasError()) {
-                val code =
-                    if (event.error == VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE) {
-                        CaptureFailureCode.LOW_STORAGE
-                    } else {
-                        CaptureFailureCode.FINALIZE
-                    }
-                finalized?.completeExceptionally(
-                    CaptureOperationException(
-                        CaptureFailure(code, true, "camerax_finalize_${event.error}"),
-                    ),
-                )
-            } else {
-                finalized?.complete(capture)
+                CaptureTelemetryRegistry.mark(request.invocationId, "finalize_error_salvaged_${event.error}")
             }
+            finalized?.complete(capture)
             resetAttemptState(keepFinalized = true)
         }
     }

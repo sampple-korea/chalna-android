@@ -102,20 +102,34 @@ class ChalnaVoiceInteractionSession(
             sessionScope.launch {
                 (appContext.applicationContext as ChalnaApplication).graph.captureStates.state.collectLatest { state ->
                     val kind = invocation.result.toPulseKind()
-                    val resolved =
+                    val resolvedKind =
                         when (kind) {
-                            InvocationPulseKind.START -> state is CaptureState.Recording || state is CaptureState.Failed
+                            InvocationPulseKind.START ->
+                                when (state) {
+                                    is CaptureState.Recording -> InvocationPulseKind.START
+                                    is CaptureState.Recovering, is CaptureState.Saved -> InvocationPulseKind.BUSY
+                                    is CaptureState.Failed -> InvocationPulseKind.ERROR
+                                    else -> null
+                                }
                             InvocationPulseKind.STOP ->
-                                state is CaptureState.Finalizing || state is CaptureState.Persisting ||
-                                    state is CaptureState.Saved || state is CaptureState.Failed
+                                when (state) {
+                                    is CaptureState.Finalizing, is CaptureState.Persisting,
+                                    is CaptureState.Saved,
+                                    -> InvocationPulseKind.STOP
+                                    is CaptureState.Failed -> InvocationPulseKind.ERROR
+                                    else -> null
+                                }
                             InvocationPulseKind.CANCEL ->
-                                state is CaptureState.Idle || state is CaptureState.Finalizing ||
-                                    state is CaptureState.Failed
-                            InvocationPulseKind.BUSY -> true
-                            InvocationPulseKind.ERROR -> true
+                                when (state) {
+                                    CaptureState.Idle, is CaptureState.Finalizing -> InvocationPulseKind.CANCEL
+                                    is CaptureState.Failed -> InvocationPulseKind.ERROR
+                                    else -> null
+                                }
+                            InvocationPulseKind.BUSY -> InvocationPulseKind.BUSY
+                            InvocationPulseKind.ERROR -> InvocationPulseKind.ERROR
                         }
-                    if (resolved) {
-                        viewOrPendingResolve(if (state is CaptureState.Failed) InvocationPulseKind.ERROR else kind)
+                    if (resolvedKind != null) {
+                        viewOrPendingResolve(resolvedKind)
                         return@collectLatest
                     }
                 }

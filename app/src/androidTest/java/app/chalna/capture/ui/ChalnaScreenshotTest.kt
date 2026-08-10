@@ -1,11 +1,11 @@
 package app.chalna.capture.ui
 
 import android.content.res.Configuration
-import android.graphics.AdaptiveIconDrawable
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.os.Build
 import android.view.View
 import androidx.compose.foundation.background

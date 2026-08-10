@@ -52,13 +52,13 @@ class CaptureService :
     private val serviceJob = SupervisorJob()
     private val scope = CoroutineScope(serviceJob + Dispatchers.Main.immediate)
     private lateinit var settings: SettingsStore
-    private lateinit var gallery: GalleryRepository
     private lateinit var states: CaptureStateRepository
     private lateinit var attempts: CaptureAttemptStore
     private lateinit var engine: CameraXCaptureEngine
     private lateinit var actor: CaptureCommandActor
     private var autoStopJob: Job? = null
     private var recoveryJob: Job? = null
+    private var recoveryWasRequired = false
     private var foregroundStarted = false
     private var previousState: CaptureState = CaptureState.Idle
     private var thermalRegistered = false
@@ -76,7 +76,6 @@ class CaptureService :
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
         val graph = (application as ChalnaApplication).graph
         settings = graph.settingsStore
-        gallery = graph.galleryRepository
         states = graph.captureStates
         attempts = CaptureAttemptStore(this)
         engine = CameraXCaptureEngine(this, this, attemptStore = attempts)
@@ -98,24 +97,26 @@ class CaptureService :
 
                         override suspend fun persist(capture: LastCapture): Boolean =
                             if (capture.state == CaptureRecordState.READY) {
-                                gallery.recordFinalized(capture)
+                                gallery().recordFinalized(capture)
                                 attempts.clear()
                                 CaptureTelemetryRegistry.mark(activeInvocationId(), "database_persisted")
                                 true
                             } else {
-                                gallery.recordMetadataPending(capture)
+                                gallery().recordMetadataPending(capture)
                                 false
                             }
                     },
             )
         recoveryJob =
             scope.launch(Dispatchers.IO) {
-                if (!attempts.hasAttempt()) return@launch
+                recoveryWasRequired = attempts.hasAttempt()
+                if (!recoveryWasRequired) return@launch
+                states.publish(CaptureState.Recovering("startup-recovery"))
                 val recovery =
                     CaptureRecoveryManager(
                         applicationContext,
                         attempts,
-                        gallery,
+                        gallery(),
                         AndroidGalleryMedia(applicationContext),
                     ).recover()
                 withContext(Dispatchers.Main.immediate) {
@@ -176,6 +177,9 @@ class CaptureService :
         scope.launch {
             recoveryJob?.join()
             if (request.command == CaptureCommand.RECOVERY) {
+                finishAfterRecovery(startId)
+            } else if (receipt is CaptureCommandResult.AcceptedStart && recoveryWasRequired) {
+                states.updateReceipt(request.invocationId, CaptureCommandResult.BusySaving(request.invocationId))
                 finishAfterRecovery(startId)
             } else {
                 if (receipt is CaptureCommandResult.AcceptedStart && !prepareAudioForeground(request)) {
@@ -404,6 +408,9 @@ class CaptureService :
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** Keep Room and Gallery construction outside the Assistant-to-command hot path. */
+    private fun gallery(): GalleryRepository = (application as ChalnaApplication).graph.galleryRepository
 
     private fun successStartHaptic() = vibrate(VibrationEffect.createOneShot(START_HAPTIC_MILLIS, VibrationEffect.DEFAULT_AMPLITUDE))
 

@@ -32,7 +32,6 @@ class AndroidCaptureCommandDispatcher(
     private val monotonicClock: MonotonicClock = AndroidMonotonicClock(),
 ) : CaptureCommandDispatcher {
     private val appContext = context.applicationContext
-    private val attempts = CaptureAttemptStore(appContext)
 
     private enum class ProjectionKind { STARTING, STOPPING }
 
@@ -56,29 +55,6 @@ class AndroidCaptureCommandDispatcher(
             val activeProjection = projection?.takeIf { it.stateVersion == currentVersion }
             if (activeProjection == null) projection = null
             val resolved = resolve(normalizedId, command, actualState, activeProjection?.kind)
-            if (resolved is CaptureCommandResult.AcceptedStart && attempts.hasAttempt()) {
-                val recovering = CaptureCommandResult.BusySaving(normalizedId)
-                states.reserve(normalizedId, recovering)
-                return@synchronized try {
-                    val request =
-                        CaptureRequest(
-                            normalizedId,
-                            CaptureCommand.RECOVERY,
-                            trigger,
-                            monotonicClock.nowNanos(),
-                        )
-                    appContext.startForegroundService(CaptureService.intent(appContext, request))
-                    recovering
-                } catch (failure: RuntimeException) {
-                    val failed =
-                        CaptureCommandResult.FailedToDispatch(
-                            normalizedId,
-                            CaptureFailure(CaptureFailureCode.DISPATCH, true, failure.javaClass.simpleName),
-                        )
-                    states.updateReceipt(normalizedId, failed)
-                    failed
-                }
-            }
             val permissionFailure = if (resolved is CaptureCommandResult.AcceptedStart) permissionFailure(normalizedId) else null
             if (permissionFailure != null) return@synchronized states.reserve(normalizedId, permissionFailure)
             val reserved = states.reserve(normalizedId, resolved)

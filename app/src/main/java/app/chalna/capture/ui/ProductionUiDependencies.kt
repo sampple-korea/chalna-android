@@ -179,6 +179,10 @@ class ProductionUiDependencies(
     init {
         activity.lifecycle.addObserver(
             object : DefaultLifecycleObserver {
+                override fun onResume(owner: LifecycleOwner) {
+                    refreshSetup()
+                }
+
                 override fun onStop(owner: LifecycleOwner) {
                     playerController?.onBackground()
                 }
