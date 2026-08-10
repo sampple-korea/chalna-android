@@ -42,6 +42,7 @@ object ChalnaScreenshotStates {
     val homeReady =
         ChalnaUiState(
             setupComplete = true,
+            phase = CapturePhase.READY,
             appearance = AppearanceMode.MIST,
             reducedMotion = true,
             ready = true,

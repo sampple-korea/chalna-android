@@ -63,7 +63,7 @@ class ChalnaVoiceInteractionSession(
     ) {
         super.onShow(args, showFlags)
         val sessionKey = AssistantInvocationRegistry.sessionKey(args)
-        if (sessionKey != null && dispatchedSession == sessionKey) return
+        if ((sessionKey != null && dispatchedSession == sessionKey) || (sessionKey == null && dispatchedSession != null)) return
         val prepared = sessionKey?.let(AssistantInvocationRegistry::take)
         val invocation =
             prepared ?: run {
@@ -145,6 +145,7 @@ class ChalnaVoiceInteractionSession(
         pulseView?.release()
         activeInvocation = null
         pendingPulse = null
+        dispatchedSession = null
         super.onHide()
     }
 

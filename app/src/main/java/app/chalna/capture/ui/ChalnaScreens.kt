@@ -553,6 +553,8 @@ internal fun GalleryScreen(
         } else {
             TopBar(pluralStringResource(R.plurals.items_selected, selected.size, selected.size), dependencies::clearMediaSelection) {
                 IconButton(ChalnaIcon.SELECT_ALL, stringResource(R.string.select_all), onClick = dependencies::selectAllMedia)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 if (state.galleryFilter == GalleryFilter.TRASH) {
                     IconButton(ChalnaIcon.RESTORE, stringResource(R.string.restore), onClick = dependencies::restoreSelectedMedia)
                     IconButton(ChalnaIcon.DELETE, stringResource(R.string.delete_permanently)) { confirmPermanent = true }
