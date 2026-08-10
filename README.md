@@ -1,17 +1,18 @@
 # Chalna
 
-Chalna is a private Android 10+ application that turns an invocation of the user-selected system Assistant into an explicit toggle for local CameraX video recording. The first invocation starts capture; a later invocation or the recording notification stops it. Chalna never pre-captures, pre-buffers, warms the camera, binds it persistently, or activates camera/microphone before a user trigger. Version 1.1.1 restores Android Assistant-role eligibility while retaining the local gallery and playback added in 1.1.0.
+Chalna is a private Android 10+ application that turns an invocation of the user-selected system Assistant into an explicit toggle for local CameraX video recording. The first invocation starts capture; a later invocation, notification action, or Quick Settings Tile stops it. Chalna never pre-captures, pre-buffers, warms the camera, binds it persistently, or activates camera/microphone before a user trigger. Version 1.2.0 hardens Assistant qualification, process/state coherence, CameraX recovery, Room-backed Gallery, and local playback.
 
 ## Status
 
-Version 1.1.1 (`versionCode` 3) is the current signed update. Its private immutable Release contains the APK, checksum, and machine-readable build metadata. GitHub Actions is the build source of truth; physical Assistant-button, locked-screen OEM, camera-hardware latency, thermal, and high-refresh-rate results remain device-only checks documented in the [QA report](docs/QA_REPORT.md).
+The source version is 1.2.0 (`versionCode` 4). Signed distribution status is recorded by the private immutable GitHub Release and its machine-readable build-info asset. GitHub Actions is the build source of truth; physical Assistant-button, locked-screen OEM, camera-hardware latency, thermal, and high-refresh-rate results remain device-only checks documented in the [QA report](docs/QA_REPORT.md).
 
 ## Product contract
 
 - Capture begins only after an Assistant invocation or recording-notification action. Test-only harnesses must never ship in production.
-- Each recording uses the selected local destination: Device Gallery writes through Android MediaStore under `Movies/Chalna`; Chalna Vault uses app-private local storage. Vault does not claim encryption. Audio is optional and requires microphone permission.
+- Every Assistant callback is deduplicated by invocation identity and serialized through one command actor. Starting can be cancelled; Saving never queues a surprise recording.
+- Each recording uses the selected local destination: Device Gallery writes through Android MediaStore under `Movies/Chalna`; Chalna Vault uses app-specific local storage. Vault does not claim encryption. Audio is optional and requires microphone permission.
 - The Chalna library indexes only recordings created by Chalna. It does not scan the device gallery and does not request `READ_MEDIA_VIDEO`.
-- Saved captures can be played in-app through AndroidX Media3. Playback accepts local content only; there is no streaming feature or network permission.
+- Saved captures are paged from Room and can be played in-app through a screen-scoped AndroidX Media3 player. Playback accepts local content only; there is no streaming feature or network permission.
 - The rear camera is used without a preview use case. Quality preference falls back across supported CameraX qualities.
 - An ongoing foreground-service notification makes recording visible and provides a stop action.
 - No account, cloud backend, analytics SDK, advertising SDK, or network permission.
@@ -24,7 +25,7 @@ Version 1.1.1 (`versionCode` 3) is the current signed update. Its private immuta
 3. Use Chalna's Assistant action to open the system role picker and select Chalna as the default digital assistant app.
 4. Choose Device Gallery or Chalna Vault for future recordings.
 5. Invoke the configured Assistant gesture to start recording. Confirm the visible recording state/notification.
-6. Invoke again or use the notification Stop action to finalize the video, then use Chalna's local library to play or manage it.
+6. Invoke again, use the notification Stop action, or tap the Quick Settings Tile to finalize the video, then use Chalna's local library to play or manage it.
 
 Assistant selection, keyguard delivery, power-button gestures, and background-start behavior vary by Android release and OEM. Complete the [device test plan](docs/DEVICE_TEST_PLAN.md) before relying on a device.
 
@@ -35,10 +36,12 @@ The project pins AGP 9.3.1, Gradle 9.5.0, Kotlin 2.3.21, Compose BOM 2026.06.00,
 ## Documentation
 
 - [Product](docs/PRODUCT_SPEC.md) · [UX](docs/UX_SPEC.md) · [Architecture](docs/ARCHITECTURE.md)
-- [Design system](docs/DESIGN_SYSTEM.md) · [Motion](docs/MOTION.md) · [Compatibility](docs/COMPATIBILITY.md)
-- [Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
+- [Capture state](docs/CAPTURE_STATE_MACHINE.md) · [Process](docs/PROCESS_MODEL.md) · [Data](docs/DATA_MODEL.md) · [Migration](docs/MIGRATION.md)
+- [Storage](docs/STORAGE.md) · [Gallery](docs/GALLERY.md) · [Player](docs/PLAYER.md) · [Performance](docs/PERFORMANCE.md)
+- [Design system](docs/DESIGN_SYSTEM.md) · [Motion](docs/MOTION.md) · [Accessibility](docs/ACCESSIBILITY.md) · [Compatibility](docs/COMPATIBILITY.md)
+- [Threat model](docs/THREAT_MODEL.md) · [Privacy](PRIVACY.md) · [Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-## v1.1.0 product screenshots
+## Product screenshots
 
 These are deterministic Korean Compose captures downloaded from [UI QA run 31322147867](https://github.com/sampple-korea/chalna-android/actions/runs/31322147867). The first rendered pass was inspected, deliberately refined, regenerated, and inspected again; no mockup tooling or fabricated product content was used.
 

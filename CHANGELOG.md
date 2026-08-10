@@ -2,6 +2,31 @@
 
 This file records repository changes, not unverified release claims. Dates use ISO 8601.
 
+## [1.2.0] - 2026-08-10
+
+### Fixed
+
+- Restored actual Assistant-role picker eligibility by adding the required default recognition-service category and selectable metadata contract.
+- Removed the process-local state split between Voice Interaction/session/recognition and CaptureService/UI.
+- Serialized capture commands, preserved coroutine cancellation, handled Starting cancellation and Saving busy state, and moved duration/latency/guards to a monotonic clock.
+- Validated CameraX finalize output, retained usable media when metadata persistence fails, and salvaged valid journaled output after process death.
+- Removed eager ExoPlayer construction, app-wide one-second ticking, whole-index Gallery refreshes, and per-frame Glow palette/path allocations.
+
+### Added
+
+- Room-backed capture metadata with Paging queries, exported schema, idempotent legacy AtomicFile import, pending reconciliation, favorites, trash, playback positions, and export relationships.
+- Recently Deleted, restore/permanent purge, deterministic sorting/filtering, typed batch outcomes, and idempotent Vault-to-MediaStore export.
+- Screen-scoped SurfaceView Media3 player lifecycle, recording-conflict pause, buffered seek, speed, resume position, missing/error state, and fullscreen ownership.
+- Official Quick Settings capture Tile using the same authoritative command pipeline.
+- StrictMode debug checks, baseline-profile/macrobenchmark module, CodeQL/security/SBOM workflow, 16 KB release validation, AAB distribution, update-install verification, and remote APK/AAB integrity checks.
+- Process, state-machine, data, migration, storage, Gallery, Player, performance, accessibility, threat-model, and ADR documentation.
+
+### Changed
+
+- Refined Home, Setup, Settings, Gallery, Player, adaptive icon masks, and transient tangent-aligned Chalna Invocation Glow.
+- Kept notification permission optional while preserving required foreground-service notification calls.
+- Version metadata now comes from `version.properties`; package and release signing identity remain unchanged.
+
 ## [1.1.1] - 2026-08-10
 
 ### Fixed

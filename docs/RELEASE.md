@@ -1,61 +1,56 @@
-# Release record and verification
+# Release procedure
 
-Android work runs in GitHub Actions, never on the local PC. The v1.1.1 workflow executes from the exact `main` commit. Repository/default workflow permissions are `contents: read`; only the release job receives `contents: write` and `attestations: read`, the minimum additional scopes needed to publish and verify the immutable release. Every reusable GitHub Action is pinned to a full 40-character commit SHA.
+Android build/test/package/emulator work runs only in GitHub Actions. v1.2.0 is version code 4 and package `app.chalna.capture`; `version.properties` is the single source checked by Gradle and the workflow.
 
-## Immutable v1.0.0 baseline
+## Signing continuity
 
-The private v1.0.0 release is published and immutable at commit `80dc98ccdc2587812e99270928531b6d40972be8`. Its downloaded build-info records package `app.chalna.capture`, version code `1`, APK SHA-256 `69ca221786038cabf5df563a296524e52a2cfa851f84a3eab726b5a7ffba8830`, and signing certificate SHA-256 `E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9`.
+The update signer is anchored to the immutable v1.1.1 APK certificate SHA-256:
 
-v1.1.1 keeps the package and signer and advances to version code `3`. The expected certificate digest is pinned directly in the workflow and must also equal the protected repository secret; changing only the secret cannot authorize an unintended signer.
+`E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9`
 
-## Signing
+The release job requires five separate protected secrets: keystore Base64, store password, alias, key password, and expected certificate. Passwords are step-scoped. The restored PKCS#12 is mode 0600, validated before Gradle, and removed in an `always()` step. Candidate APK and AAB certificates must equal the workflow anchor, secret, and downloaded v1.1.1 signer.
 
-The dedicated user-provided PKCS#12 key is stored outside the repository. Prior inspection verified alias `dev-siro`, `PrivateKeyEntry`, RSA-4096, and certificate validity through 2126. The workflow receives five independently stored secrets:
+The user-accessible backup remains outside the repository at `C:\Users\root\OneDrive\Desktop\dev-siro.p12`. Secret values are never documented or logged.
 
-- `CHALNA_RELEASE_KEYSTORE_B64`
-- `CHALNA_RELEASE_STORE_PASSWORD`
-- `CHALNA_RELEASE_KEY_ALIAS`
-- `CHALNA_RELEASE_KEY_PASSWORD`
-- `CHALNA_RELEASE_CERT_SHA256`
+## CI gates
 
-Passwords are step-scoped, the restored file is mode `0600`, and signing material is removed with `if: always()`.
+Before dispatch, the exact main commit must have green Android CI, UI QA, Benchmark, and Security workflows:
 
-## Candidate gates
+- policy, ktlint, Detekt, Android Lint, JVM tests, Room migration tests, dependency graph, and debug APK;
+- API emulator instrumentation, Assistant role assignment, accessibility and deterministic screenshot suite;
+- Baseline Profile candidate, macrobenchmark JSON, and trace artifacts;
+- actionlint, shellcheck, secret scan, CodeQL, dependency review where applicable, and CycloneDX SBOM.
 
-The exact v1.1.1 release commit must pass Android CI and UI QA before dispatch. Android CI runs repository policy, formatting, static checks, captures the resolved dependency graph, rejects resolved Material/Material-icon/Media3-Material artifacts, then runs release lint, JVM tests, and debug assembly. It requires non-empty JUnit XML with zero failures/errors and archives the dependency report, test reports, and raw test results. UI QA runs the full connected test suite, proves that Android accepts the installed debug package as an Assistant role holder without qualification bypass, separately executes screenshot instrumentation, and requires the named non-empty gallery, glow, and icon PNG artifacts.
+## Artifact build and inspection
 
-No prior run proves the v1.1.1 candidate. Run IDs and inspected artifacts must be added to `docs/QA_REPORT.md` only after the new runs finish.
+`.github/workflows/release.yml` accepts only source-matching SemVer, refuses an existing tag/release, builds minified/resource-shrunk signed APK and AAB, then validates:
 
-## Release transaction
+- application ID, version name/code, min/target SDK, non-debuggable state;
+- APK zipalign with 16 KB page alignment and APK Signature Scheme verification;
+- AAB bundletool validation, JAR signature, package/version, and `PAGE_ALIGNMENT_16K` config;
+- every native ELF LOAD segment alignment;
+- exact signer continuity with v1.1.1;
+- no Internet, media-read, broad storage, overlay, Accessibility Service, debug Activity, Visual Lab, production Diagnostics, or unexpected exported component;
+- required Voice Interaction/session/recognition/default category/Quick Tile components;
+- no resolved Material/Material icon/Media3 Material UI dependency;
+- non-empty CycloneDX SBOM and private R8 mapping evidence.
 
-`.github/workflows/release.yml` accepts only version `1.1.1`, refuses an existing tag/release, restores and validates the signing identity, runs policy/lint/JVM tests, and builds a minified signed APK. It then checks:
+The workflow then performs an uninstall-free v1.1.1 → v1.2.0 update install, clean install, Assistant role qualification, launch smoke, and API 35 16 KB page-size install/launch.
 
-- zip alignment and APK signature scheme;
-- non-debug certificate and exact v1.0.0 signer continuity;
-- package `app.chalna.capture`, version name `1.1.1`, version code `3`, min/target SDK, and non-debuggable manifest;
-- successful API 34 Assistant role assignment and secure interaction/recognition service wiring for the exact signed APK;
-- absence of `INTERNET` and `READ_MEDIA_VIDEO`;
-- absence of Diagnostics/VisualLab in the manifest, DEX package listing, and R8 mapping;
-- install and launch of that exact signed APK on an API 34 emulator.
+## Immutable publication
 
-The workflow creates a draft containing exactly these nonempty assets:
+The draft is created only after every local gate and contains exactly:
 
-- `chalna-v1.1.1-release.apk`
-- `chalna-v1.1.1-SHA256.txt`
-- `chalna-v1.1.1-build-info.json`
+- `chalna-v1.2.0-release.apk`
+- `chalna-v1.2.0-release.aab`
+- `chalna-v1.2.0-SHA256.txt`
+- `chalna-v1.2.0-build-info.json`
+- `chalna-v1.2.0-sbom.json`
 
-Only after names, count, sizes, and target commit match does it publish. It then downloads all assets again, checks the checksum and local APK hash, and runs `gh release verify-asset` plus `gh release verify` with `attestations: read`. Immutable-release attestations may propagate asynchronously, so verification retries at most 12 times at 10-second intervals and then fails. This is bounded propagation tolerance, not a bypass.
+Asset names/count/sizes and target commit are checked before publication. A failed draft may be removed; a published immutable release is never mutated.
 
-The re-downloaded APK is independently rechecked for signer, package, version name/code, forbidden permissions, and Diagnostics/VisualLab package/component names. A failed mutable draft is cleaned up; a published immutable release is never deleted or modified by the workflow.
+After publish, all assets are downloaded again. The job checks both hashes, `gh release verify`, `gh release verify-asset` for APK and AAB, immutable state, APK/AAB signer, package/version, bundle validity, build-info commit, and SBOM. The build-info records package/version/SDK/toolchain, exact commit/tag/run, sizes/hashes, previous/current signer, and reproducible commit timestamp without secrets.
 
-## Authoritative final values
+GitHub immutable-release attestation is mandatory for this repository. Additional Actions provenance attestation is recorded only if the private repository plan supports it; lack of optional plan support does not weaken checksum, platform signature, or immutable-release verification.
 
-The APK hash, byte size, signer fingerprint, commit SHA, tag, SDK values, and release workflow run ID belong in the immutable `chalna-v1.1.1-build-info.json` asset. Keeping self-derived APK hashes out of the source commit avoids a circular build where recording the hash changes the artifact being hashed.
-
-Do not claim v1.1.1 completion, signing success, publication, or integrity until the workflow logs, GitHub API state, downloaded asset metadata, build-info, checksum, and APK are inspected.
-
-## Rollback
-
-Never overwrite an immutable asset or force-push a release tag. A correction uses a new source commit, incremented version, newly signed APK, and new immutable release.
-
-References: [Android app signing](https://developer.android.com/studio/publish/app-signing), [apksigner](https://developer.android.com/tools/apksigner), [apkanalyzer](https://developer.android.com/tools/apkanalyzer), [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases), and [release integrity verification](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/verify-release-integrity).
+No release claim is valid until the workflow logs, API release metadata, downloaded artifacts, signatures, checksums, package metadata, and clean/update install evidence are inspected.

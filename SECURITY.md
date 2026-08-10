@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-No production release is verified yet. Until 1.0.0 is published and its artifact is validated, there is no supported binary distribution.
+Only the newest published immutable GitHub Release is supported. v1.2.0 source targets package `app.chalna.capture`, version code 4, and the established release signer; the Release build-info asset is the authoritative artifact ledger.
 
 ## Reporting
 
@@ -15,11 +15,14 @@ Report suspected vulnerabilities privately to the repository owner through GitHu
 - Camera and microphone are accessed only after an explicit supported trigger. Boot capture, warm-up, persistent binding, pre-buffering, and background surveillance are prohibited.
 - The capture service is non-exported. System-bound voice services require `android.permission.BIND_VOICE_INTERACTION`.
 - Release credentials belong only in protected GitHub secrets/environments. Keystores, passwords, certificates with private keys, and signing output must not enter Git history or artifacts.
-- Media is stored through MediaStore; Android and the user control downstream access and sharing.
-- Diagnostics must remain bounded and exclude assist structure, screenshots, captured media, account data, location, and foreground-app identity.
+- Media uses exact Chalna-created MediaStore identities or a canonical app-specific Vault path; Android and the user control downstream access and sharing.
+- MainActivity accepts only known actions and opaque Room capture IDs. FileProvider exposes only the Vault subtree and never accepts a user path.
+- Production telemetry is bounded outcome metadata and excludes assist structure, screenshots, captured media, account data, location, and foreground-app identity.
 
 ## Release security gates
 
 Before distribution, inspect the exact downloaded artifact: SHA-256, APK signature/certificate, package/version/SDK metadata, permissions, exported components, debuggable flag, native libraries, and absence of secrets. Match it to an immutable commit and successful CI run. See [release procedure](docs/RELEASE.md).
+
+The repository-grounded asset/boundary/threat analysis is in [THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 References: [Android app security](https://developer.android.com/privacy-and-security/security-best-practices), [exported component risks](https://developer.android.com/privacy-and-security/risks/access-control-to-exported-components), [app signing](https://developer.android.com/studio/publish/app-signing), and [GitHub encrypted secrets](https://docs.github.com/actions/security-guides/using-secrets-in-github-actions).
