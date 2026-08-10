@@ -18,6 +18,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -95,7 +96,13 @@ class CaptureCommandActor(
     private var storageStopIssued = false
     private val consumer =
         scope.launch {
-            for (message in channel) handle(message)
+            for (message in channel) {
+                if (message === Message.Destroy) {
+                    handleDestroy()
+                    break
+                }
+                handle(message)
+            }
         }
 
     fun submit(request: CaptureRequest) {
@@ -119,11 +126,7 @@ class CaptureCommandActor(
             is Message.Finalized -> persist(message.capture)
             is Message.StopFailed -> fail(message.failure)
             is Message.Persisted -> saved(message.capture, message.indexed)
-            Message.Destroy -> {
-                operationJob?.cancel()
-                engine.release()
-                channel.close()
-            }
+            Message.Destroy -> Unit
         }
     }
 
@@ -150,7 +153,7 @@ class CaptureCommandActor(
             CaptureCommand.CANCEL_START -> cancelStart(request)
             CaptureCommand.STOP, CaptureCommand.AUTO_STOP, CaptureCommand.NOTIFICATION_STOP -> stop(request)
             CaptureCommand.RECOVERY -> Unit
-            CaptureCommand.SERVICE_DESTROYED -> handle(Message.Destroy)
+            CaptureCommand.SERVICE_DESTROYED -> channel.trySend(Message.Destroy)
             CaptureCommand.TOGGLE, CaptureCommand.QUICK_TILE_TOGGLE -> error("Unresolved toggle")
         }
     }
@@ -161,8 +164,23 @@ class CaptureCommandActor(
         ) {
             return
         }
-        val snapshot = CaptureSessionSettings.snapshot(settingsSnapshot())
-        val failed = preflight.check(snapshot)
+        val snapshot =
+            try {
+                CaptureSessionSettings.snapshot(settingsSnapshot())
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                fail(failure.toCaptureFailure(CaptureFailureCode.INTERNAL))
+                return
+            }
+        val failed =
+            try {
+                preflight.check(snapshot)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                failure.toCaptureFailure(CaptureFailureCode.STORAGE_UNAVAILABLE)
+            }
         if (failed != null) {
             fail(failed)
             return
@@ -272,6 +290,12 @@ class CaptureCommandActor(
 
     private suspend fun handleProgress(message: Message.Progress) {
         val current = states.state.value as? CaptureState.Recording ?: return
+        states.publish(
+            current.copy(
+                recordedDurationNanos = message.durationNanos.coerceAtLeast(current.recordedDurationNanos),
+                bytesRecorded = message.bytes.coerceAtLeast(current.bytesRecorded),
+            ),
+        )
         if (message.storageCritical && !storageStopIssued) {
             storageStopIssued = true
             launchStop(
@@ -321,4 +345,28 @@ class CaptureCommandActor(
         states.publish(state)
         effects.onState(state)
     }
+
+    private suspend fun handleDestroy() {
+        operationJob?.cancelAndJoin()
+        engine.release()
+        if (states.state.value.isActiveCaptureState()) {
+            states.publish(
+                CaptureState.Failed(
+                    CaptureFailure(
+                        CaptureFailureCode.INTERRUPTED,
+                        recoverable = true,
+                        diagnostic = "service_destroyed",
+                    ),
+                ),
+            )
+        }
+        channel.close()
+    }
+
+    private fun CaptureState.isActiveCaptureState(): Boolean =
+        this is CaptureState.StartRequested || this is CaptureState.StartingForeground ||
+            this is CaptureState.OpeningCamera || this is CaptureState.StartingRecorder ||
+            this is CaptureState.Recording || this is CaptureState.CancelRequested ||
+            this is CaptureState.StopRequested || this is CaptureState.StoppingRecorder ||
+            this is CaptureState.Finalizing || this is CaptureState.Persisting || this is CaptureState.Recovering
 }

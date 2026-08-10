@@ -163,25 +163,10 @@ class CaptureService :
             request.command == CaptureCommand.RECOVERY ||
                 receipt is CaptureCommandResult.AcceptedStart || isCaptureActive(states.state.value)
         if (needsForeground && !foregroundStarted) {
-            val includeMicrophone = settings.settings.value.audioEnabled && hasPermission(Manifest.permission.RECORD_AUDIO)
             try {
-                beginForeground(includeMicrophone)
+                beginForeground(includeMicrophone = false)
             } catch (failure: RuntimeException) {
-                val captureFailure =
-                    CaptureFailure(
-                        code =
-                            if (failure.javaClass.simpleName == "MissingForegroundServiceTypeException") {
-                                CaptureFailureCode.FOREGROUND_TYPE_MISSING
-                            } else if (failure.javaClass.simpleName == "ForegroundServiceStartNotAllowedException") {
-                                CaptureFailureCode.FOREGROUND_START_NOT_ALLOWED
-                            } else {
-                                CaptureFailureCode.DISPATCH
-                            },
-                        recoverable = true,
-                        diagnostic = failure.javaClass.simpleName,
-                    )
-                states.publish(CaptureState.Failed(captureFailure))
-                states.updateReceipt(request.invocationId, CaptureCommandResult.FailedToDispatch(request.invocationId, captureFailure))
+                publishForegroundFailure(request, failure)
                 errorHaptic()
                 stopSelfResult(startId)
                 return START_NOT_STICKY
@@ -193,6 +178,9 @@ class CaptureService :
             if (request.command == CaptureCommand.RECOVERY) {
                 finishAfterRecovery(startId)
             } else {
+                if (receipt is CaptureCommandResult.AcceptedStart && !prepareAudioForeground(request)) {
+                    return@launch
+                }
                 actor.submit(request)
             }
         }
@@ -292,8 +280,52 @@ class CaptureService :
         } else {
             startForeground(CaptureNotifications.ACTIVE_NOTIFICATION_ID, notification)
         }
+        if (!foregroundStarted) CaptureTelemetryRegistry.mark(activeInvocationId(), "service_foreground")
         foregroundStarted = true
-        CaptureTelemetryRegistry.mark(activeInvocationId(), "service_foreground")
+    }
+
+    private suspend fun prepareAudioForeground(request: CaptureRequest): Boolean {
+        val snapshot =
+            try {
+                settings.snapshot()
+            } catch (cancellation: kotlinx.coroutines.CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                val captureFailure =
+                    CaptureFailure(CaptureFailureCode.INTERNAL, true, failure.javaClass.simpleName)
+                states.publish(CaptureState.Failed(captureFailure))
+                states.updateReceipt(request.invocationId, CaptureCommandResult.FailedToDispatch(request.invocationId, captureFailure))
+                handleState(CaptureState.Failed(captureFailure))
+                return false
+            }
+        if (!snapshot.audioEnabled || !hasPermission(Manifest.permission.RECORD_AUDIO)) return true
+        return try {
+            beginForeground(includeMicrophone = true)
+            true
+        } catch (failure: RuntimeException) {
+            publishForegroundFailure(request, failure)
+            handleState(states.state.value)
+            false
+        }
+    }
+
+    private fun publishForegroundFailure(
+        request: CaptureRequest,
+        failure: RuntimeException,
+    ) {
+        val captureFailure =
+            CaptureFailure(
+                code =
+                    when (failure.javaClass.simpleName) {
+                        "MissingForegroundServiceTypeException" -> CaptureFailureCode.FOREGROUND_TYPE_MISSING
+                        "ForegroundServiceStartNotAllowedException" -> CaptureFailureCode.FOREGROUND_START_NOT_ALLOWED
+                        else -> CaptureFailureCode.DISPATCH
+                    },
+                recoverable = true,
+                diagnostic = failure.javaClass.simpleName,
+            )
+        states.publish(CaptureState.Failed(captureFailure))
+        states.updateReceipt(request.invocationId, CaptureCommandResult.FailedToDispatch(request.invocationId, captureFailure))
     }
 
     private fun endForeground(behavior: Int) {

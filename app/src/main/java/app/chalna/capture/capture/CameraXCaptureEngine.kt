@@ -122,6 +122,7 @@ class CameraXCaptureEngine(
 
     @Volatile private var cancelledCapture: LastCapture? = null
     private var finalized: CompletableDeferred<LastCapture>? = null
+    private var firstStatusRecorded = false
     private val callbackScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override suspend fun start(
@@ -131,6 +132,7 @@ class CameraXCaptureEngine(
     ): CaptureStart {
         check(recording == null && preparedOutput == null) { "Capture already active" }
         cancelledCapture = null
+        firstStatusRecorded = false
         onStage(CaptureState.OpeningCamera(request.invocationId))
         val cameraProvider = awaitProvider()
         CaptureTelemetryRegistry.mark(request.invocationId, "camera_provider_ready")
@@ -258,7 +260,10 @@ class CameraXCaptureEngine(
             }
             is VideoRecordEvent.Status -> {
                 val stats = event.recordingStats
-                CaptureTelemetryRegistry.mark(request.invocationId, "first_status")
+                if (!firstStatusRecorded) {
+                    firstStatusRecorded = true
+                    CaptureTelemetryRegistry.mark(request.invocationId, "first_status")
+                }
                 val durationNanos = stats.recordedDurationNanos.coerceAtLeast(0)
                 val bytesRecorded = stats.numBytesRecorded.coerceAtLeast(0)
                 callbackScope.launch {
@@ -469,6 +474,7 @@ class CameraXCaptureEngine(
         recording = null
         preparedOutput = null
         actualStart = null
+        firstStatusRecorded = false
         if (!keepFinalized) finalized = null
     }
 

@@ -76,6 +76,20 @@ class AssistantEligibilityTest {
         assertTrue(context.getSystemService(RoleManager::class.java).isRoleAvailable(RoleManager.ROLE_ASSISTANT))
     }
 
+    @Test
+    fun packagePublishesProtectedOfficialAssistActivityFallback() {
+        val activity =
+            packageManager
+                .queryIntentActivities(
+                    Intent(Intent.ACTION_ASSIST).addCategory(Intent.CATEGORY_DEFAULT).setPackage(context.packageName),
+                    PackageManager.MATCH_DEFAULT_ONLY,
+                ).single()
+                .activityInfo
+
+        assertEquals(AssistFallbackActivity::class.java.name, activity.name)
+        assertEquals(Manifest.permission.BIND_VOICE_INTERACTION, activity.permission)
+    }
+
     private fun XmlPullParser.attribute(name: String): String = getAttributeValue(ANDROID_NAMESPACE, name).orEmpty()
 
     private companion object {

@@ -58,6 +58,22 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Chalna.Transparent" />
 
+        <activity
+            android:name=".assistant.AssistFallbackActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:finishOnTaskLaunch="true"
+            android:noHistory="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Chalna.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".assistant.ChalnaVoiceInteractionService"
             android:directBootAware="false"

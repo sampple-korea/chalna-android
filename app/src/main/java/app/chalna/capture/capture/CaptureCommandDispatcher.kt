@@ -189,7 +189,7 @@ class AndroidCaptureCommandDispatcher(
                 CaptureFailure(CaptureFailureCode.CAMERA_PERMISSION, true, "camera_permission"),
             )
         }
-        if (settings.settings.value.audioEnabled &&
+        if (settings.cachedSnapshotOrNull()?.audioEnabled == true &&
             appContext.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
         ) {
             return CaptureCommandResult.Rejected(

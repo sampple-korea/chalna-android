@@ -103,6 +103,37 @@ class CaptureCoordinatorTest {
             stopFailure.actor.destroy()
         }
 
+    @Test fun serviceDestroyDuringStartReleasesEngineAndClearsVisibleRecordingState() =
+        runTest {
+            val engine = FakeEngine(blockStart = true)
+            val fixture = actor(engine)
+            fixture.actor.submit(request(id(1), CaptureCommand.START))
+            advanceUntilIdle()
+
+            fixture.actor.destroy()
+
+            val failed = fixture.states.state.value as CaptureState.Failed
+            assertEquals(CaptureFailureCode.INTERRUPTED, failed.failure.code)
+            assertEquals(1, engine.cancels)
+            assertEquals(1, engine.releases)
+        }
+
+    @Test fun recordingStatusUpdatesMonotonicDurationAndByteProgress() =
+        runTest {
+            val engine = FakeEngine()
+            val fixture = actor(engine)
+            fixture.actor.submit(request(id(1), CaptureCommand.START))
+            advanceUntilIdle()
+
+            engine.reportProgress(durationNanos = 3_500_000_000L, bytes = 8_192L)
+            advanceUntilIdle()
+
+            val recording = fixture.states.state.value as CaptureState.Recording
+            assertEquals(3_500_000_000L, recording.recordedDurationNanos)
+            assertEquals(8_192L, recording.bytesRecorded)
+            fixture.actor.destroy()
+        }
+
     private fun kotlinx.coroutines.test.TestScope.actor(engine: FakeEngine): Fixture {
         val states = CaptureStateRepository(FakeMonotonicClock())
         val persisted = mutableListOf<LastCapture>()
@@ -145,8 +176,10 @@ class CaptureCoordinatorTest {
         var starts = 0
         var stops = 0
         var cancels = 0
+        var releases = 0
         var maximumActiveRecorders = 0
         private var activeRecorders = 0
+        private var progressCallback: ((CaptureProgress) -> Unit)? = null
 
         override suspend fun start(
             request: EngineStartRequest,
@@ -154,6 +187,7 @@ class CaptureCoordinatorTest {
             onProgress: (CaptureProgress) -> Unit,
         ): CaptureStart {
             starts++
+            progressCallback = onProgress
             activeRecorders++
             maximumActiveRecorders = maxOf(maximumActiveRecorders, activeRecorders)
             onStage(CaptureState.OpeningCamera(request.invocationId))
@@ -179,7 +213,16 @@ class CaptureCoordinatorTest {
             return null
         }
 
-        override suspend fun release() = Unit
+        override suspend fun release() {
+            releases++
+        }
+
+        fun reportProgress(
+            durationNanos: Long,
+            bytes: Long,
+        ) {
+            progressCallback?.invoke(CaptureProgress(durationNanos, bytes))
+        }
     }
 
     private class FakeMonotonicClock : MonotonicClock {

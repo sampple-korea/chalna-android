@@ -29,7 +29,6 @@ import android.view.View
 import android.view.animation.PathInterpolator
 import androidx.core.graphics.withRotation
 import app.chalna.capture.ChalnaApplication
-import app.chalna.capture.capture.CaptureRuntime
 import app.chalna.capture.capture.CaptureTelemetryRegistry
 import app.chalna.capture.domain.CaptureCommand
 import app.chalna.capture.domain.CaptureCommandResult
@@ -63,7 +62,7 @@ class ChalnaVoiceInteractionSession(
     ) {
         super.onShow(args, showFlags)
         val sessionKey = AssistantInvocationRegistry.sessionKey(args)
-        if ((sessionKey != null && dispatchedSession == sessionKey) || (sessionKey == null && dispatchedSession != null)) return
+        if (sessionKey != null && dispatchedSession == sessionKey) return
         val prepared = sessionKey?.let(AssistantInvocationRegistry::take)
         val invocation =
             prepared ?: run {
@@ -101,7 +100,7 @@ class ChalnaVoiceInteractionSession(
         stateJob?.cancel()
         stateJob =
             sessionScope.launch {
-                CaptureRuntime.state.collectLatest { state ->
+                (appContext.applicationContext as ChalnaApplication).graph.captureStates.state.collectLatest { state ->
                     val kind = invocation.result.toPulseKind()
                     val resolved =
                         when (kind) {

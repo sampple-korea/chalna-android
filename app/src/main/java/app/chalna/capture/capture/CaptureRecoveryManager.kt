@@ -39,7 +39,13 @@ class CaptureRecoveryManager(
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun recover(): CaptureRecoveryResult {
-        val attempt = attempts.read() ?: return CaptureRecoveryResult.NothingToRecover
+        val journalPresent = attempts.hasAttempt()
+        val attempt = attempts.read()
+        if (attempt == null) {
+            if (!journalPresent) return CaptureRecoveryResult.NothingToRecover
+            attempts.clear()
+            return CaptureRecoveryResult.RemovedCorrupt(UNKNOWN_CAPTURE_ID)
+        }
         val candidate =
             CaptureItem(
                 id = attempt.captureId,
@@ -106,5 +112,6 @@ class CaptureRecoveryManager(
 
     private companion object {
         const val RECOVERY_STALE_MILLIS = 60_000L
+        const val UNKNOWN_CAPTURE_ID = "unknown"
     }
 }

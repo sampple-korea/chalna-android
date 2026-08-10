@@ -92,6 +92,7 @@ fi
 grep -q 'ChalnaVoiceInteractionService' release-manifest.xml
 grep -q 'ChalnaVoiceInteractionSessionService' release-manifest.xml
 grep -q 'ChalnaRecognitionService' release-manifest.xml
+grep -q 'AssistFallbackActivity' release-manifest.xml
 grep -q 'android.intent.category.DEFAULT' release-manifest.xml
 grep -q 'ChalnaCaptureTileService' release-manifest.xml
 
@@ -105,6 +106,7 @@ allowed = {
     "app.chalna.capture.assistant.ChalnaVoiceInteractionService",
     "app.chalna.capture.assistant.ChalnaVoiceInteractionSessionService",
     "app.chalna.capture.assistant.ChalnaRecognitionService",
+    "app.chalna.capture.assistant.AssistFallbackActivity",
     "app.chalna.capture.capture.ChalnaCaptureTileService",
 }
 root = ET.parse(sys.argv[1]).getroot()

@@ -64,6 +64,8 @@ class SettingsStore(
         return settings.value
     }
 
+    fun cachedSnapshotOrNull(): CaptureSettings? = settings.value.takeIf { initialSettingsLoaded.isCompleted }
+
     val lastCapture: StateFlow<LastCapture?> =
         store.data
             .catch { failure ->

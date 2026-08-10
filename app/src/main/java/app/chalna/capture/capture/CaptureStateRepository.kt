@@ -66,14 +66,3 @@ class CaptureStateRepository(
         const val ANONYMOUS_FINALIZE_GUARD_NANOS = 550_000_000L
     }
 }
-
-/** Compatibility read-only facade for code being migrated from v1.1. */
-object CaptureRuntime {
-    @Volatile private var repository: CaptureStateRepository? = null
-    val state: StateFlow<CaptureState>
-        get() = requireNotNull(repository) { "Capture state repository is not installed" }.state
-
-    internal fun install(value: CaptureStateRepository) {
-        repository = value
-    }
-}

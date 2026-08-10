@@ -2,7 +2,6 @@ package app.chalna.capture
 
 import android.app.Application
 import app.chalna.capture.capture.AndroidCaptureCommandDispatcher
-import app.chalna.capture.capture.CaptureRuntime
 import app.chalna.capture.capture.CaptureStateRepository
 import app.chalna.capture.data.SettingsStore
 import app.chalna.capture.data.db.ChalnaDatabase
@@ -15,7 +14,6 @@ open class ChalnaApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        CaptureRuntime.install(graph.captureStates)
         graph.settingsStore
         CaptureNotifications.ensureChannels(this)
     }
