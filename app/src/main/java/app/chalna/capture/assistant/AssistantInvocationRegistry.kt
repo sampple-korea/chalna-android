@@ -28,6 +28,9 @@ object AssistantInvocationRegistry {
     fun take(sessionKey: String): AssistantInvocation? = entries.remove(sessionKey)
 
     @Synchronized
+    fun peek(sessionKey: String): AssistantInvocation? = entries[sessionKey]
+
+    @Synchronized
     fun discard(sessionKey: String) {
         entries.remove(sessionKey)
     }

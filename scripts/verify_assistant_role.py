@@ -50,6 +50,30 @@ def contains_exact_line(text: str, expected: str) -> bool:
     return expected in {line.strip() for line in text.splitlines()}
 
 
+def retained_role_holder(package_name: str) -> tuple[bool, str]:
+    """Read the role holder across old and new `cmd role` implementations.
+
+    API 29 and some API 33 ATD images accept add-role-holder but do not expose
+    get-role-holders. Their authoritative role state is still available from
+    dumpsys role, which is also what RoleManagerService persists.
+    """
+    command = shell("cmd", "role", "get-role-holders", "--user", "0", ROLE_NAME)
+    command_output = output(command)
+    if command.returncode == 0 and contains_exact_line(command_output, package_name):
+        return True, command_output
+
+    dump = shell("dumpsys", "role", timeout=30)
+    dump_output = output(dump)
+    assistant = re.search(
+        r"name=android\.app\.role\.ASSISTANT\s+holders=([^\r\n]+)",
+        dump_output,
+    )
+    holders = assistant.group(1).strip() if assistant else ""
+    retained = package_name in {holder.strip() for holder in holders.split(",")}
+    detail = command_output if command.returncode == 0 else f"cmd={command_output}; dumpsys={holders or '<missing>'}"
+    return retained, detail
+
+
 def acceptable_component(value: str, package_name: str, class_name: str) -> bool:
     short = f"{package_name}/.{class_name}"
     full = f"{package_name}/app.chalna.capture.{class_name}"
@@ -129,9 +153,8 @@ def main() -> int:
 
     holders = ""
     for _ in range(POLL_ATTEMPTS):
-        holders_result = shell("cmd", "role", "get-role-holders", "--user", "0", ROLE_NAME)
-        holders = output(holders_result)
-        if holders_result.returncode == 0 and contains_exact_line(holders, package_name):
+        retained, holders = retained_role_holder(package_name)
+        if retained:
             break
         time.sleep(1)
     else:

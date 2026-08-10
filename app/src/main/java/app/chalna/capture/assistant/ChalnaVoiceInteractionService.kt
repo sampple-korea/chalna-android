@@ -32,6 +32,7 @@ class ChalnaVoiceInteractionService : VoiceInteractionService() {
         super.onPrepareToShowSession(args, flags)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
         val sessionKey = AssistantInvocationRegistry.sessionKey(args) ?: return
+        if (AssistantInvocationRegistry.peek(sessionKey) != null) return
         val invocationId = AssistantInvocationRegistry.invocationId(args)
         CaptureTelemetryRegistry.mark(invocationId, "invocation_received")
         val result =

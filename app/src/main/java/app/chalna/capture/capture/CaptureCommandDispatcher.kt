@@ -111,13 +111,12 @@ class AndroidCaptureCommandDispatcher(
         val projectedStarting =
             projected == ProjectionKind.STARTING &&
                 (state is CaptureState.Idle || state is CaptureState.Saved || state is CaptureState.Failed)
-        val projectedStopping = projected == ProjectionKind.STOPPING && state is CaptureState.Recording
         val command =
             when (requested) {
                 CaptureCommand.TOGGLE, CaptureCommand.QUICK_TILE_TOGGLE ->
                     when {
                         projectedStarting -> CaptureCommand.CANCEL_START
-                        projectedStopping -> CaptureCommand.STOP
+                        projected == ProjectionKind.STOPPING -> return CaptureCommandResult.AlreadyStopping(id)
                         else ->
                             when (state) {
                                 CaptureState.Idle, is CaptureState.Failed, is CaptureState.Saved -> CaptureCommand.START

@@ -127,6 +127,22 @@ interface PendingOperationDao {
     @Query("DELETE FROM pending_operations WHERE id = :id")
     suspend fun delete(id: String): Int
 
+    @Query("DELETE FROM pending_operations WHERE captureId = :captureId AND type = :type")
+    suspend fun deleteForCapture(
+        captureId: String,
+        type: String,
+    ): Int
+
+    @Query(
+        "UPDATE pending_operations SET attempts = :attempts, nextAttemptEpochMillis = :nextAttempt " +
+            "WHERE id = :id",
+    )
+    suspend fun reschedule(
+        id: String,
+        attempts: Int,
+        nextAttempt: Long,
+    ): Int
+
     @Query("SELECT COUNT(*) FROM pending_operations")
     suspend fun count(): Int
 }

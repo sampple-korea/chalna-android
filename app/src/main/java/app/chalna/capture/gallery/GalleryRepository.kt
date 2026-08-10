@@ -3,6 +3,7 @@ package app.chalna.capture.gallery
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.filter
 import androidx.paging.map
 import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
@@ -20,6 +21,7 @@ import app.chalna.capture.domain.GalleryQuery
 import app.chalna.capture.domain.GalleryScope
 import app.chalna.capture.domain.GallerySort
 import app.chalna.capture.domain.LastCapture
+import app.chalna.capture.domain.StableCaptureId
 import app.chalna.capture.domain.StorageDestination
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -94,7 +96,9 @@ class GalleryRepository(
 
     suspend fun initialize(): Int {
         importer.import(settings.lastCapture.value)
+        processPendingOperations()
         reconcile(limit = RECONCILE_OPEN_BATCH)
+        purgeExpiredTrash()
         importer.cleanupVerifiedBackup()
         return captureDao.countAll()
     }
@@ -108,7 +112,11 @@ class GalleryRepository(
         Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
             pagingSourceFactory = { captureDao.pagingSource(buildPagingQuery(query)) },
-        ).flow.map { data -> data.map { entity -> requireNotNull(entity.toDomain()) } }
+        ).flow.map { data ->
+            data
+                .filter { it.toDomain() != null }
+                .map { entity -> requireNotNull(entity.toDomain()) }
+        }
 
     suspend fun ids(query: GalleryQuery): Set<String> = captureDao.idList(buildPagingQuery(query, "id")).toSet()
 
@@ -133,7 +141,10 @@ class GalleryRepository(
     suspend fun recordFinalized(capture: LastCapture): CaptureItem {
         require(capture.isUsable()) { "Only validated finalized media can be indexed" }
         val item = CaptureItem.from(capture)
-        captureDao.upsert(item.toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION))
+        database.withTransaction {
+            captureDao.upsert(item.toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION))
+            database.pendingOperationDao().deleteForCapture(item.id, PENDING_METADATA)
+        }
         settings.saveLastCapture(item.toLastCapture())
         return item
     }
@@ -144,12 +155,18 @@ class GalleryRepository(
                 state = CaptureRecordState.METADATA_PENDING,
                 metadataKnown = false,
             )
-        runCatching { captureDao.upsert(item.toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION)) }
+        try {
+            captureDao.upsert(item.toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // The capture attempt journal remains authoritative if even this row cannot be stored.
+        }
         database.pendingOperationDao().upsert(
             PendingOperationEntity(
                 id = "metadata-${item.id}",
                 captureId = item.id,
-                type = "RECONCILE_METADATA",
+                type = PENDING_METADATA,
                 payload = null,
                 attempts = 0,
                 nextAttemptEpochMillis = nowEpochMillis(),
@@ -207,7 +224,15 @@ class GalleryRepository(
         val succeeded = mutableSetOf<String>()
         val failed = (ids - items.mapTo(mutableSetOf(), CaptureItem::id)).toMutableSet()
         items.forEach { item ->
-            when (val result = media.moveToTrash(item, nowEpochMillis())) {
+            val result =
+                try {
+                    media.moveToTrash(item, nowEpochMillis())
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    TrashMediaResult.Failed
+                }
+            when (result) {
                 is TrashMediaResult.Trashed -> {
                     captureDao.upsert(
                         result.item
@@ -336,17 +361,23 @@ class GalleryRepository(
                 throw cancellation
             } catch (_: Exception) {
                 // The copied media is preserved and reconciled instead of being deleted.
-                database.pendingOperationDao().upsert(
-                    PendingOperationEntity(
-                        id = "export-${source.id}",
-                        captureId = source.id,
-                        type = "RECONCILE_EXPORT",
-                        payload = copy.contentUri,
-                        attempts = 0,
-                        nextAttemptEpochMillis = nowEpochMillis(),
-                        createdAtEpochMillis = nowEpochMillis(),
-                    ),
-                )
+                try {
+                    database.pendingOperationDao().upsert(
+                        PendingOperationEntity(
+                            id = "export-${source.id}",
+                            captureId = source.id,
+                            type = PENDING_EXPORT,
+                            payload = copy.contentUri,
+                            attempts = 0,
+                            nextAttemptEpochMillis = nowEpochMillis(),
+                            createdAtEpochMillis = nowEpochMillis(),
+                        ),
+                    )
+                } catch (pendingCancellation: CancellationException) {
+                    throw pendingCancellation
+                } catch (_: Exception) {
+                    // Never delete an already completed MediaStore copy because metadata storage failed.
+                }
                 succeeded += source.id
                 produced += copy.copy(state = CaptureRecordState.METADATA_PENDING)
             }
@@ -358,7 +389,16 @@ class GalleryRepository(
         captureDao
             .byIds(ids)
             .mapNotNull(CaptureEntity::toDomain)
-            .filter { it.state != CaptureRecordState.TRASHED && media.exists(it) }
+            .filter { item ->
+                item.state != CaptureRecordState.TRASHED &&
+                    try {
+                        media.exists(item)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        false
+                    }
+            }
             .map(CaptureItem::contentUri)
 
     suspend fun externalOpenUri(id: String): String? =
@@ -374,6 +414,80 @@ class GalleryRepository(
             trashBytes = captureDao.trashBytes(),
         )
 
+    private suspend fun processPendingOperations(limit: Int = PENDING_OPERATION_BATCH) {
+        val operations = database.pendingOperationDao().due(nowEpochMillis(), limit)
+        operations.forEach { operation ->
+            val completed =
+                try {
+                    when (operation.type) {
+                        PENDING_METADATA -> reconcilePendingMetadata(operation)
+                        PENDING_EXPORT -> reconcilePendingExport(operation)
+                        else -> false
+                    }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    false
+                }
+            if (completed) {
+                database.pendingOperationDao().delete(operation.id)
+            } else {
+                val attempts = (operation.attempts + 1).coerceAtMost(MAX_PENDING_ATTEMPTS)
+                database.pendingOperationDao().reschedule(
+                    operation.id,
+                    attempts,
+                    nowEpochMillis() + pendingRetryDelay(attempts),
+                )
+            }
+        }
+        repairLastCapture()
+    }
+
+    private suspend fun reconcilePendingMetadata(operation: PendingOperationEntity): Boolean {
+        val item = captureDao.byId(operation.captureId)?.toDomain() ?: return false
+        val validated = media.validate(item) ?: return false
+        captureDao.upsert(
+            validated
+                .copy(state = CaptureRecordState.READY, lastVerifiedAtMillis = nowEpochMillis())
+                .toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION),
+        )
+        val current = settings.lastCapture.value
+        if (current == null || validated.createdAtMillis >= current.createdAtMillis) {
+            settings.saveLastCapture(validated.toLastCapture())
+        }
+        return true
+    }
+
+    private suspend fun reconcilePendingExport(operation: PendingOperationEntity): Boolean {
+        val source = captureDao.byId(operation.captureId)?.toDomain() ?: return false
+        val uri = operation.payload?.takeIf(String::isNotBlank) ?: return false
+        val candidate =
+            source.copy(
+                id = StableCaptureId.from(StorageDestination.DEVICE_GALLERY, uri),
+                storageDestination = StorageDestination.DEVICE_GALLERY,
+                contentUri = uri,
+                privateRef = null,
+                state = CaptureRecordState.METADATA_PENDING,
+                exportedFromId = source.id,
+                exportedCopyId = null,
+                lastVerifiedAtMillis = null,
+            )
+        val validated = media.validate(candidate) ?: return false
+        database.withTransaction {
+            captureDao.upsert(
+                validated
+                    .copy(state = CaptureRecordState.READY, lastVerifiedAtMillis = nowEpochMillis())
+                    .toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION),
+            )
+            captureDao.linkExport(source.id, validated.id, LegacyCaptureIndexImporter.CURRENT_DATA_VERSION)
+        }
+        return true
+    }
+
+    private fun pendingRetryDelay(attempts: Int): Long =
+        (PENDING_RETRY_BASE_MILLIS shl (attempts - 1).coerceIn(0, MAX_PENDING_SHIFT))
+            .coerceAtMost(PENDING_RETRY_MAX_MILLIS)
+
     private suspend fun removeMissing(item: CaptureItem) {
         database.withTransaction {
             captureDao.deleteById(item.id)
@@ -384,7 +498,17 @@ class GalleryRepository(
     private suspend fun repairLastCapture() {
         val current = settings.lastCapture.value ?: return
         val currentId = CaptureItem.from(current).id
-        val exists = captureDao.byId(currentId)?.toDomain()?.let { it.state != CaptureRecordState.TRASHED && media.exists(it) } == true
+        val exists =
+            captureDao.byId(currentId)?.toDomain()?.let { item ->
+                item.state != CaptureRecordState.TRASHED &&
+                    try {
+                        media.exists(item)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        false
+                    }
+            } == true
         if (!exists) settings.saveLastCapture(captureDao.latestActive()?.toDomain()?.toLastCapture())
     }
 
@@ -427,6 +551,13 @@ class GalleryRepository(
         const val RECONCILE_OPEN_BATCH = 24
         const val RECONCILE_MANUAL_BATCH = 64
         const val PURGE_BATCH = 128
+        const val PENDING_OPERATION_BATCH = 32
+        const val MAX_PENDING_ATTEMPTS = 12
+        const val MAX_PENDING_SHIFT = 8
+        const val PENDING_RETRY_BASE_MILLIS = 30_000L
+        const val PENDING_RETRY_MAX_MILLIS = 6L * 60L * 60L * 1_000L
+        const val PENDING_METADATA = "RECONCILE_METADATA"
+        const val PENDING_EXPORT = "RECONCILE_EXPORT"
         const val MILLIS_PER_DAY = 86_400_000L
         const val REVERIFY_AFTER_MILLIS = 7 * MILLIS_PER_DAY
     }
