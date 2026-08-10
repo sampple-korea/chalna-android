@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.service.voice.VoiceInteractionService
 import android.speech.RecognitionService
 import androidx.test.platform.app.InstrumentationRegistry
+import app.chalna.capture.MainActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,8 +41,11 @@ class AssistantEligibilityTest {
 
     @Test
     fun declaredRecognitionServiceIsSystemBindOnly() {
+        val query = Intent(RecognitionService.SERVICE_INTERFACE)
+            .addCategory(Intent.CATEGORY_DEFAULT)
+            .setPackage(context.packageName)
         val service = packageManager.queryIntentServices(
-            Intent(RecognitionService.SERVICE_INTERFACE).setPackage(context.packageName),
+            query,
             PackageManager.GET_META_DATA,
         ).single().serviceInfo
 
@@ -52,6 +56,10 @@ class AssistantEligibilityTest {
                 metadata.next()
             }
             assertEquals("recognition-service", metadata.name)
+            assertEquals(
+                MainActivity::class.java.name,
+                metadata.getAttributeValue(ANDROID_NAMESPACE, "settingsActivity"),
+            )
         }
     }
 

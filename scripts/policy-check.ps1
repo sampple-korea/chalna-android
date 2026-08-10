@@ -6,6 +6,7 @@ function Add-Failure([string]$message) { $failures.Add($message) }
 
 $manifest = Get-Content -Raw (Join-Path $root "app/src/main/AndroidManifest.xml")
 $voiceMetadata = Get-Content -Raw (Join-Path $root "app/src/main/res/xml/voice_interaction_service.xml")
+$recognitionMetadata = Get-Content -Raw (Join-Path $root "app/src/main/res/xml/recognition_service.xml")
 $forbiddenPermissions = @(
   "android.permission.INTERNET",
   "android.permission.READ_MEDIA_VIDEO",
@@ -38,6 +39,15 @@ if ($voiceMetadata -notmatch 'android:supportsAssist="true"') {
 }
 if ($manifest -notmatch 'android:name="\.assistant\.ChalnaRecognitionService"') {
   Add-Failure "Assistant role recognition service component is missing"
+}
+if ($manifest -notmatch '(?s)android:name="\.assistant\.ChalnaRecognitionService".*?<category android:name="android.intent.category.DEFAULT"') {
+  Add-Failure "Assistant recognition service must publish CATEGORY_DEFAULT"
+}
+if ($recognitionMetadata -match 'android:selectableAsDefault="false"') {
+  Add-Failure "Assistant recognition service cannot opt out of default selection"
+}
+if ($recognitionMetadata -notmatch 'android:settingsActivity="app\.chalna\.capture\.MainActivity"') {
+  Add-Failure "Assistant recognition metadata must provide the Chalna settings activity"
 }
 
 $gradleText = (Get-ChildItem $root -Recurse -File -Include *.gradle,*.gradle.kts,*.toml | ForEach-Object { Get-Content -Raw $_.FullName }) -join "`n"

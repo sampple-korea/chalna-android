@@ -36,9 +36,7 @@
         tools:targetApi="33"
         android:usesCleartextTraffic="false">
 
-        <profileable
-            android:shell="true"
-            tools:targetApi="29" />
+        <profileable android:shell="true" />
 
         <activity
             android:name=".MainActivity"
@@ -85,6 +83,7 @@
             android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE">
             <intent-filter>
                 <action android:name="android.speech.RecognitionService" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <meta-data
                 android:name="android.speech"
