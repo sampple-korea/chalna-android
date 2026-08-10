@@ -112,11 +112,11 @@ private fun VisualLab() = Column(
     if (markers.isEmpty()) {
         Body(stringResource(R.string.lab_no_capture_timing))
     } else {
-        val origin = markers.first().elapsedRealtimeMillis
+        val origin = markers.first().elapsedRealtimeNanos
         markers.takeLast(12).forEach { marker ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ChalnaText(marker.name, Modifier.weight(1f), 12)
-                ChalnaText("+${marker.elapsedRealtimeMillis - origin} ms", 12, ChalnaTheme.colors.muted)
+                ChalnaText("+${(marker.elapsedRealtimeNanos - origin) / 1_000_000} ms", 12, ChalnaTheme.colors.muted)
             }
         }
         Spacer(Modifier.height(8.dp))

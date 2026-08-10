@@ -49,6 +49,7 @@ internal fun InvocationGlow(
         }, label = "glowReveal",
     ) { target ->
         when (target) {
+            CapturePhase.SETUP_REQUIRED -> 0f
             CapturePhase.READY -> if (enabled) .72f else 0f
             CapturePhase.SAVED -> .82f
             else -> 1f
@@ -70,6 +71,7 @@ internal fun InvocationGlow(
         modifier.clearAndSetSemantics { }.drawWithCache {
             val radius = size.minDimension / 2f
             val atmosphere = when (phase) {
+                CapturePhase.SETUP_REQUIRED -> colors.outline
                 CapturePhase.ERROR -> colors.danger
                 CapturePhase.SAVED -> colors.positive
                 CapturePhase.STOPPING -> colors.accent2
@@ -81,6 +83,7 @@ internal fun InvocationGlow(
             )
             val bloom = Brush.sweepGradient(
                 when (phase) {
+                    CapturePhase.SETUP_REQUIRED -> listOf(colors.outline, colors.muted, colors.outline)
                     CapturePhase.RECORDING -> listOf(colors.accent, Color(0xFFFF719C), Color(0xFFD965F5), colors.accent2, colors.accent)
                     CapturePhase.STOPPING -> listOf(colors.accent2, Color(0xFFFF8ABB), colors.accent, colors.accent2)
                     CapturePhase.ERROR -> listOf(Color(0xFFFFB35E), colors.danger, Color(0xFFFFD09A), Color(0xFFFFB35E))

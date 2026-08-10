@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +32,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -37,6 +43,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -103,7 +112,12 @@ import kotlin.math.sin
 
 @Composable internal fun Hairline() = Spacer(Modifier.fillMaxWidth().height(1.dp).background(ChalnaTheme.colors.outline.copy(.55f)))
 
-internal enum class ChalnaIcon { MARK, GALLERY, SETTINGS, BACK, CHECK, CAMERA, MIC, ASSISTANT, BELL, PLAY, PAUSE, VOLUME, MUTED, FULLSCREEN, SHARE, MORE, INFO, DELETE, EXPORT, EXTERNAL, CLOSE }
+internal enum class ChalnaIcon {
+    MARK, GALLERY, SETTINGS, BACK, CHECK, CAMERA, MIC, ASSISTANT, BELL, PLAY, PAUSE,
+    REWIND, FORWARD, VOLUME, MUTED, FULLSCREEN, SHARE, MORE, INFO, DELETE, EXPORT,
+    EXTERNAL, CLOSE, FILTER, SORT, FAVORITE, RESTORE, SELECT_ALL, TILE, RETRY,
+    QUALITY, TIMER, THEME, MOTION,
+}
 
 @Composable
 internal fun Modifier.clickableNoRipple(role: Role? = null, enabled: Boolean = true, onClick: () -> Unit): Modifier = composedClickable(role, enabled, onClick)
@@ -111,7 +125,27 @@ internal fun Modifier.clickableNoRipple(role: Role? = null, enabled: Boolean = t
 @Composable
 private fun Modifier.composedClickable(role: Role?, enabled: Boolean, onClick: () -> Unit): Modifier {
     val source = remember { MutableInteractionSource() }
-    return clickable(source, indication = null, enabled = enabled, role = role, onClick = onClick)
+    val pressed by source.collectIsPressedAsState()
+    val hovered by source.collectIsHoveredAsState()
+    var focused by remember { mutableStateOf(false) }
+    val focusColor = ChalnaTheme.colors.accent
+    return graphicsLayer {
+        val scale = if (pressed) 0.985f else 1f
+        scaleX = scale
+        scaleY = scale
+        alpha = when {
+            !enabled -> 0.62f
+            pressed -> 0.84f
+            hovered -> 0.93f
+            else -> 1f
+        }
+    }.onFocusChanged { focused = it.isFocused }
+        .drawWithContent {
+            drawContent()
+            if (focused) drawRoundRect(focusColor, style = Stroke(2.dp.toPx()), cornerRadius = androidx.compose.ui.geometry.CornerRadius(10.dp.toPx()))
+        }
+        .focusable(enabled, source)
+        .clickable(source, indication = null, enabled = enabled, role = role, onClick = onClick)
 }
 
 @Composable
@@ -149,7 +183,8 @@ internal fun ChalnaText(
 @Composable internal fun SectionTitle(text: String) = ChalnaText(text, Modifier.padding(top = 20.dp, bottom = 8.dp).semantics { heading() }, 13, ChalnaTheme.colors.accent, FontWeight.Bold)
 
 @Composable internal fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) = Column(
-    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+    Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState())
+        .padding(horizontal = 20.dp, vertical = 12.dp),
     content = content,
 )
 
@@ -252,6 +287,8 @@ internal fun ChalnaText(
         ChalnaIcon.BELL -> { drawArc(color,195f,150f,false,Offset(w*.20f,h*.15f),Size(w*.60f,h*.72f),style=stroke); line(Offset(w*.18f,h*.72f),Offset(w*.82f,h*.72f)); drawArc(color,0f,180f,false,Offset(w*.40f,h*.70f),Size(w*.20f,h*.18f),style=stroke) }
         ChalnaIcon.PLAY -> { val p=Path().apply { moveTo(w*.32f,h*.18f); lineTo(w*.80f,h*.5f); lineTo(w*.32f,h*.82f); close() }; drawPath(p,color) }
         ChalnaIcon.PAUSE -> { drawRoundRect(color,Offset(w*.25f,h*.18f),Size(w*.17f,h*.64f)); drawRoundRect(color,Offset(w*.58f,h*.18f),Size(w*.17f,h*.64f)) }
+        ChalnaIcon.REWIND -> { drawArc(color,35f,285f,false,Offset(w*.13f,h*.13f),Size(w*.74f,h*.74f),style=stroke);line(Offset(w*.12f,h*.28f),Offset(w*.12f,h*.56f),Offset(w*.36f,h*.45f)) }
+        ChalnaIcon.FORWARD -> { drawArc(color,220f,285f,false,Offset(w*.13f,h*.13f),Size(w*.74f,h*.74f),style=stroke);line(Offset(w*.88f,h*.28f),Offset(w*.88f,h*.56f),Offset(w*.64f,h*.45f)) }
         ChalnaIcon.VOLUME, ChalnaIcon.MUTED -> { val p=Path().apply { moveTo(w*.12f,h*.40f);lineTo(w*.32f,h*.40f);lineTo(w*.52f,h*.22f);lineTo(w*.52f,h*.78f);lineTo(w*.32f,h*.60f);lineTo(w*.12f,h*.60f);close() };drawPath(p,color); if(icon==ChalnaIcon.MUTED){line(Offset(w*.66f,h*.37f),Offset(w*.88f,h*.63f));line(Offset(w*.88f,h*.37f),Offset(w*.66f,h*.63f))}else drawArc(color,-55f,110f,false,Offset(w*.48f,h*.25f),Size(w*.34f,h*.50f),style=stroke) }
         ChalnaIcon.FULLSCREEN -> { line(Offset(w*.12f,h*.38f),Offset(w*.12f,h*.12f),Offset(w*.38f,h*.12f));line(Offset(w*.62f,h*.12f),Offset(w*.88f,h*.12f),Offset(w*.88f,h*.38f));line(Offset(w*.88f,h*.62f),Offset(w*.88f,h*.88f),Offset(w*.62f,h*.88f));line(Offset(w*.38f,h*.88f),Offset(w*.12f,h*.88f),Offset(w*.12f,h*.62f)) }
         ChalnaIcon.SHARE -> { drawCircle(color,w*.10f,Offset(w*.22f,h*.5f),style=stroke);drawCircle(color,w*.10f,Offset(w*.76f,h*.22f),style=stroke);drawCircle(color,w*.10f,Offset(w*.76f,h*.78f),style=stroke);line(Offset(w*.31f,h*.45f),Offset(w*.67f,h*.27f));line(Offset(w*.31f,h*.55f),Offset(w*.67f,h*.73f)) }
@@ -261,10 +298,28 @@ internal fun ChalnaText(
         ChalnaIcon.EXPORT -> { drawRoundRect(color,Offset(w*.12f,h*.38f),Size(w*.76f,h*.50f),androidx.compose.ui.geometry.CornerRadius(w*.08f),style=stroke);line(Offset(w*.5f,h*.68f),Offset(w*.5f,h*.12f));line(Offset(w*.30f,h*.32f),Offset(w*.5f,h*.12f),Offset(w*.70f,h*.32f)) }
         ChalnaIcon.EXTERNAL -> { drawRoundRect(color,Offset(w*.12f,h*.25f),Size(w*.62f,h*.63f),androidx.compose.ui.geometry.CornerRadius(w*.08f),style=stroke);line(Offset(w*.45f,h*.12f),Offset(w*.88f,h*.12f),Offset(w*.88f,h*.55f));line(Offset(w*.88f,h*.12f),Offset(w*.45f,h*.55f)) }
         ChalnaIcon.CLOSE -> { line(Offset(w*.20f,h*.20f),Offset(w*.80f,h*.80f));line(Offset(w*.80f,h*.20f),Offset(w*.20f,h*.80f)) }
+        ChalnaIcon.FILTER -> { line(Offset(w*.12f,h*.22f),Offset(w*.88f,h*.22f));line(Offset(w*.24f,h*.50f),Offset(w*.76f,h*.50f));line(Offset(w*.38f,h*.78f),Offset(w*.62f,h*.78f)) }
+        ChalnaIcon.SORT -> { line(Offset(w*.22f,h*.18f),Offset(w*.22f,h*.82f));line(Offset(w*.10f,h*.30f),Offset(w*.22f,h*.18f),Offset(w*.34f,h*.30f));line(Offset(w*.66f,h*.70f),Offset(w*.78f,h*.82f),Offset(w*.90f,h*.70f));line(Offset(w*.78f,h*.18f),Offset(w*.78f,h*.82f)) }
+        ChalnaIcon.FAVORITE -> { val p=Path().apply{moveTo(w*.5f,h*.84f);cubicTo(w*.38f,h*.72f,w*.12f,h*.55f,w*.16f,h*.31f);cubicTo(w*.20f,h*.10f,w*.43f,h*.11f,w*.5f,h*.28f);cubicTo(w*.57f,h*.11f,w*.80f,h*.10f,w*.84f,h*.31f);cubicTo(w*.88f,h*.55f,w*.62f,h*.72f,w*.5f,h*.84f)};drawPath(p,color,style=stroke) }
+        ChalnaIcon.RESTORE -> { drawArc(color,210f,285f,false,Offset(w*.15f,h*.15f),Size(w*.70f,h*.70f),style=stroke);line(Offset(w*.12f,h*.18f),Offset(w*.12f,h*.48f),Offset(w*.40f,h*.42f)) }
+        ChalnaIcon.SELECT_ALL -> { drawRoundRect(color,Offset(w*.18f,h*.18f),Size(w*.64f,h*.64f),androidx.compose.ui.geometry.CornerRadius(w*.08f),style=stroke);line(Offset(w*.30f,h*.50f),Offset(w*.44f,h*.64f),Offset(w*.70f,h*.36f)) }
+        ChalnaIcon.TILE -> { drawRoundRect(color,Offset(w*.12f,h*.12f),Size(w*.32f,h*.32f),androidx.compose.ui.geometry.CornerRadius(w*.06f),style=stroke);drawRoundRect(color,Offset(w*.56f,h*.12f),Size(w*.32f,h*.32f),androidx.compose.ui.geometry.CornerRadius(w*.06f),style=stroke);drawRoundRect(color,Offset(w*.12f,h*.56f),Size(w*.32f,h*.32f),androidx.compose.ui.geometry.CornerRadius(w*.06f),style=stroke);drawRoundRect(color,Offset(w*.56f,h*.56f),Size(w*.32f,h*.32f),androidx.compose.ui.geometry.CornerRadius(w*.06f),style=stroke) }
+        ChalnaIcon.RETRY -> { drawArc(color,-70f,290f,false,Offset(w*.14f,h*.14f),Size(w*.72f,h*.72f),style=stroke);line(Offset(w*.72f,h*.10f),Offset(w*.88f,h*.24f),Offset(w*.67f,h*.31f)) }
+        ChalnaIcon.QUALITY -> { drawRoundRect(color,Offset(w*.12f,h*.20f),Size(w*.76f,h*.60f),androidx.compose.ui.geometry.CornerRadius(w*.09f),style=stroke);line(Offset(w*.28f,h*.38f),Offset(w*.72f,h*.38f));line(Offset(w*.28f,h*.58f),Offset(w*.58f,h*.58f)) }
+        ChalnaIcon.TIMER -> { drawCircle(color,w*.36f,Offset(w*.5f,h*.56f),style=stroke);line(Offset(w*.5f,h*.56f),Offset(w*.5f,h*.34f));line(Offset(w*.5f,h*.56f),Offset(w*.68f,h*.64f));line(Offset(w*.38f,h*.10f),Offset(w*.62f,h*.10f)) }
+        ChalnaIcon.THEME -> { drawCircle(color,w*.36f,Offset(w*.5f,h*.5f),style=stroke);drawArc(color,-90f,180f,true,Offset(w*.14f,h*.14f),Size(w*.72f,h*.72f)) }
+        ChalnaIcon.MOTION -> { drawArc(color,210f,245f,false,Offset(w*.08f,h*.18f),Size(w*.54f,h*.64f),style=stroke);drawArc(color,25f,245f,false,Offset(w*.38f,h*.18f),Size(w*.54f,h*.64f),style=stroke) }
     }
 }
 
 internal fun formatDuration(ms: Long): String {
     val total = (ms / 1_000).coerceAtLeast(0)
-    return "${(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}"
+    val hours = total / 3_600
+    val minutes = (total % 3_600) / 60
+    val seconds = total % 60
+    return if (hours > 0) {
+        "$hours:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
+    } else {
+        "${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
+    }
 }

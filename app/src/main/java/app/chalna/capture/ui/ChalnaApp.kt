@@ -11,7 +11,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -21,9 +20,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,16 +45,31 @@ fun ChalnaApp(dependencies: UiDependencies) {
         AppearanceMode.SYSTEM -> if (systemDark) NightColors else MistColors
     }
     val lifecycleOwner = LocalLifecycleOwner.current
+    var resumed by remember { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
     DisposableEffect(lifecycleOwner, dependencies) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) dependencies.refreshSetup()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                resumed = true
+                dependencies.refreshSetup()
+            } else if (event == Lifecycle.Event.ON_PAUSE) {
+                resumed = false
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    val activity = LocalContext.current as? Activity
+    SideEffect {
+        activity?.window?.let { window ->
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars =
+                colors.background.luminance() > .5f
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars =
+                colors.background.luminance() > .5f
+        }
+    }
     CompositionLocalProvider(LocalChalnaColors provides colors) {
-        Box(Modifier.fillMaxSize().background(colors.background).systemBarsPadding()) {
-            ChalnaBackdrop(state.reducedMotion || state.powerSaver)
+        Box(Modifier.fillMaxSize().background(colors.background)) {
+            if (state.player == null) ChalnaBackdrop(state.reducedMotion || state.powerSaver || !resumed)
             if (state.setupComplete) MainShell(state, dependencies) else SetupScreen(state, dependencies)
         }
     }
