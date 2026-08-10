@@ -50,26 +50,7 @@ jobs:
           disk-size: 4096M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: |
-            ./gradlew --no-daemon --stacktrace :benchmark:connectedProfileAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
-            STARTUP_PROFILE="$(find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c -print -quit)"
-            BASELINE_PROFILE="$(find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-baseline-prof.txt' -size +0c -print -quit)"
-            test -n "$STARTUP_PROFILE"
-            cp "$STARTUP_PROFILE" generated-startup-prof.txt
-            if test -n "$BASELINE_PROFILE"; then
-              cp "$BASELINE_PROFILE" generated-baseline-prof.txt
-            else
-              # Benchmark 1.4 can emit only the startup artifact for a startup-only CUJ.
-              # Those rules are also valid baseline rules, per the official API contract.
-              cp "$STARTUP_PROFILE" generated-baseline-prof.txt
-            fi
-            test -s generated-baseline-prof.txt
-            test -s generated-startup-prof.txt
-            test "$(wc -l < generated-baseline-prof.txt)" -ge 20
-            test "$(wc -l < generated-startup-prof.txt)" -ge 20
-            grep -q 'Lapp/chalna/capture/' generated-baseline-prof.txt
-            grep -q 'Lapp/chalna/capture/' generated-startup-prof.txt
-            ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.StartupBenchmark
+          script: bash scripts/run-benchmark.sh
       - name: Verify outputs
         shell: bash
         run: |
