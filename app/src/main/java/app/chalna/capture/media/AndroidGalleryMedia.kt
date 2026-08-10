@@ -3,6 +3,8 @@ package app.chalna.capture.media
 import android.content.ContentValues
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -165,19 +167,18 @@ class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway {
         try {
             retriever.setDataSource(context, uri)
             val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
+            val track = extractVideoTrack(uri)
             return CaptureMetadata(
                 durationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull(),
                 sizeBytes = knownSize?.takeIf { it > 0 } ?: querySize(uri),
                 width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull(),
                 height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull(),
                 rotationDegrees = rotation,
-                codec = if (Build.VERSION.SDK_INT >= 30) {
-                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_CODEC_MIME_TYPE)
-                } else {
-                    null
-                },
-                frameRate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)?.toFloatOrNull(),
-                bitrate = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull(),
+                codec = track?.codec,
+                frameRate = track?.frameRate
+                    ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CAPTURE_FRAMERATE)?.toFloatOrNull(),
+                bitrate = track?.bitrate
+                    ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull(),
                 audioIncluded = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)?.let { it == "yes" },
                 mimeType = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE),
             )
@@ -185,6 +186,34 @@ class AndroidGalleryMedia(private val context: Context) : GalleryMediaGateway {
             retriever.release()
         }
     }
+
+    private fun extractVideoTrack(uri: Uri): VideoTrackMetadata? {
+        val descriptor = resolver.openAssetFileDescriptor(uri, "r") ?: return null
+        descriptor.use { asset ->
+            val extractor = MediaExtractor()
+            try {
+                extractor.setDataSource(asset.fileDescriptor, asset.startOffset, asset.length)
+                for (index in 0 until extractor.trackCount) {
+                    val format = extractor.getTrackFormat(index)
+                    val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                    if (!mime.startsWith("video/")) continue
+                    return VideoTrackMetadata(
+                        codec = mime,
+                        frameRate = format.optionalInt(MediaFormat.KEY_FRAME_RATE)?.toFloat(),
+                        bitrate = format.optionalInt(MediaFormat.KEY_BIT_RATE),
+                    )
+                }
+                return null
+            } finally {
+                extractor.release()
+            }
+        }
+    }
+
+    private fun MediaFormat.optionalInt(key: String): Int? =
+        if (containsKey(key)) runCatching { getInteger(key) }.getOrNull() else null
+
+    private data class VideoTrackMetadata(val codec: String?, val frameRate: Float?, val bitrate: Int?)
 
     private fun moveVaultToTrash(item: CaptureItem): TrashMediaResult {
         val source = vaultFile(item)?.takeIf(File::isFile) ?: return TrashMediaResult.Failed

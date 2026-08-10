@@ -340,7 +340,7 @@ class ProductionUiDependencies(
                         }
                         galleryRepository.items(current.query())
                     }
-                }.map(CaptureItem::toUi)
+                }.map { it.toUi() }
                 val available = items.mapTo(mutableSetOf(), MediaItemUi::id)
                 overlay.value.gallery.filter { it.id !in available }.forEach { ThumbnailMemoryCache.remove(it.contentUri) }
                 overlay.value = overlay.value.copy(
@@ -666,14 +666,6 @@ class ProductionUiDependencies(
 
     private fun permissionPermanentlyDenied(permission: String, requestedThisSession: Boolean): Boolean {
         if (granted(permission)) return false
-        if (Build.VERSION.SDK_INT >= 30) {
-            val flags = activity.packageManager.getPermissionFlags(
-                permission,
-                activity.packageName,
-                android.os.Process.myUserHandle(),
-            )
-            if (flags and PackageManager.FLAG_PERMISSION_USER_FIXED != 0) return true
-        }
         return requestedThisSession && !activity.shouldShowRequestPermissionRationale(permission)
     }
 

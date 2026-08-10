@@ -7,7 +7,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 
@@ -76,22 +75,17 @@ class ChalnaUiTest {
     }
 }
 
-internal class FakeUiDependencies(initial: ChalnaUiState) : UiDependencies {
-    override val state = MutableStateFlow(initial)
+internal class FakeUiDependencies(initial: ChalnaUiState) : TestUiDependencies(initial) {
     var hardwareRequestCount = 0; var microphoneRequestCount = 0; var toggleCount = 0
     override fun toggleCapture() { toggleCount++ }
     override fun requestCamera() { hardwareRequestCount++ }
     override fun requestMicrophone() { hardwareRequestCount++; microphoneRequestCount++ }
-    override fun requestNotifications() = Unit
-    override fun openAssistantSettings() = Unit
     override fun finishSetup() { state.value = state.value.copy(setupComplete = true) }
     override fun setQuality(value: VideoQuality) { state.value = state.value.copy(quality = value) }
     override fun setAppearance(value: AppearanceMode) { state.value = state.value.copy(appearance = value) }
     override fun setHaptics(value: Boolean) { state.value = state.value.copy(haptics = value) }
     override fun setSound(value: Boolean) { state.value = state.value.copy(sound = value) }
     override fun setAutoStop(seconds: Int) { state.value = state.value.copy(autoStopSeconds = seconds) }
-    override fun setReducedMotion(value: Boolean) { state.value = state.value.copy(reducedMotion = value) }
     override fun setMotion(value: MotionMode) { state.value = state.value.copy(motion = value, reducedMotion = value == MotionMode.REDUCED) }
-    override fun openLastCapture() = Unit
     override fun reviewSetup() { state.value = state.value.copy(setupComplete = false) }
 }

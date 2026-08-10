@@ -83,6 +83,7 @@ class AndroidCaptureDestinationFactory(private val context: Context) : CaptureDe
             is CaptureOutputTarget.Vault -> target.file.delete()
             is CaptureOutputTarget.DeviceGallery -> context.contentResolver.delete(target.uri, null, null)
         }
+        Unit
     }
 
     private fun prepareDeviceGallery(

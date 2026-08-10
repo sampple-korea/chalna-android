@@ -95,7 +95,6 @@ object CaptureNotifications {
             .setContentTitle(context.getString(R.string.notification_saved_title))
             .setContentText(context.getString(R.string.notification_saved_text))
             .setAutoCancel(true)
-            .setSilent(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setContentIntent(open)
             .addAction(Notification.Action.Builder(null, context.getString(R.string.action_open), open).build())
@@ -124,7 +123,6 @@ object CaptureNotifications {
             .setContentTitle(context.getString(R.string.notification_error_title))
             .setContentText(context.getString(failure.messageResource()))
             .setAutoCancel(true)
-            .setSilent(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setContentIntent(action)
             .addAction(Notification.Action.Builder(null, context.getString(R.string.action_settings), action).build())
@@ -149,7 +147,6 @@ object CaptureNotifications {
             .setCategory(Notification.CATEGORY_SERVICE)
             .setContentIntent(open)
             .setOnlyAlertOnce(true)
-            .setSilent(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
         if (Build.VERSION.SDK_INT >= 31) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
