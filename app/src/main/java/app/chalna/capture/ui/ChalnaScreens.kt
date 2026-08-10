@@ -113,6 +113,7 @@ internal fun SetupScreen(
         detail = stringResource(R.string.camera_setup_detail),
         icon = ChalnaIcon.CAMERA,
         complete = state.cameraGranted,
+        actionLabel = stringResource(if (state.cameraPermanentlyDenied) R.string.action_settings else R.string.action_allow),
         action =
             if (state.cameraGranted) {
                 null
@@ -128,6 +129,7 @@ internal fun SetupScreen(
         detail = stringResource(if (state.audioEnabled) R.string.audio_setup_on else R.string.audio_setup_off),
         icon = ChalnaIcon.MIC,
         complete = !state.audioEnabled || state.microphoneGranted,
+        actionLabel = stringResource(R.string.action_allow),
         action =
             when {
                 !state.audioEnabled -> ({ dependencies.setAudioEnabled(true) })
@@ -142,6 +144,7 @@ internal fun SetupScreen(
         detail = stringResource(R.string.assistant_setup_detail),
         icon = ChalnaIcon.ASSISTANT,
         complete = state.assistantSelected,
+        actionLabel = stringResource(R.string.action_change),
         action = if (state.assistantSelected) null else dependencies::openAssistantSettings,
     )
     Hairline()
@@ -151,6 +154,7 @@ internal fun SetupScreen(
         icon = ChalnaIcon.BELL,
         complete = state.notificationsGranted,
         optional = true,
+        actionLabel = stringResource(R.string.action_allow),
         action = if (state.notificationsGranted) null else dependencies::requestNotifications,
     )
     Spacer(Modifier.height(26.dp))
@@ -165,6 +169,7 @@ private fun SetupRow(
     icon: ChalnaIcon,
     complete: Boolean,
     optional: Boolean = false,
+    actionLabel: String? = null,
     action: (() -> Unit)?,
 ) {
     Row(
@@ -181,7 +186,9 @@ private fun SetupRow(
             ChalnaText(title, 16, weight = FontWeight.SemiBold)
             ChalnaText(detail, 13, ChalnaTheme.colors.muted)
         }
-        if (optional && !complete) {
+        if (!complete && action != null && actionLabel != null) {
+            ChalnaText(actionLabel, 12, ChalnaTheme.colors.accent, weight = FontWeight.SemiBold)
+        } else if (optional && !complete) {
             ChalnaText(stringResource(R.string.optional), 12, ChalnaTheme.colors.muted)
         } else {
             StatusPill(complete)

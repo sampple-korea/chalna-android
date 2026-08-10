@@ -40,7 +40,7 @@
     <string name="version_info">Version %1$s</string>
     <string name="notification_channel_name">Active captures</string><string name="notification_starting_title">Opening camera</string><string name="notification_starting_text">Preparing your recording.</string><string name="notification_recording_title">Chalna is recording</string><string name="notification_recording_text">Invoke Assistant again or tap Stop.</string>
     <string name="notification_saved_title">Video saved</string><string name="notification_saved_text">Saved to your Chalna gallery</string><string name="notification_error_title">Chalna could not start recording</string>
-    <string name="action_stop">Stop</string><string name="action_open">Open Chalna</string><string name="action_settings">Settings</string>
+    <string name="action_stop">Stop</string><string name="action_open">Open Chalna</string><string name="action_settings">Settings</string><string name="action_allow">Allow</string><string name="action_change">Change</string>
     <string name="file_not_found">The saved video can no longer be found.</string>
     <string name="no_video_viewer">No video viewer is available.</string>
     <string name="capture_error_camera">The camera is unavailable.</string><string name="capture_error_storage">Storage space is too low.</string>

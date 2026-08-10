@@ -202,6 +202,9 @@ internal class ChalnaInvocationGlowView(
 
     private val density = resources.displayMetrics.density
     private val edgePath = Path()
+    private val energyPathPrimary = Path()
+    private val energyPathSecondary = Path()
+    private val energyPathTertiary = Path()
     private val edgeBounds = RectF()
     private val pathMeasure = PathMeasure()
     private val shaderMatrix = Matrix()
@@ -223,6 +226,8 @@ internal class ChalnaInvocationGlowView(
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
         }
+    private val energyBloomPaint = strokePaint(7.5f, 0)
+    private val energyCorePaint = strokePaint(2.1f, 0)
     private val atmosphereNode = RenderNode("chalna-atmosphere")
     private val bloomNode = RenderNode("chalna-bloom")
     private var animator: ValueAnimator? = null
@@ -236,6 +241,7 @@ internal class ChalnaInvocationGlowView(
     private var measuredLength = 0f
     private var completionSent = false
     private var previewMode = false
+    private var activeHotColor = Color.WHITE
 
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -313,6 +319,7 @@ internal class ChalnaInvocationGlowView(
         corePaint.shader = null
         hotspotBloomPaint.shader = null
         hotspotTailPaint.shader = null
+        energyBloomPaint.shader = null
         hotspotShader = null
         atmosphereNode.discardDisplayList()
         bloomNode.discardDisplayList()
@@ -366,29 +373,72 @@ internal class ChalnaInvocationGlowView(
         super.onDraw(canvas)
         if ((animator?.isRunning != true && !previewMode) || measuredLength <= 0f) return
 
-        val activation = (progress / 0.16f).coerceIn(0f, 1f)
+        val activation = ((progress - 0.04f) / 0.24f).coerceIn(0f, 1f)
+        val hotspotActivation = (progress / 0.08f).coerceIn(0f, 1f)
         val decay =
             when {
                 progress < 0.56f -> 1f
                 else -> (1f - (progress - 0.56f) / 0.44f).coerceIn(0f, 1f)
             }
         val envelope = activation * decay
+        val hotspotEnvelope = hotspotActivation * decay
         val asymmetry = 0.78f + 0.22f * activation
         val boost = 1f + resolveBoost * 0.28f
         val contraction = if (kind == InvocationPulseKind.STOP || kind == InvocationPulseKind.CANCEL) 1f - progress * 0.18f else 1f
 
         rotateShaders(progress)
-        atmospherePaint.alpha = (34f * envelope * asymmetry).toInt().coerceIn(0, 255)
-        bloomPaint.alpha = (112f * envelope * boost * contraction).toInt().coerceIn(0, 255)
-        corePaint.alpha = (238f * envelope * boost).toInt().coerceIn(0, 255)
+        atmospherePaint.alpha = (30f * envelope * asymmetry).toInt().coerceIn(0, 255)
+        bloomPaint.alpha = (82f * envelope * boost * contraction).toInt().coerceIn(0, 255)
+        corePaint.alpha = (112f * envelope * boost).toInt().coerceIn(0, 255)
         drawOpticalLayer(canvas, atmosphereNode, atmospherePaint)
         drawOpticalLayer(canvas, bloomNode, bloomPaint)
         canvas.drawPath(edgePath, corePaint)
 
         val direction = if (kind == InvocationPulseKind.STOP || kind == InvocationPulseKind.CANCEL) -1f else 1f
-        drawHotspot(canvas, (1.08f + direction * progress * 0.93f) % 1f, envelope, 1f)
-        drawHotspot(canvas, (1.43f + direction * progress * 0.57f) % 1f, envelope, 0.72f)
-        if (progress < 0.34f) drawHotspot(canvas, (1.74f + direction * progress * 0.38f) % 1f, envelope, 0.52f)
+        val primary = (1.08f + direction * progress * 0.93f) % 1f
+        val secondary = (1.43f + direction * progress * 0.57f) % 1f
+        val tertiary = (1.74f + direction * progress * 0.38f) % 1f
+        drawEnergySegment(canvas, primary, hotspotEnvelope, 1f, energyPathPrimary)
+        drawEnergySegment(canvas, secondary, hotspotEnvelope, 0.68f, energyPathSecondary)
+        drawHotspot(canvas, primary, hotspotEnvelope, 1f)
+        drawHotspot(canvas, secondary, hotspotEnvelope, 0.72f)
+        if (progress < 0.34f) {
+            drawEnergySegment(canvas, tertiary, hotspotEnvelope, 0.44f, energyPathTertiary)
+            drawHotspot(canvas, tertiary, hotspotEnvelope, 0.52f)
+        }
+    }
+
+    private fun drawEnergySegment(
+        canvas: Canvas,
+        fraction: Float,
+        envelope: Float,
+        energy: Float,
+        path: Path,
+    ) {
+        if (!pathMeasure.getPosTan(measuredLength * fraction, hotspotPosition, hotspotTangent)) return
+        hotspotShaderMatrix.setTranslate(hotspotPosition[0], hotspotPosition[1])
+        hotspotShader?.setLocalMatrix(hotspotShaderMatrix)
+        val halfLength = measuredLength * (0.022f + 0.014f * energy)
+        val center = measuredLength * fraction
+        val start = center - halfLength
+        val end = center + halfLength
+        path.rewind()
+        when {
+            start < 0f -> {
+                pathMeasure.getSegment(measuredLength + start, measuredLength, path, true)
+                pathMeasure.getSegment(0f, end, path, true)
+            }
+            end > measuredLength -> {
+                pathMeasure.getSegment(start, measuredLength, path, true)
+                pathMeasure.getSegment(0f, end - measuredLength, path, true)
+            }
+            else -> pathMeasure.getSegment(start, end, path, true)
+        }
+        energyBloomPaint.alpha = (176f * envelope * energy).toInt().coerceIn(0, 255)
+        energyCorePaint.color = activeHotColor
+        energyCorePaint.alpha = (244f * envelope * energy).toInt().coerceIn(0, 255)
+        canvas.drawPath(path, energyBloomPaint)
+        canvas.drawPath(path, energyCorePaint)
     }
 
     private fun drawHotspot(
@@ -402,7 +452,7 @@ internal class ChalnaInvocationGlowView(
         hotspotShader?.setLocalMatrix(hotspotShaderMatrix)
         hotspotBloomPaint.alpha = (185f * envelope * energy).toInt().coerceIn(0, 255)
         hotspotTailPaint.alpha = (138f * envelope * energy).toInt().coerceIn(0, 255)
-        hotspotTailPaint.strokeWidth = density * (4.2f + resolveBoost)
+        hotspotTailPaint.strokeWidth = density * (5.6f + resolveBoost)
         hotspotCorePaint.color = Color.WHITE
         hotspotCorePaint.alpha = (230f * envelope * energy).toInt().coerceIn(0, 255)
         hotspotCorePaint.strokeWidth = density * 1.35f
@@ -425,10 +475,10 @@ internal class ChalnaInvocationGlowView(
             drawCircle(centerX, centerY, bloomRadius, hotspotBloomPaint)
         }
         canvas.drawLine(
-            centerX - tangentX * density * 19f,
-            centerY - tangentY * density * 19f,
-            centerX + tangentX * density * 3f,
-            centerY + tangentY * density * 3f,
+            centerX - tangentX * density * 32f,
+            centerY - tangentY * density * 32f,
+            centerX + tangentX * density * 5f,
+            centerY + tangentY * density * 5f,
             hotspotTailPaint,
         )
         canvas.drawLine(
@@ -491,6 +541,8 @@ internal class ChalnaInvocationGlowView(
         corePaint.shader = coreShader
         hotspotBloomPaint.shader = hotspotShader
         hotspotTailPaint.shader = hotspotShader
+        energyBloomPaint.shader = hotspotShader
+        activeHotColor = palette.hot
     }
 
     private fun rotateShaders(phase: Float) {
