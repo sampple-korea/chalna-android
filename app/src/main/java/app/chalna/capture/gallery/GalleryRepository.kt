@@ -398,8 +398,7 @@ class GalleryRepository(
                     } catch (_: Exception) {
                         false
                     }
-            }
-            .map(CaptureItem::contentUri)
+            }.map(CaptureItem::contentUri)
 
     suspend fun externalOpenUri(id: String): String? =
         byId(id)
