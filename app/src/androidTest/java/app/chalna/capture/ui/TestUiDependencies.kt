@@ -7,24 +7,24 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 internal open class TestUiDependencies(initial: ChalnaUiState) : UiDependencies {
     override val state = MutableStateFlow(initial)
-    override fun toggleCapture() = Unit
-    override fun requestCamera() = Unit
-    override fun requestMicrophone() = Unit
+    open override fun toggleCapture() = Unit
+    open override fun requestCamera() = Unit
+    open override fun requestMicrophone() = Unit
     override fun requestNotifications() = Unit
     override fun openAssistantSettings() = Unit
     override fun openAppSettings() = Unit
     override fun openNotificationSettings() = Unit
     override fun refreshSetup() = Unit
-    override fun finishSetup() = Unit
-    override fun setQuality(value: VideoQuality) = Unit
-    override fun setAppearance(value: AppearanceMode) = Unit
-    override fun setHaptics(value: Boolean) = Unit
-    override fun setSound(value: Boolean) = Unit
-    override fun setAutoStop(seconds: Int) = Unit
-    override fun setMotion(value: MotionMode) = Unit
+    open override fun finishSetup() = Unit
+    open override fun setQuality(value: VideoQuality) = Unit
+    open override fun setAppearance(value: AppearanceMode) = Unit
+    open override fun setHaptics(value: Boolean) = Unit
+    open override fun setSound(value: Boolean) = Unit
+    open override fun setAutoStop(seconds: Int) = Unit
+    open override fun setMotion(value: MotionMode) = Unit
     override fun setStorageDestination(value: StorageDestinationUi) = Unit
     override fun openLastCapture() = Unit
-    override fun reviewSetup() = Unit
+    open override fun reviewSetup() = Unit
     override fun requestQuickTile() = Unit
     override fun refreshGallery() = Unit
     override fun loadThumbnail(uri: String, sizePx: Int, cancellationSignal: CancellationSignal): Bitmap? = null

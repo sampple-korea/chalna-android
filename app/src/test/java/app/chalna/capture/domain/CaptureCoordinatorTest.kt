@@ -75,7 +75,7 @@ class CaptureCoordinatorTest {
         val persisted: MutableList<LastCapture>,
     )
 
-    private class FakeEngine(private val blockStart: Boolean = false) : CaptureEngine {
+    private inner class FakeEngine(private val blockStart: Boolean = false) : CaptureEngine {
         var starts = 0
         var stops = 0
         var cancels = 0
