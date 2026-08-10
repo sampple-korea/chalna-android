@@ -16,7 +16,9 @@ interface CaptureEngine {
     ): CaptureStart
 
     suspend fun stop(): LastCapture
+
     suspend fun cancelStart(): LastCapture?
+
     suspend fun release()
 }
 
@@ -32,13 +34,14 @@ fun Throwable.toCaptureFailure(defaultCode: CaptureFailureCode): CaptureFailure 
     if (this is CancellationException) throw this
     if (this is CaptureOperationException) return failure
     val diagnosticName = javaClass.simpleName.take(80)
-    val code = when {
-        diagnosticName.contains("CameraAccess", true) || message?.contains("busy", true) == true ->
-            CaptureFailureCode.CAMERA_BUSY
-        message?.contains("permission", true) == true -> CaptureFailureCode.CAMERA_PERMISSION
-        message?.contains("space", true) == true || message?.contains("storage", true) == true ->
-            CaptureFailureCode.LOW_STORAGE
-        else -> defaultCode
-    }
+    val code =
+        when {
+            diagnosticName.contains("CameraAccess", true) || message?.contains("busy", true) == true ->
+                CaptureFailureCode.CAMERA_BUSY
+            message?.contains("permission", true) == true -> CaptureFailureCode.CAMERA_PERMISSION
+            message?.contains("space", true) == true || message?.contains("storage", true) == true ->
+                CaptureFailureCode.LOW_STORAGE
+            else -> defaultCode
+        }
     return CaptureFailure(code, code !in setOf(CaptureFailureCode.OUTPUT_INVALID, CaptureFailureCode.INTERNAL), diagnosticName)
 }

@@ -20,7 +20,6 @@ import app.chalna.capture.data.db.ChalnaDatabase
 import app.chalna.capture.data.db.PlaybackStateEntity
 import app.chalna.capture.domain.CaptureItem
 import app.chalna.capture.domain.CaptureState
-import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +32,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
 data class PlayerSnapshot(
     val item: CaptureItem,
@@ -60,11 +60,15 @@ class PlayerController(
     private var ticker: Job? = null
     private var lastPersistedPosition = -1L
     private var receiverRegistered = false
-    private val noisyReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) pause()
+    private val noisyReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?,
+            ) {
+                if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) pause()
+            }
         }
-    }
 
     init {
         scope.launch {
@@ -76,35 +80,41 @@ class PlayerController(
         }
     }
 
-    suspend fun open(item: CaptureItem, requestedPositionMillis: Long = 0) {
+    suspend fun open(
+        item: CaptureItem,
+        requestedPositionMillis: Long = 0,
+    ) {
         close()
-        val savedPosition = withContext(Dispatchers.IO) {
-            database.playbackStateDao().byCaptureId(item.id)?.positionMillis ?: 0
-        }
+        val savedPosition =
+            withContext(Dispatchers.IO) {
+                database.playbackStateDao().byCaptureId(item.id)?.positionMillis ?: 0
+            }
         val startPosition = requestedPositionMillis.takeIf { it > 0 } ?: savedPosition
         withContext(Dispatchers.Main.immediate) {
-            val created = ExoPlayer.Builder(appContext).build().apply {
-                setAudioAttributes(AudioAttributes.DEFAULT, true)
-                addListener(listener)
-                setMediaItem(MediaItem.fromUri(item.contentUri))
-                prepare()
-                playWhenReady = false
-                if (startPosition > 0) seekTo(startPosition)
-            }
+            val created =
+                ExoPlayer.Builder(appContext).build().apply {
+                    setAudioAttributes(AudioAttributes.DEFAULT, true)
+                    addListener(listener)
+                    setMediaItem(MediaItem.fromUri(item.contentUri))
+                    prepare()
+                    playWhenReady = false
+                    if (startPosition > 0) seekTo(startPosition)
+                }
             player = created
             surfaceView?.let(created::setVideoSurfaceView)
             registerNoisyReceiver()
-            mutableState.value = PlayerSnapshot(
-                item = item,
-                phase = PlayerPhase.PREPARING,
-                positionMillis = startPosition,
-                durationMillis = item.durationMillis,
-                bufferedMillis = 0,
-                playing = false,
-                muted = false,
-                speed = 1f,
-                recordingConflict = captureStates.state.value.blocksPlayback(),
-            )
+            mutableState.value =
+                PlayerSnapshot(
+                    item = item,
+                    phase = PlayerPhase.PREPARING,
+                    positionMillis = startPosition,
+                    durationMillis = item.durationMillis,
+                    bufferedMillis = 0,
+                    playing = false,
+                    muted = false,
+                    speed = 1f,
+                    recordingConflict = captureStates.state.value.blocksPlayback(),
+                )
         }
     }
 
@@ -174,73 +184,82 @@ class PlayerController(
         unregisterNoisyReceiver()
     }
 
-    fun bookmark(): Pair<String, Long>? = mutableState.value?.item?.id?.let { id ->
-        id to (player?.currentPosition ?: mutableState.value?.positionMillis ?: 0).coerceAtLeast(0)
-    }
-
-    private val listener = object : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            publish()
-            if (playbackState == Player.STATE_ENDED) persistPosition(force = true)
+    fun bookmark(): Pair<String, Long>? =
+        mutableState.value?.item?.id?.let { id ->
+            id to (player?.currentPosition ?: mutableState.value?.positionMillis ?: 0).coerceAtLeast(0)
         }
 
-        override fun onIsPlayingChanged(isPlaying: Boolean) {
-            publish()
-            if (isPlaying) startTicker() else {
-                ticker?.cancel()
-                ticker = null
-                persistPosition(force = true)
+    private val listener =
+        object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                publish()
+                if (playbackState == Player.STATE_ENDED) persistPosition(force = true)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                publish()
+                if (isPlaying) {
+                    startTicker()
+                } else {
+                    ticker?.cancel()
+                    ticker = null
+                    persistPosition(force = true)
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val current = mutableState.value ?: return
+                mutableState.value =
+                    current.copy(
+                        phase =
+                            if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) {
+                                PlayerPhase.SOURCE_MISSING
+                            } else {
+                                PlayerPhase.ERROR
+                            },
+                        playing = false,
+                    )
+            }
+
+            override fun onRenderedFirstFrame() {
+                CaptureTelemetryRegistry.mark("player", "player_first_frame")
             }
         }
-
-        override fun onPlayerError(error: PlaybackException) {
-            val current = mutableState.value ?: return
-            mutableState.value = current.copy(
-                phase = if (error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND) {
-                    PlayerPhase.SOURCE_MISSING
-                } else {
-                    PlayerPhase.ERROR
-                },
-                playing = false,
-            )
-        }
-
-        override fun onRenderedFirstFrame() {
-            CaptureTelemetryRegistry.mark("player", "player_first_frame")
-        }
-    }
 
     private fun startTicker() {
         ticker?.cancel()
-        ticker = scope.launch {
-            while (isActive && player?.isPlaying == true) {
-                publish()
-                persistPosition(force = false)
-                delay(250)
+        ticker =
+            scope.launch {
+                while (isActive && player?.isPlaying == true) {
+                    publish()
+                    persistPosition(force = false)
+                    delay(250)
+                }
             }
-        }
     }
 
     private fun publish() {
         val current = player ?: return
         val existing = mutableState.value ?: return
         val duration = current.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: existing.item.durationMillis
-        val phase = when (current.playbackState) {
-            Player.STATE_IDLE -> if (current.playerError == null) PlayerPhase.PREPARING else PlayerPhase.ERROR
-            Player.STATE_BUFFERING -> PlayerPhase.BUFFERING
-            Player.STATE_READY -> PlayerPhase.READY
-            Player.STATE_ENDED -> PlayerPhase.ENDED
-            else -> PlayerPhase.ERROR
-        }
-        mutableState.value = existing.copy(
-            phase = phase,
-            positionMillis = current.currentPosition.coerceAtLeast(0),
-            durationMillis = duration.coerceAtLeast(0),
-            bufferedMillis = current.bufferedPosition.coerceAtLeast(0),
-            playing = current.isPlaying,
-            muted = current.volume == 0f,
-            speed = current.playbackParameters.speed,
-        )
+        val phase =
+            when (current.playbackState) {
+                Player.STATE_IDLE -> if (current.playerError == null) PlayerPhase.PREPARING else PlayerPhase.ERROR
+                Player.STATE_BUFFERING -> PlayerPhase.BUFFERING
+                Player.STATE_READY -> PlayerPhase.READY
+                Player.STATE_ENDED -> PlayerPhase.ENDED
+                else -> PlayerPhase.ERROR
+            }
+        mutableState.value =
+            existing.copy(
+                phase = phase,
+                positionMillis = current.currentPosition.coerceAtLeast(0),
+                durationMillis = duration.coerceAtLeast(0),
+                bufferedMillis = current.bufferedPosition.coerceAtLeast(0),
+                playing = current.isPlaying,
+                muted = current.volume == 0f,
+                speed = current.playbackParameters.speed,
+            )
         updateKeepScreenOn()
     }
 
@@ -284,12 +303,13 @@ class PlayerController(
         receiverRegistered = false
     }
 
-    private fun CaptureState.blocksPlayback(): Boolean = this is CaptureState.StartRequested ||
-        this is CaptureState.StartingForeground || this is CaptureState.OpeningCamera ||
-        this is CaptureState.StartingRecorder || this is CaptureState.Recording ||
-        this is CaptureState.CancelRequested || this is CaptureState.StopRequested ||
-        this is CaptureState.StoppingRecorder || this is CaptureState.Finalizing ||
-        this is CaptureState.Persisting
+    private fun CaptureState.blocksPlayback(): Boolean =
+        this is CaptureState.StartRequested ||
+            this is CaptureState.StartingForeground || this is CaptureState.OpeningCamera ||
+            this is CaptureState.StartingRecorder || this is CaptureState.Recording ||
+            this is CaptureState.CancelRequested || this is CaptureState.StopRequested ||
+            this is CaptureState.StoppingRecorder || this is CaptureState.Finalizing ||
+            this is CaptureState.Persisting
 
     private companion object {
         val PLAYBACK_SPEEDS = setOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)

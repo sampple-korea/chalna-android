@@ -6,13 +6,13 @@ import app.chalna.capture.domain.CaptureQuality
 import app.chalna.capture.domain.CaptureSessionSettings
 import app.chalna.capture.domain.StorageDestination
 import app.chalna.capture.media.PreparedCaptureOutput
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.File
 
 enum class CaptureAttemptStage {
     OUTPUT_CREATED,
@@ -38,7 +38,9 @@ data class CaptureAttempt(
 )
 
 /** Durable journal for the single output that may outlive an abrupt process death. */
-class CaptureAttemptStore(context: Context) {
+class CaptureAttemptStore(
+    context: Context,
+) {
     private val file = AtomicFile(File(context.applicationContext.filesDir, FILE_NAME))
 
     fun hasAttempt(): Boolean = file.baseFile.isFile
@@ -65,70 +67,75 @@ class CaptureAttemptStore(context: Context) {
         ),
     )
 
-    suspend fun updateStage(stage: CaptureAttemptStage) = journalMutex.withLock {
-        val current = readUnsafe() ?: return@withLock
-        writeUnsafe(current.copy(stage = stage))
-    }
+    suspend fun updateStage(stage: CaptureAttemptStage) =
+        journalMutex.withLock {
+            val current = readUnsafe() ?: return@withLock
+            writeUnsafe(current.copy(stage = stage))
+        }
 
     suspend fun read(): CaptureAttempt? = journalMutex.withLock { readUnsafe() }
 
-    suspend fun clear(): Boolean = journalMutex.withLock {
-        withContext(Dispatchers.IO) {
-            file.delete()
-            !file.baseFile.exists()
+    suspend fun clear(): Boolean =
+        journalMutex.withLock {
+            withContext(Dispatchers.IO) {
+                file.delete()
+                !file.baseFile.exists()
+            }
         }
-    }
 
     private suspend fun write(attempt: CaptureAttempt) = journalMutex.withLock { writeUnsafe(attempt) }
 
-    private suspend fun writeUnsafe(attempt: CaptureAttempt) = withContext(Dispatchers.IO) {
-        val stream = file.startWrite()
-        try {
-            val data = DataOutputStream(stream)
-            data.writeInt(FORMAT_VERSION)
-            data.writeUTF(attempt.invocationId)
-            data.writeUTF(attempt.captureId)
-            data.writeUTF(attempt.destination.name)
-            data.writeUTF(attempt.contentUri)
-            data.writeUTF(attempt.privateRef.orEmpty())
-            data.writeUTF(attempt.displayName)
-            data.writeLong(attempt.startedAtEpochMillis)
-            data.writeLong(attempt.startedAtElapsedNanos)
-            data.writeBoolean(attempt.requestedAudio)
-            data.writeUTF(attempt.requestedQuality.name)
-            data.writeUTF(attempt.stage.name)
-            data.flush()
-            file.finishWrite(stream)
-        } catch (failure: Exception) {
-            file.failWrite(stream)
-            throw failure
-        }
-    }
-
-    private suspend fun readUnsafe(): CaptureAttempt? = withContext(Dispatchers.IO) {
-        if (!file.baseFile.isFile) return@withContext null
-        runCatching {
-            file.openRead().use { input ->
-                DataInputStream(input).use { data ->
-                    check(data.readInt() == FORMAT_VERSION)
-                    CaptureAttempt(
-                        invocationId = data.readUTF(),
-                        captureId = data.readUTF(),
-                        destination = StorageDestination.valueOf(data.readUTF()),
-                        contentUri = data.readUTF(),
-                        privateRef = data.readUTF().ifBlank { null },
-                        displayName = data.readUTF(),
-                        startedAtEpochMillis = data.readLong(),
-                        startedAtElapsedNanos = data.readLong(),
-                        requestedAudio = data.readBoolean(),
-                        requestedQuality = runCatching { CaptureQuality.valueOf(data.readUTF()) }
-                            .getOrDefault(CaptureQuality.UNKNOWN),
-                        stage = CaptureAttemptStage.valueOf(data.readUTF()),
-                    )
-                }
+    private suspend fun writeUnsafe(attempt: CaptureAttempt) =
+        withContext(Dispatchers.IO) {
+            val stream = file.startWrite()
+            try {
+                val data = DataOutputStream(stream)
+                data.writeInt(FORMAT_VERSION)
+                data.writeUTF(attempt.invocationId)
+                data.writeUTF(attempt.captureId)
+                data.writeUTF(attempt.destination.name)
+                data.writeUTF(attempt.contentUri)
+                data.writeUTF(attempt.privateRef.orEmpty())
+                data.writeUTF(attempt.displayName)
+                data.writeLong(attempt.startedAtEpochMillis)
+                data.writeLong(attempt.startedAtElapsedNanos)
+                data.writeBoolean(attempt.requestedAudio)
+                data.writeUTF(attempt.requestedQuality.name)
+                data.writeUTF(attempt.stage.name)
+                data.flush()
+                file.finishWrite(stream)
+            } catch (failure: Exception) {
+                file.failWrite(stream)
+                throw failure
             }
-        }.getOrNull()
-    }
+        }
+
+    private suspend fun readUnsafe(): CaptureAttempt? =
+        withContext(Dispatchers.IO) {
+            if (!file.baseFile.isFile) return@withContext null
+            runCatching {
+                file.openRead().use { input ->
+                    DataInputStream(input).use { data ->
+                        check(data.readInt() == FORMAT_VERSION)
+                        CaptureAttempt(
+                            invocationId = data.readUTF(),
+                            captureId = data.readUTF(),
+                            destination = StorageDestination.valueOf(data.readUTF()),
+                            contentUri = data.readUTF(),
+                            privateRef = data.readUTF().ifBlank { null },
+                            displayName = data.readUTF(),
+                            startedAtEpochMillis = data.readLong(),
+                            startedAtElapsedNanos = data.readLong(),
+                            requestedAudio = data.readBoolean(),
+                            requestedQuality =
+                                runCatching { CaptureQuality.valueOf(data.readUTF()) }
+                                    .getOrDefault(CaptureQuality.UNKNOWN),
+                            stage = CaptureAttemptStage.valueOf(data.readUTF()),
+                        )
+                    }
+                }
+            }.getOrNull()
+        }
 
     private companion object {
         const val FILE_NAME = "active-capture-attempt-v2"

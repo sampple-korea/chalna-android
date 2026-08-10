@@ -33,7 +33,6 @@ import app.chalna.capture.domain.LastCapture
 import app.chalna.capture.gallery.GalleryRepository
 import app.chalna.capture.media.AndroidGalleryMedia
 import app.chalna.capture.notifications.CaptureNotifications
-import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -43,8 +42,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
-class CaptureService : Service(), LifecycleOwner {
+class CaptureService :
+    Service(),
+    LifecycleOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     private val serviceJob = SupervisorJob()
@@ -60,12 +62,14 @@ class CaptureService : Service(), LifecycleOwner {
     private var foregroundStarted = false
     private var previousState: CaptureState = CaptureState.Idle
     private var thermalRegistered = false
-    private val thermalListener = PowerManager.OnThermalStatusChangedListener { status ->
-        if (status >= PowerManager.THERMAL_STATUS_CRITICAL) requestSafetyStop("thermal")
-        else if (status >= PowerManager.THERMAL_STATUS_SEVERE) {
-            CaptureTelemetryRegistry.mark(activeInvocationId(), "thermal_severe")
+    private val thermalListener =
+        PowerManager.OnThermalStatusChangedListener { status ->
+            if (status >= PowerManager.THERMAL_STATUS_CRITICAL) {
+                requestSafetyStop("thermal")
+            } else if (status >= PowerManager.THERMAL_STATUS_SEVERE) {
+                CaptureTelemetryRegistry.mark(activeInvocationId(), "thermal_severe")
+            }
         }
-    }
 
     override fun onCreate() {
         super.onCreate()
@@ -76,56 +80,69 @@ class CaptureService : Service(), LifecycleOwner {
         states = graph.captureStates
         attempts = CaptureAttemptStore(this)
         engine = CameraXCaptureEngine(this, this, attemptStore = attempts)
-        actor = CaptureCommandActor(
-            scope = scope,
-            states = states,
-            engine = engine,
-            settingsSnapshot = settings::snapshot,
-            preflight = AndroidCapturePreflight(this),
-            epochClock = object : EpochClock { override fun nowMillis(): Long = System.currentTimeMillis() },
-            monotonicClock = AndroidMonotonicClock(),
-            effects = object : CaptureActorEffects {
-                override suspend fun onState(state: CaptureState) = handleState(state)
+        actor =
+            CaptureCommandActor(
+                scope = scope,
+                states = states,
+                engine = engine,
+                settingsSnapshot = settings::snapshot,
+                preflight = AndroidCapturePreflight(this),
+                epochClock =
+                    object : EpochClock {
+                        override fun nowMillis(): Long = System.currentTimeMillis()
+                    },
+                monotonicClock = AndroidMonotonicClock(),
+                effects =
+                    object : CaptureActorEffects {
+                        override suspend fun onState(state: CaptureState) = handleState(state)
 
-                override suspend fun persist(capture: LastCapture): Boolean {
-                    return if (capture.state == CaptureRecordState.READY) {
-                        gallery.recordFinalized(capture)
-                        attempts.clear()
-                        CaptureTelemetryRegistry.mark(activeInvocationId(), "database_persisted")
-                        true
-                    } else {
-                        gallery.recordMetadataPending(capture)
-                        false
+                        override suspend fun persist(capture: LastCapture): Boolean =
+                            if (capture.state == CaptureRecordState.READY) {
+                                gallery.recordFinalized(capture)
+                                attempts.clear()
+                                CaptureTelemetryRegistry.mark(activeInvocationId(), "database_persisted")
+                                true
+                            } else {
+                                gallery.recordMetadataPending(capture)
+                                false
+                            }
+                    },
+            )
+        recoveryJob =
+            scope.launch(Dispatchers.IO) {
+                if (!attempts.hasAttempt()) return@launch
+                val recovery =
+                    CaptureRecoveryManager(
+                        applicationContext,
+                        attempts,
+                        gallery,
+                        AndroidGalleryMedia(applicationContext),
+                    ).recover()
+                withContext(Dispatchers.Main.immediate) {
+                    when (recovery) {
+                        is CaptureRecoveryResult.Salvaged ->
+                            states.publish(
+                                CaptureState.Saved(recovery.item.toLastCapture(), SystemClock.elapsedRealtimeNanos()),
+                            )
+                        is CaptureRecoveryResult.Deferred ->
+                            states.publish(
+                                CaptureState.Failed(CaptureFailure(CaptureFailureCode.INTERRUPTED, true, "recovery_deferred")),
+                            )
+                        is CaptureRecoveryResult.Failed ->
+                            states.publish(
+                                CaptureState.Failed(CaptureFailure(CaptureFailureCode.INTERRUPTED, true, "recovery_failed")),
+                            )
+                        CaptureRecoveryResult.NothingToRecover, is CaptureRecoveryResult.RemovedCorrupt -> states.publish(CaptureState.Idle)
                     }
                 }
-            },
-        )
-        recoveryJob = scope.launch(Dispatchers.IO) {
-            if (!attempts.hasAttempt()) return@launch
-            val recovery = CaptureRecoveryManager(
-                applicationContext,
-                attempts,
-                gallery,
-                AndroidGalleryMedia(applicationContext),
-            ).recover()
-            withContext(Dispatchers.Main.immediate) {
-                when (recovery) {
-                    is CaptureRecoveryResult.Salvaged -> states.publish(
-                        CaptureState.Saved(recovery.item.toLastCapture(), SystemClock.elapsedRealtimeNanos()),
-                    )
-                    is CaptureRecoveryResult.Deferred -> states.publish(
-                        CaptureState.Failed(CaptureFailure(CaptureFailureCode.INTERRUPTED, true, "recovery_deferred")),
-                    )
-                    is CaptureRecoveryResult.Failed -> states.publish(
-                        CaptureState.Failed(CaptureFailure(CaptureFailureCode.INTERRUPTED, true, "recovery_failed")),
-                    )
-                    CaptureRecoveryResult.NothingToRecover, is CaptureRecoveryResult.RemovedCorrupt -> states.publish(CaptureState.Idle)
-                }
             }
-        }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         val request = intent?.toCaptureRequest()
         if (intent?.action != ACTION_COMMAND || request == null) {
             stopSelfResult(startId)
@@ -142,24 +159,27 @@ class CaptureService : Service(), LifecycleOwner {
             stopSelfResult(startId)
             return START_NOT_STICKY
         }
-        val needsForeground = request.command == CaptureCommand.RECOVERY ||
-            receipt is CaptureCommandResult.AcceptedStart || isCaptureActive(states.state.value)
+        val needsForeground =
+            request.command == CaptureCommand.RECOVERY ||
+                receipt is CaptureCommandResult.AcceptedStart || isCaptureActive(states.state.value)
         if (needsForeground && !foregroundStarted) {
             val includeMicrophone = settings.settings.value.audioEnabled && hasPermission(Manifest.permission.RECORD_AUDIO)
             try {
                 beginForeground(includeMicrophone)
             } catch (failure: RuntimeException) {
-                val captureFailure = CaptureFailure(
-                    code = if (failure.javaClass.simpleName == "MissingForegroundServiceTypeException") {
-                        CaptureFailureCode.FOREGROUND_TYPE_MISSING
-                    } else if (failure.javaClass.simpleName == "ForegroundServiceStartNotAllowedException") {
-                        CaptureFailureCode.FOREGROUND_START_NOT_ALLOWED
-                    } else {
-                        CaptureFailureCode.DISPATCH
-                    },
-                    recoverable = true,
-                    diagnostic = failure.javaClass.simpleName,
-                )
+                val captureFailure =
+                    CaptureFailure(
+                        code =
+                            if (failure.javaClass.simpleName == "MissingForegroundServiceTypeException") {
+                                CaptureFailureCode.FOREGROUND_TYPE_MISSING
+                            } else if (failure.javaClass.simpleName == "ForegroundServiceStartNotAllowedException") {
+                                CaptureFailureCode.FOREGROUND_START_NOT_ALLOWED
+                            } else {
+                                CaptureFailureCode.DISPATCH
+                            },
+                        recoverable = true,
+                        diagnostic = failure.javaClass.simpleName,
+                    )
                 states.publish(CaptureState.Failed(captureFailure))
                 states.updateReceipt(request.invocationId, CaptureCommandResult.FailedToDispatch(request.invocationId, captureFailure))
                 errorHaptic()
@@ -197,7 +217,8 @@ class CaptureService : Service(), LifecycleOwner {
             is CaptureState.StartRequested,
             is CaptureState.StartingForeground,
             is CaptureState.OpeningCamera,
-            is CaptureState.StartingRecorder -> Unit
+            is CaptureState.StartingRecorder,
+            -> Unit
             is CaptureState.Recording -> {
                 registerThermal()
                 getSystemService(NotificationManager::class.java).notify(
@@ -212,17 +233,19 @@ class CaptureService : Service(), LifecycleOwner {
             is CaptureState.CancelRequested,
             is CaptureState.StopRequested,
             is CaptureState.StoppingRecorder,
-            is CaptureState.Finalizing -> {
+            is CaptureState.Finalizing,
+            -> {
                 autoStopJob?.cancel()
                 getSystemService(NotificationManager::class.java).notify(
                     CaptureNotifications.ACTIVE_NOTIFICATION_ID,
                     CaptureNotifications.saving(this),
                 )
             }
-            is CaptureState.Persisting -> getSystemService(NotificationManager::class.java).notify(
-                CaptureNotifications.ACTIVE_NOTIFICATION_ID,
-                CaptureNotifications.saving(this),
-            )
+            is CaptureState.Persisting ->
+                getSystemService(NotificationManager::class.java).notify(
+                    CaptureNotifications.ACTIVE_NOTIFICATION_ID,
+                    CaptureNotifications.saving(this),
+                )
             is CaptureState.Saved -> {
                 cleanupRecordingObservers()
                 savedHaptic()
@@ -248,12 +271,13 @@ class CaptureService : Service(), LifecycleOwner {
                 }
                 stopSelf()
             }
-            CaptureState.Idle -> if (old is CaptureState.CancelRequested) {
-                cleanupRecordingObservers()
-                cancelHaptic()
-                endForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
-            }
+            CaptureState.Idle ->
+                if (old is CaptureState.CancelRequested) {
+                    cleanupRecordingObservers()
+                    cancelHaptic()
+                    endForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
             is CaptureState.Recovering -> Unit
         }
     }
@@ -261,8 +285,9 @@ class CaptureService : Service(), LifecycleOwner {
     private fun beginForeground(includeMicrophone: Boolean) {
         val notification = CaptureNotifications.starting(this)
         if (Build.VERSION.SDK_INT >= 30) {
-            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
-                if (includeMicrophone) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+            val type =
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
+                    if (includeMicrophone) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
             startForeground(CaptureNotifications.ACTIVE_NOTIFICATION_ID, notification, type)
         } else {
             startForeground(CaptureNotifications.ACTIVE_NOTIFICATION_ID, notification)
@@ -281,17 +306,18 @@ class CaptureService : Service(), LifecycleOwner {
         autoStopJob?.cancel()
         val seconds = settings.settings.value.autoStopSeconds
         if (seconds <= 0) return
-        autoStopJob = scope.launch {
-            delay(seconds * 1_000L)
-            actor.submit(
-                CaptureRequest(
-                    invocationId = "auto-${state.invocationId}",
-                    command = CaptureCommand.AUTO_STOP,
-                    trigger = CaptureTrigger.AUTO_STOP,
-                    receivedElapsedNanos = SystemClock.elapsedRealtimeNanos(),
-                ),
-            )
-        }
+        autoStopJob =
+            scope.launch {
+                delay(seconds * 1_000L)
+                actor.submit(
+                    CaptureRequest(
+                        invocationId = "auto-${state.invocationId}",
+                        command = CaptureCommand.AUTO_STOP,
+                        trigger = CaptureTrigger.AUTO_STOP,
+                        receivedElapsedNanos = SystemClock.elapsedRealtimeNanos(),
+                    ),
+                )
+            }
     }
 
     private fun requestSafetyStop(reason: String) {
@@ -326,7 +352,10 @@ class CaptureService : Service(), LifecycleOwner {
         super.onTaskRemoved(rootIntent)
     }
 
-    override fun onTimeout(startId: Int, fgsType: Int) {
+    override fun onTimeout(
+        startId: Int,
+        fgsType: Int,
+    ) {
         requestSafetyStop("timeout")
         super.onTimeout(startId, fgsType)
     }
@@ -354,53 +383,57 @@ class CaptureService : Service(), LifecycleOwner {
 
     private fun vibrate(effect: VibrationEffect) {
         if (!::settings.isInitialized || !settings.settings.value.hapticsEnabled || !systemHapticsEnabled()) return
-        val vibrator = if (Build.VERSION.SDK_INT >= 31) {
-            getSystemService(VibratorManager::class.java).defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Vibrator::class.java)
-        }
+        val vibrator =
+            if (Build.VERSION.SDK_INT >= 31) {
+                getSystemService(VibratorManager::class.java).defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Vibrator::class.java)
+            }
         if (vibrator.hasVibrator()) vibrator.vibrate(effect)
     }
 
-    private fun systemHapticsEnabled(): Boolean = runCatching {
-        @Suppress("DEPRECATION")
-        val setting = Settings.System.HAPTIC_FEEDBACK_ENABLED
-        Settings.System.getInt(contentResolver, setting, 1) == 1
-    }.getOrDefault(true)
+    private fun systemHapticsEnabled(): Boolean =
+        runCatching {
+            @Suppress("DEPRECATION")
+            val setting = Settings.System.HAPTIC_FEEDBACK_ENABLED
+            Settings.System.getInt(contentResolver, setting, 1) == 1
+        }.getOrDefault(true)
 
-    private fun hasPermission(permission: String): Boolean =
-        checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    private fun hasPermission(permission: String): Boolean = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun hasNotificationPermission(): Boolean =
-        Build.VERSION.SDK_INT < 33 || hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+    private fun hasNotificationPermission(): Boolean = Build.VERSION.SDK_INT < 33 || hasPermission(Manifest.permission.POST_NOTIFICATIONS)
 
-    private fun activeInvocationId(): String = when (val state = states.state.value) {
-        is CaptureState.StartRequested -> state.invocationId
-        is CaptureState.StartingForeground -> state.invocationId
-        is CaptureState.OpeningCamera -> state.invocationId
-        is CaptureState.StartingRecorder -> state.invocationId
-        is CaptureState.Recording -> state.invocationId
-        is CaptureState.CancelRequested -> state.invocationId
-        is CaptureState.StopRequested -> state.invocationId
-        is CaptureState.StoppingRecorder -> state.invocationId
-        is CaptureState.Finalizing -> state.invocationId
-        else -> "capture"
-    }
+    private fun activeInvocationId(): String =
+        when (val state = states.state.value) {
+            is CaptureState.StartRequested -> state.invocationId
+            is CaptureState.StartingForeground -> state.invocationId
+            is CaptureState.OpeningCamera -> state.invocationId
+            is CaptureState.StartingRecorder -> state.invocationId
+            is CaptureState.Recording -> state.invocationId
+            is CaptureState.CancelRequested -> state.invocationId
+            is CaptureState.StopRequested -> state.invocationId
+            is CaptureState.StoppingRecorder -> state.invocationId
+            is CaptureState.Finalizing -> state.invocationId
+            else -> "capture"
+        }
 
-    private fun isCaptureActive(state: CaptureState): Boolean = state is CaptureState.StartRequested ||
-        state is CaptureState.StartingForeground || state is CaptureState.OpeningCamera ||
-        state is CaptureState.StartingRecorder || state is CaptureState.Recording ||
-        state is CaptureState.CancelRequested || state is CaptureState.StopRequested ||
-        state is CaptureState.StoppingRecorder || state is CaptureState.Finalizing ||
-        state is CaptureState.Persisting
+    private fun isCaptureActive(state: CaptureState): Boolean =
+        state is CaptureState.StartRequested ||
+            state is CaptureState.StartingForeground || state is CaptureState.OpeningCamera ||
+            state is CaptureState.StartingRecorder || state is CaptureState.Recording ||
+            state is CaptureState.CancelRequested || state is CaptureState.StopRequested ||
+            state is CaptureState.StoppingRecorder || state is CaptureState.Finalizing ||
+            state is CaptureState.Persisting
 
     private fun Intent.toCaptureRequest(): CaptureRequest? {
         val id = getStringExtra(EXTRA_INVOCATION_ID)?.takeIf { it.length in 1..160 } ?: return null
-        val command = getStringExtra(EXTRA_COMMAND)?.let { runCatching { CaptureCommand.valueOf(it) }.getOrNull() }
-            ?: return null
-        val trigger = getStringExtra(EXTRA_TRIGGER)?.let { runCatching { CaptureTrigger.valueOf(it) }.getOrNull() }
-            ?: return null
+        val command =
+            getStringExtra(EXTRA_COMMAND)?.let { runCatching { CaptureCommand.valueOf(it) }.getOrNull() }
+                ?: return null
+        val trigger =
+            getStringExtra(EXTRA_TRIGGER)?.let { runCatching { CaptureTrigger.valueOf(it) }.getOrNull() }
+                ?: return null
         val received = getLongExtra(EXTRA_RECEIVED_ELAPSED_NANOS, -1L).takeIf { it >= 0 } ?: return null
         return CaptureRequest(id, command, trigger, received)
     }
@@ -414,14 +447,22 @@ class CaptureService : Service(), LifecycleOwner {
         private const val EXTRA_TRIGGER = "capture_trigger"
         private const val EXTRA_RECEIVED_ELAPSED_NANOS = "received_elapsed_nanos"
 
-        fun intent(context: Context, request: CaptureRequest): Intent = Intent(context, CaptureService::class.java)
-            .setAction(ACTION_COMMAND)
-            .putExtra(EXTRA_INVOCATION_ID, request.invocationId)
-            .putExtra(EXTRA_COMMAND, request.command.name)
-            .putExtra(EXTRA_TRIGGER, request.trigger.name)
-            .putExtra(EXTRA_RECEIVED_ELAPSED_NANOS, request.receivedElapsedNanos)
+        fun intent(
+            context: Context,
+            request: CaptureRequest,
+        ): Intent =
+            Intent(context, CaptureService::class.java)
+                .setAction(ACTION_COMMAND)
+                .putExtra(EXTRA_INVOCATION_ID, request.invocationId)
+                .putExtra(EXTRA_COMMAND, request.command.name)
+                .putExtra(EXTRA_TRIGGER, request.trigger.name)
+                .putExtra(EXTRA_RECEIVED_ELAPSED_NANOS, request.receivedElapsedNanos)
 
-        fun intent(context: Context, action: String, id: String = UUID.randomUUID().toString()): Intent {
+        fun intent(
+            context: Context,
+            action: String,
+            id: String = UUID.randomUUID().toString(),
+        ): Intent {
             val command = if (action == ACTION_STOP) CaptureCommand.NOTIFICATION_STOP else CaptureCommand.TOGGLE
             val trigger = if (action == ACTION_STOP) CaptureTrigger.NOTIFICATION else CaptureTrigger.ACTIVITY
             return intent(
@@ -430,10 +471,16 @@ class CaptureService : Service(), LifecycleOwner {
             )
         }
 
-        fun dispatch(context: Context, id: String): CaptureCommandResult =
-            dispatch(context, ACTION_TOGGLE, id)
+        fun dispatch(
+            context: Context,
+            id: String,
+        ): CaptureCommandResult = dispatch(context, ACTION_TOGGLE, id)
 
-        fun dispatch(context: Context, action: String, id: String): CaptureCommandResult {
+        fun dispatch(
+            context: Context,
+            action: String,
+            id: String,
+        ): CaptureCommandResult {
             val app = context.applicationContext as ChalnaApplication
             return app.graph.captureCommands.dispatch(
                 id,

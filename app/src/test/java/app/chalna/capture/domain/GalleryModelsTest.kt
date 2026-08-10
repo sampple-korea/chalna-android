@@ -28,16 +28,23 @@ class GalleryModelsTest {
     }
 
     @Test fun newestDestinationAndScopeFiltersCompose() {
-        val result = GalleryFilter.apply(
-            listOf(oldDevice, newDevice, vault),
-            GalleryQuery(destination = StorageDestination.DEVICE_GALLERY),
-        )
+        val result =
+            GalleryFilter.apply(
+                listOf(oldDevice, newDevice, vault),
+                GalleryQuery(destination = StorageDestination.DEVICE_GALLERY),
+            )
         assertEquals(listOf(newDevice.id, oldDevice.id), result.map(CaptureItem::id))
-        assertEquals(listOf(newDevice.id, vault.id, oldDevice.id), GalleryFilter.apply(listOf(oldDevice, vault, newDevice), GalleryQuery()).map(CaptureItem::id))
+        assertEquals(
+            listOf(newDevice.id, vault.id, oldDevice.id),
+            GalleryFilter.apply(listOf(oldDevice, vault, newDevice), GalleryQuery()).map(CaptureItem::id),
+        )
     }
 
     @Test fun oldestSortIsStable() {
-        assertEquals(listOf(oldDevice.id, vault.id, newDevice.id), GalleryFilter.apply(listOf(newDevice, oldDevice, vault), GalleryQuery(GallerySort.OLDEST_FIRST)).map(CaptureItem::id))
+        assertEquals(
+            listOf(oldDevice.id, vault.id, newDevice.id),
+            GalleryFilter.apply(listOf(newDevice, oldDevice, vault), GalleryQuery(GallerySort.OLDEST_FIRST)).map(CaptureItem::id),
+        )
     }
 
     @Test fun selectionToggleSelectAllRetainAndClearArePure() {
@@ -50,8 +57,16 @@ class GalleryModelsTest {
         assertFalse(empty.selectedIds.contains(oldDevice.id))
     }
 
-    private fun item(id: String, created: Long, destination: StorageDestination) = CaptureItem(
-        id, destination, "content://capture/$id", displayName = "$id.mp4",
-        createdAtMillis = created, durationMillis = 1,
+    private fun item(
+        id: String,
+        created: Long,
+        destination: StorageDestination,
+    ) = CaptureItem(
+        id,
+        destination,
+        "content://capture/$id",
+        displayName = "$id.mp4",
+        createdAtMillis = created,
+        durationMillis = 1,
     )
 }

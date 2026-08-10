@@ -20,7 +20,10 @@ object CaptureTelemetryRegistry {
         sink = value
     }
 
-    fun mark(invocationId: String, name: String) {
+    fun mark(
+        invocationId: String,
+        name: String,
+    ) {
         try {
             sink.mark(
                 CaptureTelemetryEvent(

@@ -14,7 +14,10 @@ class CaptureModelsTest {
     }
 
     @Test fun qualityFallbackStartsAtPreferenceAndIncludesAvailableOnly() {
-        assertEquals(listOf(CaptureQuality.FHD, CaptureQuality.HD), QualityFallback.ordered(CaptureQuality.FHD, setOf(CaptureQuality.FHD, CaptureQuality.HD)))
+        assertEquals(
+            listOf(CaptureQuality.FHD, CaptureQuality.HD),
+            QualityFallback.ordered(CaptureQuality.FHD, setOf(CaptureQuality.FHD, CaptureQuality.HD)),
+        )
     }
 
     @Test fun filenameIsUtcStableAndSafe() {

@@ -19,15 +19,19 @@ class AssistantEligibilityTest {
 
     @Test
     fun packagePublishesCompleteAssistantRoleMetadata() {
-        val service = packageManager.queryIntentServices(
-            Intent(VoiceInteractionService.SERVICE_INTERFACE).setPackage(context.packageName),
-            PackageManager.GET_META_DATA,
-        ).single().serviceInfo
+        val service =
+            packageManager
+                .queryIntentServices(
+                    Intent(VoiceInteractionService.SERVICE_INTERFACE).setPackage(context.packageName),
+                    PackageManager.GET_META_DATA,
+                ).single()
+                .serviceInfo
 
         assertEquals(Manifest.permission.BIND_VOICE_INTERACTION, service.permission)
-        val metadata = requireNotNull(
-            service.loadXmlMetaData(packageManager, VoiceInteractionService.SERVICE_META_DATA),
-        )
+        val metadata =
+            requireNotNull(
+                service.loadXmlMetaData(packageManager, VoiceInteractionService.SERVICE_META_DATA),
+            )
         metadata.use { parser ->
             while (parser.eventType != XmlPullParser.START_TAG && parser.eventType != XmlPullParser.END_DOCUMENT) {
                 parser.next()
@@ -41,13 +45,17 @@ class AssistantEligibilityTest {
 
     @Test
     fun declaredRecognitionServiceIsSystemBindOnly() {
-        val query = Intent(RecognitionService.SERVICE_INTERFACE)
-            .addCategory(Intent.CATEGORY_DEFAULT)
-            .setPackage(context.packageName)
-        val service = packageManager.queryIntentServices(
-            query,
-            PackageManager.GET_META_DATA,
-        ).single().serviceInfo
+        val query =
+            Intent(RecognitionService.SERVICE_INTERFACE)
+                .addCategory(Intent.CATEGORY_DEFAULT)
+                .setPackage(context.packageName)
+        val service =
+            packageManager
+                .queryIntentServices(
+                    query,
+                    PackageManager.GET_META_DATA,
+                ).single()
+                .serviceInfo
 
         assertEquals(BIND_SPEECH_RECOGNITION_SERVICE, service.permission)
         assertEquals(ChalnaRecognitionService::class.java.name, service.name)
@@ -68,8 +76,7 @@ class AssistantEligibilityTest {
         assertTrue(context.getSystemService(RoleManager::class.java).isRoleAvailable(RoleManager.ROLE_ASSISTANT))
     }
 
-    private fun XmlPullParser.attribute(name: String): String =
-        getAttributeValue(ANDROID_NAMESPACE, name).orEmpty()
+    private fun XmlPullParser.attribute(name: String): String = getAttributeValue(ANDROID_NAMESPACE, name).orEmpty()
 
     private companion object {
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"

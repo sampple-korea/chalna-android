@@ -53,15 +53,20 @@ object CaptureNotifications {
         )
     }
 
-    fun starting(context: Context): Notification = activeBase(
-        context,
-        context.getString(R.string.notification_starting_title),
-        context.getString(R.string.notification_starting_text),
-    ).build()
+    fun starting(context: Context): Notification =
+        activeBase(
+            context,
+            context.getString(R.string.notification_starting_title),
+            context.getString(R.string.notification_starting_text),
+        ).build()
 
-    fun active(context: Context, recordingStartedElapsedNanos: Long): Notification {
-        val wallStart = System.currentTimeMillis() -
-            ((SystemClock.elapsedRealtimeNanos() - recordingStartedElapsedNanos).coerceAtLeast(0) / 1_000_000L)
+    fun active(
+        context: Context,
+        recordingStartedElapsedNanos: Long,
+    ): Notification {
+        val wallStart =
+            System.currentTimeMillis() -
+                ((SystemClock.elapsedRealtimeNanos() - recordingStartedElapsedNanos).coerceAtLeast(0) / 1_000_000L)
         return activeBase(
             context,
             context.getString(R.string.notification_recording_title),
@@ -71,26 +76,33 @@ object CaptureNotifications {
             .build()
     }
 
-    fun saving(context: Context): Notification = activeBase(
-        context,
-        context.getString(R.string.notification_saving_title),
-        context.getString(R.string.notification_saving_text),
-        includeStop = false,
-    ).build()
-
-    fun saved(context: Context, capture: LastCapture): Notification {
-        ensureChannels(context)
-        val view = Intent(context, MainActivity::class.java)
-            .setAction(MainActivity.ACTION_OPEN_CAPTURE)
-            .putExtra(MainActivity.EXTRA_CAPTURE_ID, capture.id)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val open = PendingIntent.getActivity(
+    fun saving(context: Context): Notification =
+        activeBase(
             context,
-            capture.id.hashCode(),
-            view,
-            immutableUpdate(),
-        )
-        return Notification.Builder(context, RESULT_CHANNEL_ID)
+            context.getString(R.string.notification_saving_title),
+            context.getString(R.string.notification_saving_text),
+            includeStop = false,
+        ).build()
+
+    fun saved(
+        context: Context,
+        capture: LastCapture,
+    ): Notification {
+        ensureChannels(context)
+        val view =
+            Intent(context, MainActivity::class.java)
+                .setAction(MainActivity.ACTION_OPEN_CAPTURE)
+                .putExtra(MainActivity.EXTRA_CAPTURE_ID, capture.id)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val open =
+            PendingIntent.getActivity(
+                context,
+                capture.id.hashCode(),
+                view,
+                immutableUpdate(),
+            )
+        return Notification
+            .Builder(context, RESULT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_chalna)
             .setContentTitle(context.getString(R.string.notification_saved_title))
             .setContentText(context.getString(R.string.notification_saved_text))
@@ -101,24 +113,34 @@ object CaptureNotifications {
             .build()
     }
 
-    fun error(context: Context, failure: CaptureFailure): Notification {
+    fun error(
+        context: Context,
+        failure: CaptureFailure,
+    ): Notification {
         ensureChannels(context)
-        val actionIntent = when (failure.code) {
-            CaptureFailureCode.CAMERA_PERMISSION,
-            CaptureFailureCode.MICROPHONE_PERMISSION -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                .setData("package:${context.packageName}".toUri())
-            CaptureFailureCode.LOW_STORAGE,
-            CaptureFailureCode.STORAGE_UNAVAILABLE -> Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
-            else -> Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        val action = PendingIntent.getActivity(
-            context,
-            50 + failure.code.ordinal,
-            actionIntent,
-            immutableUpdate(),
-        )
-        return Notification.Builder(context, RESULT_CHANNEL_ID)
+        val actionIntent =
+            when (failure.code) {
+                CaptureFailureCode.CAMERA_PERMISSION,
+                CaptureFailureCode.MICROPHONE_PERMISSION,
+                ->
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        .setData("package:${context.packageName}".toUri())
+                CaptureFailureCode.LOW_STORAGE,
+                CaptureFailureCode.STORAGE_UNAVAILABLE,
+                -> Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+                else ->
+                    Intent(context, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+        val action =
+            PendingIntent.getActivity(
+                context,
+                50 + failure.code.ordinal,
+                actionIntent,
+                immutableUpdate(),
+            )
+        return Notification
+            .Builder(context, RESULT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_chalna)
             .setContentTitle(context.getString(R.string.notification_error_title))
             .setContentText(context.getString(failure.messageResource()))
@@ -136,47 +158,53 @@ object CaptureNotifications {
         includeStop: Boolean = true,
     ): Notification.Builder {
         ensureChannels(context)
-        val openIntent = Intent(context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val openIntent =
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val open = PendingIntent.getActivity(context, 20, openIntent, immutableUpdate())
-        val builder = Notification.Builder(context, ACTIVE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_chalna)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setOngoing(true)
-            .setCategory(Notification.CATEGORY_SERVICE)
-            .setContentIntent(open)
-            .setOnlyAlertOnce(true)
-            .setVisibility(Notification.VISIBILITY_PRIVATE)
+        val builder =
+            Notification
+                .Builder(context, ACTIVE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_chalna)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setOngoing(true)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setContentIntent(open)
+                .setOnlyAlertOnce(true)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
         if (Build.VERSION.SDK_INT >= 31) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         }
         if (includeStop) {
-            val request = CaptureRequest(
-                invocationId = "notification-${UUID.randomUUID()}",
-                command = CaptureCommand.NOTIFICATION_STOP,
-                trigger = CaptureTrigger.NOTIFICATION,
-                receivedElapsedNanos = SystemClock.elapsedRealtimeNanos(),
-            )
-            val stop = PendingIntent.getService(
-                context,
-                21,
-                CaptureService.intent(context, request),
-                immutableUpdate(),
-            )
+            val request =
+                CaptureRequest(
+                    invocationId = "notification-${UUID.randomUUID()}",
+                    command = CaptureCommand.NOTIFICATION_STOP,
+                    trigger = CaptureTrigger.NOTIFICATION,
+                    receivedElapsedNanos = SystemClock.elapsedRealtimeNanos(),
+                )
+            val stop =
+                PendingIntent.getService(
+                    context,
+                    21,
+                    CaptureService.intent(context, request),
+                    immutableUpdate(),
+                )
             builder.addAction(Notification.Action.Builder(null, context.getString(R.string.action_stop), stop).build())
         }
         return builder
     }
 
-    private fun CaptureFailure.messageResource(): Int = when (code) {
-        CaptureFailureCode.CAMERA_PERMISSION -> R.string.capture_error_camera_permission
-        CaptureFailureCode.MICROPHONE_PERMISSION -> R.string.capture_error_microphone_permission
-        CaptureFailureCode.CAMERA_BUSY -> R.string.capture_error_camera_busy
-        CaptureFailureCode.LOW_STORAGE -> R.string.capture_error_storage
-        CaptureFailureCode.STORAGE_UNAVAILABLE -> R.string.capture_error_storage_unavailable
-        else -> R.string.capture_error_camera
-    }
+    private fun CaptureFailure.messageResource(): Int =
+        when (code) {
+            CaptureFailureCode.CAMERA_PERMISSION -> R.string.capture_error_camera_permission
+            CaptureFailureCode.MICROPHONE_PERMISSION -> R.string.capture_error_microphone_permission
+            CaptureFailureCode.CAMERA_BUSY -> R.string.capture_error_camera_busy
+            CaptureFailureCode.LOW_STORAGE -> R.string.capture_error_storage
+            CaptureFailureCode.STORAGE_UNAVAILABLE -> R.string.capture_error_storage_unavailable
+            else -> R.string.capture_error_camera
+        }
 
     private fun immutableUpdate(): Int = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 }

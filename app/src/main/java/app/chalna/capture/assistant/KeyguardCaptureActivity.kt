@@ -13,9 +13,11 @@ class KeyguardCaptureActivity : Activity() {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         setTurnScreenOn(false)
-        val invocationId = intent.getStringExtra(CaptureService.EXTRA_INVOCATION_ID)
-            ?.takeIf { it.length <= 160 }
-            ?: "keyguard-${UUID.randomUUID()}"
+        val invocationId =
+            intent
+                .getStringExtra(CaptureService.EXTRA_INVOCATION_ID)
+                ?.takeIf { it.length <= 160 }
+                ?: "keyguard-${UUID.randomUUID()}"
         (application as ChalnaApplication).graph.captureCommands.dispatch(
             invocationId,
             CaptureCommand.TOGGLE,

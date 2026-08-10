@@ -29,8 +29,8 @@ import androidx.paging.insertSeparators
 import androidx.paging.map
 import app.chalna.capture.ChalnaApplication
 import app.chalna.capture.R
-import app.chalna.capture.capture.ChalnaCaptureTileService
 import app.chalna.capture.capture.CaptureService
+import app.chalna.capture.capture.ChalnaCaptureTileService
 import app.chalna.capture.data.SettingsStore
 import app.chalna.capture.domain.CaptureCommand
 import app.chalna.capture.domain.CaptureFailureCode
@@ -48,19 +48,16 @@ import app.chalna.capture.domain.StorageDestination
 import app.chalna.capture.domain.ThemePreference
 import app.chalna.capture.gallery.BatchOperationResult
 import app.chalna.capture.gallery.GalleryRepository
-import java.util.UUID
-import java.time.Instant
-import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -69,6 +66,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.ZoneId
+import java.util.UUID
 
 class ProductionUiDependencies(
     private val activity: ComponentActivity,
@@ -82,7 +82,12 @@ class ProductionUiDependencies(
     private val systemSnapshot = MutableStateFlow(readSystemSnapshot())
     private val overlay = MutableStateFlow(UiOverlay())
     private val playerSnapshot = MutableStateFlow<PlayerSnapshot?>(null)
-    private data class GalleryRequest(val query: GalleryQuery, val generation: Long)
+
+    private data class GalleryRequest(
+        val query: GalleryQuery,
+        val generation: Long,
+    )
+
     private val galleryRequest = MutableStateFlow(GalleryRequest(GalleryQuery(), 0))
     private val galleryMutex = Mutex()
     private var galleryInitialized = false
@@ -94,28 +99,30 @@ class ProductionUiDependencies(
     private var cameraRequestedThisSession = false
     private var microphoneRequestedThisSession = false
 
-    override val galleryPaging: Flow<PagingData<GalleryPagingItem>> = galleryRequest
-        .flatMapLatest { request ->
-            flow {
-                galleryMutex.withLock {
-                    if (!galleryInitialized) {
-                        galleryRepository.initialize()
-                        galleryInitialized = true
+    override val galleryPaging: Flow<PagingData<GalleryPagingItem>> =
+        galleryRequest
+            .flatMapLatest { request ->
+                flow {
+                    galleryMutex.withLock {
+                        if (!galleryInitialized) {
+                            galleryRepository.initialize()
+                            galleryInitialized = true
+                        }
                     }
+                    emitAll(
+                        galleryRepository.paging(request.query).map { page ->
+                            page
+                                .map { GalleryPagingItem.Media(it.toUi()) as GalleryPagingItem }
+                                .insertSeparators { before, after ->
+                                    val next = (after as? GalleryPagingItem.Media)?.item ?: return@insertSeparators null
+                                    val previousDay = (before as? GalleryPagingItem.Media)?.item?.capturedAtMillis?.toLocalDay()
+                                    val nextDay = next.capturedAtMillis.toLocalDay()
+                                    if (previousDay != nextDay) GalleryPagingItem.Day(nextDay) else null
+                                }
+                        },
+                    )
                 }
-                emitAll(
-                    galleryRepository.paging(request.query).map { page ->
-                        page.map { GalleryPagingItem.Media(it.toUi()) as GalleryPagingItem }
-                            .insertSeparators { before, after ->
-                                val next = (after as? GalleryPagingItem.Media)?.item ?: return@insertSeparators null
-                                val previousDay = (before as? GalleryPagingItem.Media)?.item?.capturedAtMillis?.toLocalDay()
-                                val nextDay = next.capturedAtMillis.toLocalDay()
-                                if (previousDay != nextDay) GalleryPagingItem.Day(nextDay) else null
-                            }
-                    },
-                )
-            }
-        }.cachedIn(activity.lifecycleScope)
+            }.cachedIn(activity.lifecycleScope)
 
     private data class SystemSnapshot(
         val assistantAvailable: Boolean,
@@ -140,28 +147,32 @@ class ProductionUiDependencies(
         val savedVisible: Boolean = false,
     )
 
-    private val cameraPermission = activity.registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) {
-        cameraRequestedThisSession = true
-        refreshSetup()
-    }
+    private val cameraPermission =
+        activity.registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) {
+            cameraRequestedThisSession = true
+            refreshSetup()
+        }
 
-    private val microphonePermission = activity.registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        microphoneRequestedThisSession = true
-        if (granted) updateSettings { copy(audioEnabled = true) }
-        refreshSetup()
-    }
+    private val microphonePermission =
+        activity.registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            microphoneRequestedThisSession = true
+            if (granted) updateSettings { copy(audioEnabled = true) }
+            refreshSetup()
+        }
 
-    private val notificationPermission = activity.registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { refreshSetup() }
+    private val notificationPermission =
+        activity.registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { refreshSetup() }
 
-    private val assistantRole = activity.registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { refreshSetup() }
+    private val assistantRole =
+        activity.registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) { refreshSetup() }
 
     init {
         activity.lifecycle.addObserver(
@@ -199,29 +210,34 @@ class ProductionUiDependencies(
                 val system = values[3] as SystemSnapshot
                 val ui = values[4] as UiOverlay
                 val player = values[5] as PlayerSnapshot?
-                val ready = system.cameraGranted && system.assistantSelected &&
-                    (!settings.audioEnabled || system.microphoneGranted)
-                val phase = when {
-                    !ready && capture is CaptureState.Idle -> CapturePhase.SETUP_REQUIRED
-                    capture is CaptureState.StartRequested || capture is CaptureState.StartingForeground ||
-                        capture is CaptureState.OpeningCamera || capture is CaptureState.StartingRecorder -> CapturePhase.STARTING
-                    capture is CaptureState.Recording -> CapturePhase.RECORDING
-                    capture is CaptureState.CancelRequested || capture is CaptureState.StopRequested ||
-                        capture is CaptureState.StoppingRecorder || capture is CaptureState.Finalizing ||
-                        capture is CaptureState.Persisting || capture is CaptureState.Recovering -> CapturePhase.STOPPING
-                    capture is CaptureState.Saved && ui.savedVisible -> CapturePhase.SAVED
-                    capture is CaptureState.Failed -> CapturePhase.ERROR
-                    else -> CapturePhase.READY
-                }
+                val ready =
+                    system.cameraGranted && system.assistantSelected &&
+                        (!settings.audioEnabled || system.microphoneGranted)
+                val phase =
+                    when {
+                        !ready && capture is CaptureState.Idle -> CapturePhase.SETUP_REQUIRED
+                        capture is CaptureState.StartRequested || capture is CaptureState.StartingForeground ||
+                            capture is CaptureState.OpeningCamera || capture is CaptureState.StartingRecorder -> CapturePhase.STARTING
+                        capture is CaptureState.Recording -> CapturePhase.RECORDING
+                        capture is CaptureState.CancelRequested || capture is CaptureState.StopRequested ||
+                            capture is CaptureState.StoppingRecorder || capture is CaptureState.Finalizing ||
+                            capture is CaptureState.Persisting || capture is CaptureState.Recovering -> CapturePhase.STOPPING
+                        capture is CaptureState.Saved && ui.savedVisible -> CapturePhase.SAVED
+                        capture is CaptureState.Failed -> CapturePhase.ERROR
+                        else -> CapturePhase.READY
+                    }
                 val fresh = (capture as? CaptureState.Saved)?.capture?.let(CaptureItem::from)?.toUi()
                 val persisted = lastCapture?.let(CaptureItem::from)?.toUi()
                 ChalnaUiState(
                     setupComplete = settings.onboardingSeen,
                     phase = phase,
-                    durationSeconds = (capture as? CaptureState.Recording)
-                        ?.recordedDurationNanos?.div(1_000_000_000L) ?: 0,
-                    recordingStartedElapsedNanos = (capture as? CaptureState.Recording)
-                        ?.startedAtElapsedNanos ?: 0,
+                    durationSeconds =
+                        (capture as? CaptureState.Recording)
+                            ?.recordedDurationNanos
+                            ?.div(1_000_000_000L) ?: 0,
+                    recordingStartedElapsedNanos =
+                        (capture as? CaptureState.Recording)
+                            ?.startedAtElapsedNanos ?: 0,
                     lastCapture = fresh ?: persisted,
                     errorCode = (capture as? CaptureState.Failed)?.failure?.code?.name,
                     operationEvent = ui.operation,
@@ -325,9 +341,10 @@ class ProductionUiDependencies(
 
     override fun setMotion(value: MotionMode) = updateSettings { copy(motion = value.toDomain()) }
 
-    override fun setStorageDestination(value: StorageDestinationUi) = updateSettings {
-        copy(storageDestination = value.toDomain())
-    }
+    override fun setStorageDestination(value: StorageDestinationUi) =
+        updateSettings {
+            copy(storageDestination = value.toDomain())
+        }
 
     override fun openLastCapture() {
         state.value.lastCapture?.let { openPlayer(it.id) }
@@ -337,66 +354,78 @@ class ProductionUiDependencies(
 
     override fun requestQuickTile() {
         ChalnaCaptureTileService.requestAdd(activity) { result ->
-            val message = if (result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
-                result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED
-            ) {
-                R.string.quick_tile_added
-            } else {
-                R.string.quick_tile_add_failed
-            }
+            val message =
+                if (result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
+                    result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED
+                ) {
+                    R.string.quick_tile_added
+                } else {
+                    R.string.quick_tile_add_failed
+                }
             publishOperation(UiOperationEvent.Succeeded(message))
         }
     }
 
     override fun refreshGallery() {
         galleryJob?.cancel()
-        galleryJob = activity.lifecycleScope.launch {
-            val current = overlay.value
-            overlay.value = current.copy(galleryLoading = current.gallery.isEmpty(), galleryError = false)
-            try {
-                withContext(Dispatchers.IO) {
-                    galleryMutex.withLock {
-                        if (!galleryInitialized) {
-                            galleryRepository.initialize()
-                            galleryInitialized = true
+        galleryJob =
+            activity.lifecycleScope.launch {
+                val current = overlay.value
+                overlay.value = current.copy(galleryLoading = current.gallery.isEmpty(), galleryError = false)
+                try {
+                    withContext(Dispatchers.IO) {
+                        galleryMutex.withLock {
+                            if (!galleryInitialized) {
+                                galleryRepository.initialize()
+                                galleryInitialized = true
+                            }
                         }
                     }
+                    overlay.value =
+                        overlay.value.copy(
+                            galleryLoading = false,
+                            galleryError = false,
+                        )
+                    galleryRequest.value = GalleryRequest(current.query(), galleryRequest.value.generation + 1)
+                    refreshStorageSummary()
+                    pendingOpenId?.let { id ->
+                        openCaptureWhenReady(id, pendingOpenPosition)
+                        pendingOpenId = null
+                        pendingOpenPosition = 0
+                    }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    overlay.value = overlay.value.copy(galleryLoading = false, galleryError = true)
                 }
-                overlay.value = overlay.value.copy(
-                    galleryLoading = false,
-                    galleryError = false,
-                )
-                galleryRequest.value = GalleryRequest(current.query(), galleryRequest.value.generation + 1)
-                refreshStorageSummary()
-                pendingOpenId?.let { id ->
-                    openCaptureWhenReady(id, pendingOpenPosition)
-                    pendingOpenId = null
-                    pendingOpenPosition = 0
-                }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                overlay.value = overlay.value.copy(galleryLoading = false, galleryError = true)
             }
-        }
     }
 
-    override fun loadThumbnail(uri: String, sizePx: Int, cancellationSignal: CancellationSignal): Bitmap? {
+    override fun loadThumbnail(
+        uri: String,
+        sizePx: Int,
+        cancellationSignal: CancellationSignal,
+    ): Bitmap? {
         if (cancellationSignal.isCanceled || sizePx <= 0) return null
         val parsed = runCatching { uri.toUri() }.getOrNull() ?: return null
-        val platform = runCatching {
-            activity.contentResolver.loadThumbnail(parsed, Size(sizePx, sizePx), cancellationSignal)
-        }.getOrNull()
+        val platform =
+            runCatching {
+                activity.contentResolver.loadThumbnail(parsed, Size(sizePx, sizePx), cancellationSignal)
+            }.getOrNull()
         if (platform != null || cancellationSignal.isCanceled) return platform
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(activity, parsed)
-            if (cancellationSignal.isCanceled) null else retriever.getScaledFrameAtTime(
-                -1,
-                MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                sizePx,
-                sizePx,
-            )
+            if (cancellationSignal.isCanceled) {
+                null
+            } else {
+                retriever.getScaledFrameAtTime(
+                    -1,
+                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    sizePx,
+                    sizePx,
+                )
+            }
         } catch (_: RuntimeException) {
             null
         } finally {
@@ -435,19 +464,22 @@ class ProductionUiDependencies(
 
     override fun restoreSelectedMedia() = runBatch("restore") { galleryRepository.restore(overlay.value.selected) }
 
-    override fun deleteSelectedMediaPermanently() = runBatch("delete") {
-        galleryRepository.deletePermanently(overlay.value.selected)
-    }
+    override fun deleteSelectedMediaPermanently() =
+        runBatch("delete") {
+            galleryRepository.deletePermanently(overlay.value.selected)
+        }
 
-    override fun favoriteSelectedMedia(favorite: Boolean) = runBatch("favorite") {
-        galleryRepository.setFavorite(overlay.value.selected, favorite)
-    }
+    override fun favoriteSelectedMedia(favorite: Boolean) =
+        runBatch("favorite") {
+            galleryRepository.setFavorite(overlay.value.selected, favorite)
+        }
 
     override fun shareSelectedMedia() = share(overlay.value.selected)
 
-    override fun exportSelectedMedia(forceCopy: Boolean) = runBatch("export") {
-        galleryRepository.exportVault(overlay.value.selected, forceCopy)
-    }
+    override fun exportSelectedMedia(forceCopy: Boolean) =
+        runBatch("export") {
+            galleryRepository.exportVault(overlay.value.selected, forceCopy)
+        }
 
     override fun emptyTrash() {
         activity.lifecycleScope.launch(Dispatchers.IO) {
@@ -473,7 +505,10 @@ class ProductionUiDependencies(
         if (item != null) openPlayerItem(item, 0) else openCaptureWhenReady(id)
     }
 
-    fun openCaptureWhenReady(id: String, positionMillis: Long = 0) {
+    fun openCaptureWhenReady(
+        id: String,
+        positionMillis: Long = 0,
+    ) {
         if (!id.isOpaqueCaptureId()) return
         activity.lifecycleScope.launch {
             val item = withContext(Dispatchers.IO) { galleryRepository.byId(id) }
@@ -522,24 +557,36 @@ class ProductionUiDependencies(
     }
 
     override fun shareCurrentMedia() {
-        state.value.player?.item?.id?.let { share(setOf(it)) }
+        state.value.player
+            ?.item
+            ?.id
+            ?.let { share(setOf(it)) }
     }
 
     override fun trashCurrentMedia() {
-        val id = state.value.player?.item?.id ?: return
+        val id =
+            state.value.player
+                ?.item
+                ?.id ?: return
         overlay.value = overlay.value.copy(selected = setOf(id))
         closePlayer()
         trashSelectedMedia()
     }
 
     override fun exportCurrentMedia(forceCopy: Boolean) {
-        val id = state.value.player?.item?.id ?: return
+        val id =
+            state.value.player
+                ?.item
+                ?.id ?: return
         overlay.value = overlay.value.copy(selected = setOf(id))
         exportSelectedMedia(forceCopy)
     }
 
     override fun openCurrentMediaExternally() {
-        val id = state.value.player?.item?.id ?: return
+        val id =
+            state.value.player
+                ?.item
+                ?.id ?: return
         activity.lifecycleScope.launch {
             val uri = withContext(Dispatchers.IO) { galleryRepository.externalOpenUri(id) }
             if (uri == null) {
@@ -560,7 +607,10 @@ class ProductionUiDependencies(
         overlay.value = overlay.value.copy(operation = null)
     }
 
-    private fun openPlayerItem(item: MediaItemUi, position: Long) {
+    private fun openPlayerItem(
+        item: MediaItemUi,
+        position: Long,
+    ) {
         activity.lifecycleScope.launch {
             val domain = withContext(Dispatchers.IO) { galleryRepository.byId(item.id) }
             if (domain == null) {
@@ -568,20 +618,24 @@ class ProductionUiDependencies(
                 refreshGallery()
                 return@launch
             }
-            val controller = playerController ?: PlayerController(
-                activity,
-                graph.database,
-                captureStates,
-                activity.lifecycleScope,
-            ).also { created ->
-                playerController = created
-                launch { created.state.collectLatest { playerSnapshot.value = it } }
-            }
+            val controller =
+                playerController ?: PlayerController(
+                    activity,
+                    graph.database,
+                    captureStates,
+                    activity.lifecycleScope,
+                ).also { created ->
+                    playerController = created
+                    launch { created.state.collectLatest { playerSnapshot.value = it } }
+                }
             controller.open(domain, position)
         }
     }
 
-    private fun runBatch(name: String, operation: suspend () -> BatchOperationResult) {
+    private fun runBatch(
+        name: String,
+        operation: suspend () -> BatchOperationResult,
+    ) {
         val ids = overlay.value.selected
         if (ids.isEmpty()) return
         publishOperation(UiOperationEvent.Started(name, ids.size), dismiss = false)
@@ -591,20 +645,27 @@ class ProductionUiDependencies(
         }
     }
 
-    private fun handleBatchResult(name: String, result: BatchOperationResult) {
+    private fun handleBatchResult(
+        name: String,
+        result: BatchOperationResult,
+    ) {
         result.succeededIds.forEach { id ->
-            overlay.value.gallery.firstOrNull { it.id == id }?.let { ThumbnailMemoryCache.remove(it.contentUri) }
+            overlay.value.gallery
+                .firstOrNull { it.id == id }
+                ?.let { ThumbnailMemoryCache.remove(it.contentUri) }
         }
         overlay.value = overlay.value.copy(selected = result.failedIds)
-        val event = when {
-            result.failedIds.isEmpty() -> UiOperationEvent.Succeeded(operationSuccessMessage(name))
-            result.succeededIds.isNotEmpty() -> UiOperationEvent.PartiallyFailed(
-                R.string.operation_partially_failed,
-                result.succeededIds.size,
-                result.failedIds.size,
-            )
-            else -> UiOperationEvent.Failed(operationFailureMessage(name))
-        }
+        val event =
+            when {
+                result.failedIds.isEmpty() -> UiOperationEvent.Succeeded(operationSuccessMessage(name))
+                result.succeededIds.isNotEmpty() ->
+                    UiOperationEvent.PartiallyFailed(
+                        R.string.operation_partially_failed,
+                        result.succeededIds.size,
+                        result.failedIds.size,
+                    )
+                else -> UiOperationEvent.Failed(operationFailureMessage(name))
+            }
         publishOperation(event)
         refreshGallery()
     }
@@ -617,17 +678,19 @@ class ProductionUiDependencies(
                 publishOperation(UiOperationEvent.Failed(R.string.gallery_share_failed))
                 return@launch
             }
-            val shareIntent = if (uris.size == 1) {
-                Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.first())
-            } else {
-                Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-            }.apply {
-                type = VIDEO_MIME_TYPE
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                clipData = ClipData.newUri(activity.contentResolver, activity.getString(R.string.gallery), uris.first()).also { clip ->
-                    uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+            val shareIntent =
+                if (uris.size == 1) {
+                    Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.first())
+                } else {
+                    Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                }.apply {
+                    type = VIDEO_MIME_TYPE
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    clipData =
+                        ClipData.newUri(activity.contentResolver, activity.getString(R.string.gallery), uris.first()).also { clip ->
+                            uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+                        }
                 }
-            }
             runCatching { activity.startActivity(Intent.createChooser(shareIntent, activity.getString(R.string.share))) }
                 .onFailure { publishOperation(UiOperationEvent.Failed(R.string.gallery_share_failed)) }
         }
@@ -637,26 +700,32 @@ class ProductionUiDependencies(
         overlay.value = overlay.value.copy(storageSummary = overlay.value.storageSummary.copy(loading = true))
         activity.lifecycleScope.launch {
             val summary = withContext(Dispatchers.IO) { galleryRepository.storageSummary() }
-            overlay.value = overlay.value.copy(
-                storageSummary = StorageSummaryUi(
-                    loading = false,
-                    deviceGalleryCount = summary.deviceGalleryCount,
-                    vaultCount = summary.vaultCount,
-                    vaultBytes = summary.vaultBytes,
-                    trashBytes = summary.trashBytes,
-                ),
-            )
+            overlay.value =
+                overlay.value.copy(
+                    storageSummary =
+                        StorageSummaryUi(
+                            loading = false,
+                            deviceGalleryCount = summary.deviceGalleryCount,
+                            vaultCount = summary.vaultCount,
+                            vaultBytes = summary.vaultBytes,
+                            trashBytes = summary.trashBytes,
+                        ),
+                )
         }
     }
 
-    private fun publishOperation(event: UiOperationEvent, dismiss: Boolean = true) {
+    private fun publishOperation(
+        event: UiOperationEvent,
+        dismiss: Boolean = true,
+    ) {
         operationDismissJob?.cancel()
         overlay.value = overlay.value.copy(operation = event)
         if (dismiss) {
-            operationDismissJob = activity.lifecycleScope.launch {
-                delay(OPERATION_MESSAGE_MILLIS)
-                overlay.value = overlay.value.copy(operation = null)
-            }
+            operationDismissJob =
+                activity.lifecycleScope.launch {
+                    delay(OPERATION_MESSAGE_MILLIS)
+                    overlay.value = overlay.value.copy(operation = null)
+                }
         }
     }
 
@@ -669,19 +738,24 @@ class ProductionUiDependencies(
             cameraGranted = granted(Manifest.permission.CAMERA),
             microphoneGranted = granted(Manifest.permission.RECORD_AUDIO),
             notificationsGranted = Build.VERSION.SDK_INT < 33 || granted(Manifest.permission.POST_NOTIFICATIONS),
-            cameraPermanentlyDenied = permissionPermanentlyDenied(
-                Manifest.permission.CAMERA,
-                cameraRequestedThisSession,
-            ),
-            microphonePermanentlyDenied = permissionPermanentlyDenied(
-                Manifest.permission.RECORD_AUDIO,
-                microphoneRequestedThisSession,
-            ),
+            cameraPermanentlyDenied =
+                permissionPermanentlyDenied(
+                    Manifest.permission.CAMERA,
+                    cameraRequestedThisSession,
+                ),
+            microphonePermanentlyDenied =
+                permissionPermanentlyDenied(
+                    Manifest.permission.RECORD_AUDIO,
+                    microphoneRequestedThisSession,
+                ),
             powerSaver = activity.getSystemService(PowerManager::class.java).isPowerSaveMode,
         )
     }
 
-    private fun permissionPermanentlyDenied(permission: String, requestedThisSession: Boolean): Boolean {
+    private fun permissionPermanentlyDenied(
+        permission: String,
+        requestedThisSession: Boolean,
+    ): Boolean {
         if (granted(permission)) return false
         return requestedThisSession && !activity.shouldShowRequestPermissionRationale(permission)
     }
@@ -693,123 +767,139 @@ class ProductionUiDependencies(
     private fun granted(permission: String): Boolean =
         ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun UiOverlay.query(): GalleryQuery = GalleryQuery(
-        sort = when (sort) {
-            GallerySortUi.NEWEST -> GallerySort.NEWEST_FIRST
-            GallerySortUi.OLDEST -> GallerySort.OLDEST_FIRST
-            GallerySortUi.LONGEST -> GallerySort.LONGEST_FIRST
-            GallerySortUi.LARGEST -> GallerySort.LARGEST_FIRST
-        },
-        destination = when (filter) {
-            GalleryFilter.DEVICE_GALLERY -> StorageDestination.DEVICE_GALLERY
-            GalleryFilter.CHALNA_VAULT -> StorageDestination.CHALNA_VAULT
-            else -> null
-        },
-        scope = when (filter) {
-            GalleryFilter.FAVORITES -> GalleryScope.FAVORITES
-            GalleryFilter.TRASH -> GalleryScope.TRASH
-            else -> GalleryScope.ACTIVE
-        },
-    )
+    private fun UiOverlay.query(): GalleryQuery =
+        GalleryQuery(
+            sort =
+                when (sort) {
+                    GallerySortUi.NEWEST -> GallerySort.NEWEST_FIRST
+                    GallerySortUi.OLDEST -> GallerySort.OLDEST_FIRST
+                    GallerySortUi.LONGEST -> GallerySort.LONGEST_FIRST
+                    GallerySortUi.LARGEST -> GallerySort.LARGEST_FIRST
+                },
+            destination =
+                when (filter) {
+                    GalleryFilter.DEVICE_GALLERY -> StorageDestination.DEVICE_GALLERY
+                    GalleryFilter.CHALNA_VAULT -> StorageDestination.CHALNA_VAULT
+                    else -> null
+                },
+            scope =
+                when (filter) {
+                    GalleryFilter.FAVORITES -> GalleryScope.FAVORITES
+                    GalleryFilter.TRASH -> GalleryScope.TRASH
+                    else -> GalleryScope.ACTIVE
+                },
+        )
 
-    private fun CaptureItem.toUi(): MediaItemUi = MediaItemUi(
-        id = id,
-        displayName = displayName.ifBlank { activity.getString(R.string.untitled_video) },
-        contentUri = contentUri,
-        mimeType = mimeType,
-        destination = storageDestination.toUi(),
-        capturedAtMillis = createdAtMillis,
-        durationMillis = durationMillis,
-        sizeBytes = sizeBytes ?: 0,
-        hasAudio = audioIncluded.takeIf { audioKnown },
-        width = width ?: 0,
-        height = height ?: 0,
-        rotationDegrees = rotationDegrees ?: 0,
-        codec = codec,
-        frameRate = frameRate,
-        favorite = favorite,
-        trashed = state == CaptureRecordState.TRASHED,
-    )
+    private fun CaptureItem.toUi(): MediaItemUi =
+        MediaItemUi(
+            id = id,
+            displayName = displayName.ifBlank { activity.getString(R.string.untitled_video) },
+            contentUri = contentUri,
+            mimeType = mimeType,
+            destination = storageDestination.toUi(),
+            capturedAtMillis = createdAtMillis,
+            durationMillis = durationMillis,
+            sizeBytes = sizeBytes ?: 0,
+            hasAudio = audioIncluded.takeIf { audioKnown },
+            width = width ?: 0,
+            height = height ?: 0,
+            rotationDegrees = rotationDegrees ?: 0,
+            codec = codec,
+            frameRate = frameRate,
+            favorite = favorite,
+            trashed = state == CaptureRecordState.TRASHED,
+        )
 
-    private fun PlayerSnapshot.toUi(): PlayerUiState = PlayerUiState(
-        item = item.toUi(),
-        phase = phase,
-        positionMillis = positionMillis,
-        durationMillis = durationMillis,
-        bufferedMillis = bufferedMillis,
-        playing = playing,
-        muted = muted,
-        playbackSpeed = speed,
-        recordingConflict = recordingConflict,
-        keepScreenOn = playing,
-    )
+    private fun PlayerSnapshot.toUi(): PlayerUiState =
+        PlayerUiState(
+            item = item.toUi(),
+            phase = phase,
+            positionMillis = positionMillis,
+            durationMillis = durationMillis,
+            bufferedMillis = bufferedMillis,
+            playing = playing,
+            muted = muted,
+            playbackSpeed = speed,
+            recordingConflict = recordingConflict,
+            keepScreenOn = playing,
+        )
 
-    private fun CaptureQuality.toUi(): VideoQuality = when (this) {
-        CaptureQuality.FHD -> VideoQuality.FHD
-        CaptureQuality.HD, CaptureQuality.SD -> VideoQuality.HD
-        CaptureQuality.AUTO, CaptureQuality.UNKNOWN -> VideoQuality.AUTO
-    }
+    private fun CaptureQuality.toUi(): VideoQuality =
+        when (this) {
+            CaptureQuality.FHD -> VideoQuality.FHD
+            CaptureQuality.HD, CaptureQuality.SD -> VideoQuality.HD
+            CaptureQuality.AUTO, CaptureQuality.UNKNOWN -> VideoQuality.AUTO
+        }
 
-    private fun VideoQuality.toDomain(): CaptureQuality = when (this) {
-        VideoQuality.AUTO -> CaptureQuality.AUTO
-        VideoQuality.FHD -> CaptureQuality.FHD
-        VideoQuality.HD -> CaptureQuality.HD
-    }
+    private fun VideoQuality.toDomain(): CaptureQuality =
+        when (this) {
+            VideoQuality.AUTO -> CaptureQuality.AUTO
+            VideoQuality.FHD -> CaptureQuality.FHD
+            VideoQuality.HD -> CaptureQuality.HD
+        }
 
-    private fun ThemePreference.toUi(): AppearanceMode = when (this) {
-        ThemePreference.SYSTEM -> AppearanceMode.SYSTEM
-        ThemePreference.NIGHT -> AppearanceMode.NIGHT
-        ThemePreference.MIST -> AppearanceMode.MIST
-    }
+    private fun ThemePreference.toUi(): AppearanceMode =
+        when (this) {
+            ThemePreference.SYSTEM -> AppearanceMode.SYSTEM
+            ThemePreference.NIGHT -> AppearanceMode.NIGHT
+            ThemePreference.MIST -> AppearanceMode.MIST
+        }
 
-    private fun AppearanceMode.toDomain(): ThemePreference = when (this) {
-        AppearanceMode.SYSTEM -> ThemePreference.SYSTEM
-        AppearanceMode.NIGHT -> ThemePreference.NIGHT
-        AppearanceMode.MIST -> ThemePreference.MIST
-    }
+    private fun AppearanceMode.toDomain(): ThemePreference =
+        when (this) {
+            AppearanceMode.SYSTEM -> ThemePreference.SYSTEM
+            AppearanceMode.NIGHT -> ThemePreference.NIGHT
+            AppearanceMode.MIST -> ThemePreference.MIST
+        }
 
-    private fun MotionPreference.toUi(): MotionMode = when (this) {
-        MotionPreference.SYSTEM -> MotionMode.SYSTEM
-        MotionPreference.FULL -> MotionMode.FULL
-        MotionPreference.REDUCED -> MotionMode.REDUCED
-    }
+    private fun MotionPreference.toUi(): MotionMode =
+        when (this) {
+            MotionPreference.SYSTEM -> MotionMode.SYSTEM
+            MotionPreference.FULL -> MotionMode.FULL
+            MotionPreference.REDUCED -> MotionMode.REDUCED
+        }
 
-    private fun MotionMode.toDomain(): MotionPreference = when (this) {
-        MotionMode.SYSTEM -> MotionPreference.SYSTEM
-        MotionMode.FULL -> MotionPreference.FULL
-        MotionMode.REDUCED -> MotionPreference.REDUCED
-    }
+    private fun MotionMode.toDomain(): MotionPreference =
+        when (this) {
+            MotionMode.SYSTEM -> MotionPreference.SYSTEM
+            MotionMode.FULL -> MotionPreference.FULL
+            MotionMode.REDUCED -> MotionPreference.REDUCED
+        }
 
-    private fun StorageDestination.toUi(): StorageDestinationUi = when (this) {
-        StorageDestination.DEVICE_GALLERY -> StorageDestinationUi.DEVICE_GALLERY
-        StorageDestination.CHALNA_VAULT -> StorageDestinationUi.CHALNA_VAULT
-    }
+    private fun StorageDestination.toUi(): StorageDestinationUi =
+        when (this) {
+            StorageDestination.DEVICE_GALLERY -> StorageDestinationUi.DEVICE_GALLERY
+            StorageDestination.CHALNA_VAULT -> StorageDestinationUi.CHALNA_VAULT
+        }
 
-    private fun StorageDestinationUi.toDomain(): StorageDestination = when (this) {
-        StorageDestinationUi.DEVICE_GALLERY -> StorageDestination.DEVICE_GALLERY
-        StorageDestinationUi.CHALNA_VAULT -> StorageDestination.CHALNA_VAULT
-    }
+    private fun StorageDestinationUi.toDomain(): StorageDestination =
+        when (this) {
+            StorageDestinationUi.DEVICE_GALLERY -> StorageDestination.DEVICE_GALLERY
+            StorageDestinationUi.CHALNA_VAULT -> StorageDestination.CHALNA_VAULT
+        }
 
     private fun String.isOpaqueCaptureId(): Boolean = matches(Regex("[0-9a-fA-F-]{32,36}"))
 
     private fun Long.toLocalDay() = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
 
-    private fun operationSuccessMessage(name: String): Int = when (name) {
-        "trash" -> R.string.gallery_trash_succeeded
-        "restore" -> R.string.gallery_restore_succeeded
-        "delete" -> R.string.gallery_delete_succeeded
-        "favorite" -> R.string.gallery_favorite_succeeded
-        "export" -> R.string.gallery_export_succeeded
-        else -> R.string.operation_succeeded
-    }
+    private fun operationSuccessMessage(name: String): Int =
+        when (name) {
+            "trash" -> R.string.gallery_trash_succeeded
+            "restore" -> R.string.gallery_restore_succeeded
+            "delete" -> R.string.gallery_delete_succeeded
+            "favorite" -> R.string.gallery_favorite_succeeded
+            "export" -> R.string.gallery_export_succeeded
+            else -> R.string.operation_succeeded
+        }
 
-    private fun operationFailureMessage(name: String): Int = when (name) {
-        "trash", "delete" -> R.string.gallery_delete_failed
-        "restore" -> R.string.gallery_restore_failed
-        "favorite" -> R.string.gallery_favorite_failed
-        "export" -> R.string.gallery_export_failed
-        else -> R.string.operation_failed
-    }
+    private fun operationFailureMessage(name: String): Int =
+        when (name) {
+            "trash", "delete" -> R.string.gallery_delete_failed
+            "restore" -> R.string.gallery_restore_failed
+            "favorite" -> R.string.gallery_favorite_failed
+            "export" -> R.string.gallery_export_failed
+            else -> R.string.operation_failed
+        }
 
     private companion object {
         const val VIDEO_MIME_TYPE = "video/mp4"

@@ -4,11 +4,11 @@ import android.os.SystemClock
 import app.chalna.capture.domain.CaptureCommandResult
 import app.chalna.capture.domain.CaptureState
 import app.chalna.capture.domain.MonotonicClock
-import java.util.LinkedHashMap
-import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.LinkedHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 class AndroidMonotonicClock : MonotonicClock {
     override fun nowNanos(): Long = SystemClock.elapsedRealtimeNanos()
@@ -32,7 +32,10 @@ class CaptureStateRepository(
     }
 
     @Synchronized
-    fun reserve(invocationId: String, result: CaptureCommandResult): CaptureCommandResult {
+    fun reserve(
+        invocationId: String,
+        result: CaptureCommandResult,
+    ): CaptureCommandResult {
         receipts[invocationId]?.let { return CaptureCommandResult.Duplicate(invocationId, it) }
         receipts[invocationId] = result
         trimReceipts()
@@ -40,7 +43,10 @@ class CaptureStateRepository(
     }
 
     @Synchronized
-    fun updateReceipt(invocationId: String, result: CaptureCommandResult) {
+    fun updateReceipt(
+        invocationId: String,
+        result: CaptureCommandResult,
+    ) {
         receipts[invocationId] = result
         trimReceipts()
     }

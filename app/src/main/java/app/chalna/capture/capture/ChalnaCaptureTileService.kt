@@ -1,17 +1,16 @@
 package app.chalna.capture.capture
 
+import android.app.StatusBarManager
 import android.content.ComponentName
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import android.app.StatusBarManager
 import app.chalna.capture.ChalnaApplication
 import app.chalna.capture.R
 import app.chalna.capture.domain.CaptureCommand
 import app.chalna.capture.domain.CaptureState
 import app.chalna.capture.domain.CaptureTrigger
-import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 class ChalnaCaptureTileService : TileService() {
     private var listeningJob: Job? = null
@@ -67,7 +67,8 @@ class ChalnaCaptureTileService : TileService() {
             is CaptureState.OpeningCamera, is CaptureState.StartingRecorder,
             is CaptureState.CancelRequested, is CaptureState.StopRequested,
             is CaptureState.StoppingRecorder, is CaptureState.Finalizing,
-            is CaptureState.Persisting, is CaptureState.Recovering -> {
+            is CaptureState.Persisting, is CaptureState.Recovering,
+            -> {
                 tile.state = Tile.STATE_UNAVAILABLE
                 tile.label = getString(R.string.quick_tile_busy)
             }
@@ -83,7 +84,10 @@ class ChalnaCaptureTileService : TileService() {
     companion object {
         private const val UNSUPPORTED_RESULT = -1
 
-        fun requestAdd(context: android.content.Context, callback: (Int) -> Unit) {
+        fun requestAdd(
+            context: android.content.Context,
+            callback: (Int) -> Unit,
+        ) {
             if (Build.VERSION.SDK_INT < 33) {
                 callback(UNSUPPORTED_RESULT)
                 return

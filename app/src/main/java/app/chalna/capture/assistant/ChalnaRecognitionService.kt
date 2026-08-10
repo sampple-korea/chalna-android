@@ -9,7 +9,10 @@ import android.speech.SpeechRecognizer
  * Chalna never performs speech recognition, so every request is rejected without opening audio.
  */
 class ChalnaRecognitionService : RecognitionService() {
-    override fun onStartListening(recognizerIntent: Intent, listener: Callback) {
+    override fun onStartListening(
+        recognizerIntent: Intent,
+        listener: Callback,
+    ) {
         listener.error(SpeechRecognizer.ERROR_CLIENT)
     }
 

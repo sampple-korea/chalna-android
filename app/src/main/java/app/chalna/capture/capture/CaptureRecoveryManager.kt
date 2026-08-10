@@ -13,10 +13,22 @@ import kotlinx.coroutines.CancellationException
 
 sealed interface CaptureRecoveryResult {
     data object NothingToRecover : CaptureRecoveryResult
-    data class Salvaged(val item: CaptureItem) : CaptureRecoveryResult
-    data class Deferred(val captureId: String) : CaptureRecoveryResult
-    data class RemovedCorrupt(val captureId: String) : CaptureRecoveryResult
-    data class Failed(val captureId: String) : CaptureRecoveryResult
+
+    data class Salvaged(
+        val item: CaptureItem,
+    ) : CaptureRecoveryResult
+
+    data class Deferred(
+        val captureId: String,
+    ) : CaptureRecoveryResult
+
+    data class RemovedCorrupt(
+        val captureId: String,
+    ) : CaptureRecoveryResult
+
+    data class Failed(
+        val captureId: String,
+    ) : CaptureRecoveryResult
 }
 
 class CaptureRecoveryManager(
@@ -28,35 +40,38 @@ class CaptureRecoveryManager(
 ) {
     suspend fun recover(): CaptureRecoveryResult {
         val attempt = attempts.read() ?: return CaptureRecoveryResult.NothingToRecover
-        val candidate = CaptureItem(
-            id = attempt.captureId,
-            storageDestination = attempt.destination,
-            contentUri = attempt.contentUri,
-            privateRef = attempt.privateRef,
-            displayName = attempt.displayName,
-            createdAtMillis = attempt.startedAtEpochMillis,
-            durationMillis = 0,
-            quality = attempt.requestedQuality,
-            audioIncluded = attempt.requestedAudio,
-            audioKnown = false,
-            metadataKnown = false,
-            state = CaptureRecordState.METADATA_PENDING,
-        )
-        val validated = try {
-            media.validate(candidate)
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Exception) {
-            null
-        }
+        val candidate =
+            CaptureItem(
+                id = attempt.captureId,
+                storageDestination = attempt.destination,
+                contentUri = attempt.contentUri,
+                privateRef = attempt.privateRef,
+                displayName = attempt.displayName,
+                createdAtMillis = attempt.startedAtEpochMillis,
+                durationMillis = 0,
+                quality = attempt.requestedQuality,
+                audioIncluded = attempt.requestedAudio,
+                audioKnown = false,
+                metadataKnown = false,
+                state = CaptureRecordState.METADATA_PENDING,
+            )
+        val validated =
+            try {
+                media.validate(candidate)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                null
+            }
         if (validated != null) {
             if (attempt.destination == StorageDestination.DEVICE_GALLERY && !publishPending(attempt.contentUri)) {
                 return CaptureRecoveryResult.Failed(attempt.captureId)
             }
             return try {
-                val indexed = gallery.recordFinalized(
-                    validated.copy(state = CaptureRecordState.READY).toLastCapture(),
-                )
+                val indexed =
+                    gallery.recordFinalized(
+                        validated.copy(state = CaptureRecordState.READY).toLastCapture(),
+                    )
                 attempts.clear()
                 CaptureRecoveryResult.Salvaged(indexed)
             } catch (cancellation: CancellationException) {

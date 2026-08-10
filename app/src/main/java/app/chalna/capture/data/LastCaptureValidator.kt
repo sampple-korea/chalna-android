@@ -2,10 +2,12 @@ package app.chalna.capture.data
 
 import android.content.ContentResolver
 import android.provider.OpenableColumns
-import app.chalna.capture.domain.LastCapture
 import androidx.core.net.toUri
+import app.chalna.capture.domain.LastCapture
 
-class LastCaptureValidator(private val resolver: ContentResolver) {
+class LastCaptureValidator(
+    private val resolver: ContentResolver,
+) {
     fun exists(capture: LastCapture?): Boolean {
         if (capture == null || !capture.isUsable()) return false
         val uri = runCatching { capture.uri.toUri() }.getOrNull() ?: return false

@@ -29,10 +29,11 @@ class GalleryRepositoryTest {
     }
 
     @Test fun partialBatchResultNeverLosesSuccessfulIdentities() {
-        val result = BatchOperationResult(
-            succeededIds = setOf("11111111-1111-1111-1111-111111111111"),
-            failedIds = setOf("22222222-2222-2222-2222-222222222222"),
-        )
+        val result =
+            BatchOperationResult(
+                succeededIds = setOf("11111111-1111-1111-1111-111111111111"),
+                failedIds = setOf("22222222-2222-2222-2222-222222222222"),
+            )
         assertTrue(result.succeededIds.intersect(result.failedIds).isEmpty())
         assertEquals(1, result.succeededIds.size)
         assertEquals(1, result.failedIds.size)

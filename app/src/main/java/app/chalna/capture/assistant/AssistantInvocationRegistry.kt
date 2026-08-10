@@ -16,7 +16,10 @@ object AssistantInvocationRegistry {
     private val entries = LinkedHashMap<String, AssistantInvocation>()
 
     @Synchronized
-    fun put(sessionKey: String, invocation: AssistantInvocation) {
+    fun put(
+        sessionKey: String,
+        invocation: AssistantInvocation,
+    ) {
         entries[sessionKey] = invocation
         while (entries.size > MAX_ENTRIES) entries.remove(entries.keys.first())
     }
@@ -29,12 +32,15 @@ object AssistantInvocationRegistry {
         entries.remove(sessionKey)
     }
 
-    fun sessionKey(args: Bundle?): String? = when {
-        Build.VERSION.SDK_INT >= 34 -> args?.getString(VoiceInteractionSession.KEY_SHOW_SESSION_ID)
-        else -> args?.getLong(EXTRA_INVOCATION_TIME, Long.MIN_VALUE)
-            ?.takeIf { it != Long.MIN_VALUE }
-            ?.let { "time-$it" }
-    }
+    fun sessionKey(args: Bundle?): String? =
+        when {
+            Build.VERSION.SDK_INT >= 34 -> args?.getString(VoiceInteractionSession.KEY_SHOW_SESSION_ID)
+            else ->
+                args
+                    ?.getLong(EXTRA_INVOCATION_TIME, Long.MIN_VALUE)
+                    ?.takeIf { it != Long.MIN_VALUE }
+                    ?.let { "time-$it" }
+        }
 
     fun invocationId(args: Bundle?): String {
         val key = sessionKey(args)

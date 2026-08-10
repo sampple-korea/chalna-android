@@ -71,8 +71,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -85,16 +85,19 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import app.chalna.capture.BuildConfig
 import app.chalna.capture.R
 import app.chalna.capture.domain.CaptureFailureCode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Date
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 
 @Composable
-internal fun SetupScreen(state: ChalnaUiState, dependencies: UiDependencies) = ScreenColumn {
+internal fun SetupScreen(
+    state: ChalnaUiState,
+    dependencies: UiDependencies,
+) = ScreenColumn {
     Row(verticalAlignment = Alignment.CenterVertically) {
         ChalnaIconCanvas(ChalnaIcon.MARK, Modifier.size(34.dp), ChalnaTheme.colors.accent)
         Spacer(Modifier.width(10.dp))
@@ -110,7 +113,14 @@ internal fun SetupScreen(state: ChalnaUiState, dependencies: UiDependencies) = S
         detail = stringResource(R.string.camera_setup_detail),
         icon = ChalnaIcon.CAMERA,
         complete = state.cameraGranted,
-        action = if (state.cameraGranted) null else if (state.cameraPermanentlyDenied) dependencies::openAppSettings else dependencies::requestCamera,
+        action =
+            if (state.cameraGranted) {
+                null
+            } else if (state.cameraPermanentlyDenied) {
+                dependencies::openAppSettings
+            } else {
+                dependencies::requestCamera
+            },
     )
     Hairline()
     SetupRow(
@@ -118,12 +128,13 @@ internal fun SetupScreen(state: ChalnaUiState, dependencies: UiDependencies) = S
         detail = stringResource(if (state.sound) R.string.audio_setup_on else R.string.audio_setup_off),
         icon = ChalnaIcon.MIC,
         complete = !state.sound || state.microphoneGranted,
-        action = when {
-            !state.sound -> ({ dependencies.setSound(true) })
-            state.microphoneGranted -> ({ dependencies.setSound(false) })
-            state.microphonePermanentlyDenied -> dependencies::openAppSettings
-            else -> dependencies::requestMicrophone
-        },
+        action =
+            when {
+                !state.sound -> ({ dependencies.setSound(true) })
+                state.microphoneGranted -> ({ dependencies.setSound(false) })
+                state.microphonePermanentlyDenied -> dependencies::openAppSettings
+                else -> dependencies::requestMicrophone
+            },
     )
     Hairline()
     SetupRow(
@@ -157,7 +168,9 @@ private fun SetupRow(
     action: (() -> Unit)?,
 ) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 76.dp)
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 76.dp)
             .then(if (action == null) Modifier else Modifier.clickableNoRipple(Role.Button, onClick = action))
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -168,13 +181,20 @@ private fun SetupRow(
             ChalnaText(title, 16, weight = FontWeight.SemiBold)
             ChalnaText(detail, 13, ChalnaTheme.colors.muted)
         }
-        if (optional && !complete) ChalnaText(stringResource(R.string.optional), 12, ChalnaTheme.colors.muted)
-        else StatusPill(complete)
+        if (optional && !complete) {
+            ChalnaText(stringResource(R.string.optional), 12, ChalnaTheme.colors.muted)
+        } else {
+            StatusPill(complete)
+        }
     }
 }
 
 @Composable
-internal fun HomeScreen(state: ChalnaUiState, dependencies: UiDependencies, navigate: (ChalnaRoute) -> Unit) = ScreenColumn {
+internal fun HomeScreen(
+    state: ChalnaUiState,
+    dependencies: UiDependencies,
+    navigate: (ChalnaRoute) -> Unit,
+) = ScreenColumn {
     val elapsedSeconds by produceState(
         initialValue = state.durationSeconds,
         key1 = state.phase,
@@ -182,8 +202,10 @@ internal fun HomeScreen(state: ChalnaUiState, dependencies: UiDependencies, navi
     ) {
         if (state.phase == CapturePhase.RECORDING && state.recordingStartedElapsedNanos > 0) {
             while (true) {
-                value = ((SystemClock.elapsedRealtimeNanos() - state.recordingStartedElapsedNanos)
-                    .coerceAtLeast(0) / 1_000_000_000L)
+                value = (
+                    (SystemClock.elapsedRealtimeNanos() - state.recordingStartedElapsedNanos)
+                        .coerceAtLeast(0) / 1_000_000_000L
+                )
                 kotlinx.coroutines.delay(1_000L)
             }
         }
@@ -237,23 +259,27 @@ internal fun HomeScreen(state: ChalnaUiState, dependencies: UiDependencies, navi
         CapturePhase.RECORDING -> PrimaryButton(stringResource(R.string.stop_capture), onClick = dependencies::toggleCapture)
         CapturePhase.SETUP_REQUIRED -> PrimaryButton(stringResource(R.string.review_setup), onClick = dependencies::reviewSetup)
         CapturePhase.ERROR -> PrimaryButton(stringResource(R.string.retry), onClick = dependencies::toggleCapture)
-        CapturePhase.READY -> ChalnaText(
-            stringResource(R.string.home_trigger_hint),
-            Modifier.fillMaxWidth(),
-            15,
-            ChalnaTheme.colors.muted,
-            align = TextAlign.Center,
-        )
+        CapturePhase.READY ->
+            ChalnaText(
+                stringResource(R.string.home_trigger_hint),
+                Modifier.fillMaxWidth(),
+                15,
+                ChalnaTheme.colors.muted,
+                align = TextAlign.Center,
+            )
         else -> Unit
     }
     state.lastCapture?.let { latest ->
         Spacer(Modifier.height(30.dp))
         SectionTitle(stringResource(R.string.latest_capture))
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 94.dp).clickableNoRipple(Role.Button) {
-                dependencies.openPlayer(latest.id)
-                navigate(ChalnaRoute.PLAYER)
-            }.padding(vertical = 8.dp),
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 94.dp)
+                .clickableNoRipple(Role.Button) {
+                    dependencies.openPlayer(latest.id)
+                    navigate(ChalnaRoute.PLAYER)
+                }.padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MediaThumbnail(latest, dependencies, Modifier.size(88.dp).clip(RoundedCornerShape(13.dp)))
@@ -283,11 +309,26 @@ internal fun SettingsScreen(
         ChalnaIcon.GALLERY,
         expanded == "storage",
     ) { expanded = if (expanded == "storage") null else "storage" }
-    if (expanded == "storage") SelectionList(
-        StorageDestinationUi.entries.map { it to destinationLabel(it) },
-        state.storageDestination,
-    ) { dependencies.setStorageDestination(it); expanded = null }
-    Body(stringResource(if (state.storageDestination == StorageDestinationUi.CHALNA_VAULT) R.string.vault_storage_detail else R.string.device_gallery_storage_detail))
+    if (expanded == "storage") {
+        SelectionList(
+            StorageDestinationUi.entries.map { it to destinationLabel(it) },
+            state.storageDestination,
+        ) {
+            dependencies.setStorageDestination(it)
+            expanded = null
+        }
+    }
+    Body(
+        stringResource(
+            if (state.storageDestination ==
+                StorageDestinationUi.CHALNA_VAULT
+            ) {
+                R.string.vault_storage_detail
+            } else {
+                R.string.device_gallery_storage_detail
+            },
+        ),
+    )
     ChalnaText(stringResource(R.string.existing_videos_not_moved), 12, ChalnaTheme.colors.muted)
     ToggleRow(stringResource(R.string.include_audio), state.sound, dependencies::setSound)
     SelectionSettingRow(
@@ -296,8 +337,11 @@ internal fun SettingsScreen(
         ChalnaIcon.QUALITY,
         expanded == "quality",
     ) { expanded = if (expanded == "quality") null else "quality" }
-    if (expanded == "quality") SelectionList(VideoQuality.entries.map { it to qualityLabel(it) }, state.quality) {
-        dependencies.setQuality(it); expanded = null
+    if (expanded == "quality") {
+        SelectionList(VideoQuality.entries.map { it to qualityLabel(it) }, state.quality) {
+            dependencies.setQuality(it)
+            expanded = null
+        }
     }
     SelectionSettingRow(
         stringResource(R.string.auto_stop),
@@ -305,8 +349,11 @@ internal fun SettingsScreen(
         ChalnaIcon.TIMER,
         expanded == "auto",
     ) { expanded = if (expanded == "auto") null else "auto" }
-    if (expanded == "auto") SelectionList(listOf(0, 15, 30, 60).map { it to autoStopLabel(it) }, state.autoStopSeconds) {
-        dependencies.setAutoStop(it); expanded = null
+    if (expanded == "auto") {
+        SelectionList(listOf(0, 15, 30, 60).map { it to autoStopLabel(it) }, state.autoStopSeconds) {
+            dependencies.setAutoStop(it)
+            expanded = null
+        }
     }
     StorageSummary(state, dependencies)
     Hairline()
@@ -314,15 +361,21 @@ internal fun SettingsScreen(
     SelectionSettingRow(stringResource(R.string.theme), appearanceLabel(state.appearance), ChalnaIcon.THEME, expanded == "theme") {
         expanded = if (expanded == "theme") null else "theme"
     }
-    if (expanded == "theme") SelectionList(AppearanceMode.entries.map { it to appearanceLabel(it) }, state.appearance) {
-        dependencies.setAppearance(it); expanded = null
+    if (expanded == "theme") {
+        SelectionList(AppearanceMode.entries.map { it to appearanceLabel(it) }, state.appearance) {
+            dependencies.setAppearance(it)
+            expanded = null
+        }
     }
     ToggleRow(stringResource(R.string.haptics), state.haptics, dependencies::setHaptics)
     SelectionSettingRow(stringResource(R.string.motion_effects), motionLabel(state.motion), ChalnaIcon.MOTION, expanded == "motion") {
         expanded = if (expanded == "motion") null else "motion"
     }
-    if (expanded == "motion") SelectionList(MotionMode.entries.map { it to motionLabel(it) }, state.motion) {
-        dependencies.setMotion(it); expanded = null
+    if (expanded == "motion") {
+        SelectionList(MotionMode.entries.map { it to motionLabel(it) }, state.motion) {
+            dependencies.setMotion(it)
+            expanded = null
+        }
     }
     Hairline()
     SectionTitle(stringResource(R.string.access_setup))
@@ -341,7 +394,15 @@ internal fun SettingsScreen(
     ) { if (state.cameraPermanentlyDenied) dependencies.openAppSettings() else dependencies.requestCamera() }
     SettingRow(
         stringResource(R.string.microphone),
-        stringResource(if (!state.sound) R.string.audio_off else if (state.microphoneGranted) R.string.allowed else R.string.action_needed),
+        stringResource(
+            if (!state.sound) {
+                R.string.audio_off
+            } else if (state.microphoneGranted) {
+                R.string.allowed
+            } else {
+                R.string.action_needed
+            },
+        ),
         ChalnaIcon.MIC,
         !state.sound || state.microphoneGranted,
     ) { if (state.microphonePermanentlyDenied) dependencies.openAppSettings() else dependencies.requestMicrophone() }
@@ -373,9 +434,19 @@ internal fun SettingsScreen(
 }
 
 @Composable
-private fun SelectionSettingRow(title: String, value: String, icon: ChalnaIcon, expanded: Boolean, action: () -> Unit) {
+private fun SelectionSettingRow(
+    title: String,
+    value: String,
+    icon: ChalnaIcon,
+    expanded: Boolean,
+    action: () -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 62.dp).clickableNoRipple(Role.Button, onClick = action).padding(horizontal = 8.dp),
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 62.dp)
+            .clickableNoRipple(Role.Button, onClick = action)
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ChalnaIconCanvas(icon, Modifier.size(21.dp), ChalnaTheme.colors.accent)
@@ -386,14 +457,24 @@ private fun SelectionSettingRow(title: String, value: String, icon: ChalnaIcon, 
 }
 
 @Composable
-private fun <T> SelectionList(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit) = Column(
+private fun <T> SelectionList(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+) = Column(
     Modifier.fillMaxWidth().padding(start = 42.dp, bottom = 8.dp),
 ) {
     options.forEach { (value, label) ->
         val active = value == selected
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 48.dp).clickableNoRipple(Role.RadioButton) { onSelect(value) }
-                .semantics { role = Role.RadioButton; this.selected = active },
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickableNoRipple(Role.RadioButton) { onSelect(value) }
+                .semantics {
+                    role = Role.RadioButton
+                    this.selected = active
+                },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -413,11 +494,16 @@ private fun <T> SelectionList(options: List<Pair<T, String>>, selected: T, onSel
 }
 
 @Composable
-private fun StorageSummary(state: ChalnaUiState, dependencies: UiDependencies) {
+private fun StorageSummary(
+    state: ChalnaUiState,
+    dependencies: UiDependencies,
+) {
     val summary = state.storageSummary
     Column(Modifier.fillMaxWidth().padding(vertical = 14.dp)) {
         ChalnaText(stringResource(R.string.storage_summary), 14, weight = FontWeight.SemiBold)
-        if (summary.loading) Body(stringResource(R.string.loading)) else {
+        if (summary.loading) {
+            Body(stringResource(R.string.loading))
+        } else {
             ChalnaText(
                 stringResource(R.string.storage_summary_counts, summary.deviceGalleryCount, summary.vaultCount),
                 13,
@@ -441,7 +527,12 @@ private fun StorageSummary(state: ChalnaUiState, dependencies: UiDependencies) {
 }
 
 @Composable
-internal fun GalleryScreen(state: ChalnaUiState, dependencies: UiDependencies, back: () -> Unit, open: (String) -> Unit) {
+internal fun GalleryScreen(
+    state: ChalnaUiState,
+    dependencies: UiDependencies,
+    back: () -> Unit,
+    open: (String) -> Unit,
+) {
     val selected = state.selectedMediaIds
     val gallery = dependencies.galleryPaging.collectAsLazyPagingItems()
     var controlsVisible by rememberSaveable { mutableStateOf(false) }
@@ -476,12 +567,14 @@ internal fun GalleryScreen(state: ChalnaUiState, dependencies: UiDependencies, b
             }
         }
         if (controlsVisible) GalleryControls(state, dependencies)
-        if (confirmPermanent) ConfirmationRow(
-            stringResource(R.string.delete_permanently_confirm),
-            { confirmPermanent = false },
-        ) {
-            confirmPermanent = false
-            dependencies.deleteSelectedMediaPermanently()
+        if (confirmPermanent) {
+            ConfirmationRow(
+                stringResource(R.string.delete_permanently_confirm),
+                { confirmPermanent = false },
+            ) {
+                confirmPermanent = false
+                dependencies.deleteSelectedMediaPermanently()
+            }
         }
         state.operationEvent?.let { OperationBanner(it) }
         when {
@@ -495,21 +588,32 @@ internal fun GalleryScreen(state: ChalnaUiState, dependencies: UiDependencies, b
 }
 
 @Composable
-private fun GalleryControls(state: ChalnaUiState, dependencies: UiDependencies) {
+private fun GalleryControls(
+    state: ChalnaUiState,
+    dependencies: UiDependencies,
+) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         ChalnaText(stringResource(R.string.filter), 12, ChalnaTheme.colors.muted, FontWeight.SemiBold)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            GalleryFilter.entries.forEach { filter -> ChoiceChip(filterLabel(filter), state.galleryFilter == filter) { dependencies.setGalleryFilter(filter) } }
+            GalleryFilter.entries.forEach { filter ->
+                ChoiceChip(filterLabel(filter), state.galleryFilter == filter) { dependencies.setGalleryFilter(filter) }
+            }
         }
         ChalnaText(stringResource(R.string.sort), Modifier.padding(top = 10.dp), 12, ChalnaTheme.colors.muted, FontWeight.SemiBold)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            GallerySortUi.entries.forEach { sort -> ChoiceChip(sortLabel(sort), state.gallerySort == sort) { dependencies.setGallerySort(sort) } }
+            GallerySortUi.entries.forEach { sort ->
+                ChoiceChip(sortLabel(sort), state.gallerySort == sort) { dependencies.setGallerySort(sort) }
+            }
         }
     }
 }
 
 @Composable
-private fun ConfirmationRow(message: String, cancel: () -> Unit, confirm: () -> Unit) {
+private fun ConfirmationRow(
+    message: String,
+    cancel: () -> Unit,
+    confirm: () -> Unit,
+) {
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         ChalnaText(message, 14, weight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -521,30 +625,47 @@ private fun ConfirmationRow(message: String, cancel: () -> Unit, confirm: () -> 
 
 @Composable
 private fun OperationBanner(event: UiOperationEvent) {
-    val text = when (event) {
-        is UiOperationEvent.Started -> stringResource(R.string.operation_started, event.total)
-        is UiOperationEvent.Progress -> stringResource(R.string.operation_progress, event.completed, event.total)
-        is UiOperationEvent.Succeeded -> stringResource(event.messageResource)
-        is UiOperationEvent.PartiallyFailed -> stringResource(event.messageResource, event.succeeded, event.failed)
-        is UiOperationEvent.Failed -> stringResource(event.messageResource)
-    }
+    val text =
+        when (event) {
+            is UiOperationEvent.Started -> stringResource(R.string.operation_started, event.total)
+            is UiOperationEvent.Progress -> stringResource(R.string.operation_progress, event.completed, event.total)
+            is UiOperationEvent.Succeeded -> stringResource(event.messageResource)
+            is UiOperationEvent.PartiallyFailed -> stringResource(event.messageResource, event.succeeded, event.failed)
+            is UiOperationEvent.Failed -> stringResource(event.messageResource)
+        }
     ChalnaText(
         text,
         Modifier.fillMaxWidth().padding(vertical = 7.dp).semantics { liveRegion = LiveRegionMode.Polite },
         13,
-        if (event is UiOperationEvent.Failed || event is UiOperationEvent.PartiallyFailed) ChalnaTheme.colors.warning else ChalnaTheme.colors.positive,
+        if (event is UiOperationEvent.Failed ||
+            event is UiOperationEvent.PartiallyFailed
+        ) {
+            ChalnaTheme.colors.warning
+        } else {
+            ChalnaTheme.colors.positive
+        },
     )
 }
 
 @Composable
-private fun GalleryMessage(title: Int, body: Int?, action: (() -> Unit)? = null) = Box(
+private fun GalleryMessage(
+    title: Int,
+    body: Int?,
+    action: (() -> Unit)? = null,
+) = Box(
     Modifier.fillMaxSize(),
     contentAlignment = Alignment.Center,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         ChalnaText(stringResource(title), 18, weight = FontWeight.SemiBold, align = TextAlign.Center)
-        body?.let { Spacer(Modifier.height(8.dp)); ChalnaText(stringResource(it), 14, ChalnaTheme.colors.muted, align = TextAlign.Center) }
-        action?.let { Spacer(Modifier.height(12.dp)); SecondaryButton(stringResource(R.string.retry), it) }
+        body?.let {
+            Spacer(Modifier.height(8.dp))
+            ChalnaText(stringResource(it), 14, ChalnaTheme.colors.muted, align = TextAlign.Center)
+        }
+        action?.let {
+            Spacer(Modifier.height(12.dp))
+            SecondaryButton(stringResource(R.string.retry), it)
+        }
     }
 }
 
@@ -575,21 +696,23 @@ private fun GalleryGrid(
             },
         ) { index ->
             when (val entry = items[index]) {
-                is GalleryPagingItem.Day -> ChalnaText(
-                    dayLabel(entry.date),
-                    Modifier.padding(top = 14.dp, bottom = 4.dp),
-                    14,
-                    ChalnaTheme.colors.muted,
-                    FontWeight.SemiBold,
-                )
-                is GalleryPagingItem.Media -> MediaGridItem(
-                    entry.item,
-                    dependencies,
-                    entry.item.id in selected,
-                    selected.isNotEmpty(),
-                    { dependencies.toggleMediaSelection(entry.item.id) },
-                    { open(entry.item.id) },
-                )
+                is GalleryPagingItem.Day ->
+                    ChalnaText(
+                        dayLabel(entry.date),
+                        Modifier.padding(top = 14.dp, bottom = 4.dp),
+                        14,
+                        ChalnaTheme.colors.muted,
+                        FontWeight.SemiBold,
+                    )
+                is GalleryPagingItem.Media ->
+                    MediaGridItem(
+                        entry.item,
+                        dependencies,
+                        entry.item.id in selected,
+                        selected.isNotEmpty(),
+                        { dependencies.toggleMediaSelection(entry.item.id) },
+                        { open(entry.item.id) },
+                    )
                 null -> Box(Modifier.fillMaxWidth().aspectRatio(1f).background(ChalnaTheme.colors.surfaceHigh))
             }
         }
@@ -607,27 +730,44 @@ private fun MediaGridItem(
 ) {
     val description = galleryItemDescription(item)
     Column(
-        Modifier.combinedClickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            onLongClick = select,
-            onClick = { if (selectionMode) select() else open() },
-        ).semantics { this.selected = selected; contentDescription = description },
+        Modifier
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onLongClick = select,
+                onClick = { if (selectionMode) select() else open() },
+            ).semantics {
+                this.selected = selected
+                contentDescription = description
+            },
     ) {
         Box {
             MediaThumbnail(item, dependencies, Modifier.fillMaxWidth().aspectRatio(item.thumbnailRatio()))
-            if (selected) Box(
-                Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp).clip(CircleShape).background(ChalnaTheme.colors.accent),
-                contentAlignment = Alignment.Center,
-            ) { ChalnaIconCanvas(ChalnaIcon.CHECK, Modifier.size(16.dp), Color(0xFF071018)) }
-            if (item.favorite) ChalnaIconCanvas(
-                ChalnaIcon.FAVORITE,
-                Modifier.align(Alignment.TopStart).padding(8.dp).size(17.dp),
-                Color.White,
-            )
+            if (selected) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(ChalnaTheme.colors.accent),
+                    contentAlignment = Alignment.Center,
+                ) { ChalnaIconCanvas(ChalnaIcon.CHECK, Modifier.size(16.dp), Color(0xFF071018)) }
+            }
+            if (item.favorite) {
+                ChalnaIconCanvas(
+                    ChalnaIcon.FAVORITE,
+                    Modifier.align(Alignment.TopStart).padding(8.dp).size(17.dp),
+                    Color.White,
+                )
+            }
             Row(
-                Modifier.align(Alignment.BottomEnd).padding(7.dp).clip(RoundedCornerShape(7.dp))
-                    .background(Color.Black.copy(.68f)).padding(horizontal = 6.dp, vertical = 2.dp),
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(7.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(Color.Black.copy(.68f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (item.destination == StorageDestinationUi.CHALNA_VAULT) {
@@ -642,7 +782,11 @@ private fun MediaGridItem(
 }
 
 @Composable
-internal fun PlayerScreen(player: PlayerUiState, dependencies: UiDependencies, back: () -> Unit) {
+internal fun PlayerScreen(
+    player: PlayerUiState,
+    dependencies: UiDependencies,
+    back: () -> Unit,
+) {
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var controls by rememberSaveable { mutableStateOf(true) }
     var more by rememberSaveable { mutableStateOf(false) }
@@ -664,7 +808,15 @@ internal fun PlayerScreen(player: PlayerUiState, dependencies: UiDependencies, b
             val controller = WindowCompat.getInsetsController(window, window.decorView)
             if (fullscreen) controller.hide(WindowInsetsCompat.Type.systemBars()) else controller.show(WindowInsetsCompat.Type.systemBars())
         }
-        onDispose { activity?.window?.let { WindowCompat.getInsetsController(it, it.decorView).show(WindowInsetsCompat.Type.systemBars()) } }
+        onDispose {
+            activity?.window?.let {
+                WindowCompat
+                    .getInsetsController(
+                        it,
+                        it.decorView,
+                    ).show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
     }
     LaunchedEffect(controls, player.playing, more, details, confirmDelete) {
         if (controls && player.playing && !more && !details && !confirmDelete && !touchExploration) {
@@ -676,11 +828,12 @@ internal fun PlayerScreen(player: PlayerUiState, dependencies: UiDependencies, b
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val ratio = player.item.videoRatio()
             val container = maxWidth / maxHeight
-            val surfaceModifier = if (container > ratio) {
-                Modifier.fillMaxHeight().aspectRatio(ratio).align(Alignment.Center)
-            } else {
-                Modifier.fillMaxWidth().aspectRatio(ratio).align(Alignment.Center)
-            }
+            val surfaceModifier =
+                if (container > ratio) {
+                    Modifier.fillMaxHeight().aspectRatio(ratio).align(Alignment.Center)
+                } else {
+                    Modifier.fillMaxWidth().aspectRatio(ratio).align(Alignment.Center)
+                }
             PlayerSurface(dependencies, player.keepScreenOn, surfaceModifier)
             Box(
                 Modifier.fillMaxSize().testTag("player_touch_surface").pointerInput(Unit) {
@@ -725,23 +878,29 @@ internal fun PlayerScreen(player: PlayerUiState, dependencies: UiDependencies, b
             }
         }
         if (details) PlayerDetailsPanel(player.item) { details = false }
-        if (confirmDelete) PlayerDeleteDialog(
-            cancel = { confirmDelete = false },
-            confirm = { confirmDelete = false; dependencies.trashCurrentMedia() },
-        )
+        if (confirmDelete) {
+            PlayerDeleteDialog(
+                cancel = { confirmDelete = false },
+                confirm = {
+                    confirmDelete = false
+                    dependencies.trashCurrentMedia()
+                },
+            )
+        }
     }
 }
 
 @Composable
 private fun PlayerStatusOverlay(player: PlayerUiState) {
-    val message = when {
-        player.recordingConflict -> R.string.player_recording_conflict
-        player.phase == PlayerPhase.PREPARING -> R.string.player_preparing
-        player.phase == PlayerPhase.BUFFERING -> R.string.player_buffering
-        player.phase == PlayerPhase.ERROR -> R.string.player_error
-        player.phase == PlayerPhase.SOURCE_MISSING -> R.string.file_not_found
-        else -> null
-    }
+    val message =
+        when {
+            player.recordingConflict -> R.string.player_recording_conflict
+            player.phase == PlayerPhase.PREPARING -> R.string.player_preparing
+            player.phase == PlayerPhase.BUFFERING -> R.string.player_buffering
+            player.phase == PlayerPhase.ERROR -> R.string.player_error
+            player.phase == PlayerPhase.SOURCE_MISSING -> R.string.file_not_found
+            else -> null
+        }
     message?.let {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             ChalnaText(stringResource(it), 14, Color.White.copy(.84f), align = TextAlign.Center)
@@ -776,8 +935,16 @@ private fun PlayerMoreActions(
 }
 
 @Composable
-private fun PlayerAction(label: Int, icon: ChalnaIcon, action: () -> Unit) = Column(
-    Modifier.width(88.dp).heightIn(min = 64.dp).clickableNoRipple(Role.Button, onClick = action).padding(6.dp),
+private fun PlayerAction(
+    label: Int,
+    icon: ChalnaIcon,
+    action: () -> Unit,
+) = Column(
+    Modifier
+        .width(88.dp)
+        .heightIn(min = 64.dp)
+        .clickableNoRipple(Role.Button, onClick = action)
+        .padding(6.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
 ) {
     ChalnaIconCanvas(icon, Modifier.size(22.dp), Color.White)
@@ -786,54 +953,103 @@ private fun PlayerAction(label: Int, icon: ChalnaIcon, action: () -> Unit) = Col
 }
 
 @Composable
-private fun PlayerSurface(dependencies: UiDependencies, keepScreenOn: Boolean, modifier: Modifier) {
+private fun PlayerSurface(
+    dependencies: UiDependencies,
+    keepScreenOn: Boolean,
+    modifier: Modifier,
+) {
     AndroidView(
         modifier = modifier.background(Color.Black),
         factory = { context -> SurfaceView(context).also(dependencies::bindPlayerView) },
-        update = { view -> view.keepScreenOn = keepScreenOn; dependencies.bindPlayerView(view) },
+        update = { view ->
+            view.keepScreenOn = keepScreenOn
+            dependencies.bindPlayerView(view)
+        },
     )
     DisposableEffect(dependencies) { onDispose { dependencies.bindPlayerView(null) } }
 }
 
 @Composable
-private fun PlayerScrubber(player: PlayerUiState, seek: (Long) -> Unit) {
+private fun PlayerScrubber(
+    player: PlayerUiState,
+    seek: (Long) -> Unit,
+) {
     val duration = player.durationMillis.coerceAtLeast(1L)
     val fraction = (player.positionMillis.toFloat() / duration).coerceIn(0f, 1f)
     val buffered = (player.bufferedMillis.toFloat() / duration).coerceIn(0f, 1f)
     BoxWithConstraints(
-        Modifier.fillMaxWidth().height(48.dp)
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
             .pointerInput(duration) {
                 detectTapGestures { offset -> seek((duration * (offset.x / size.width).coerceIn(0f, 1f)).toLong()) }
-            }
-            .pointerInput(duration) {
+            }.pointerInput(duration) {
                 detectHorizontalDragGestures { change, _ ->
                     seek((duration * (change.position.x / size.width).coerceIn(0f, 1f)).toLong())
                 }
-            }
-            .semantics {
+            }.semantics {
                 contentDescription = "${formatDuration(player.positionMillis)} / ${formatDuration(player.durationMillis)}"
                 progressBarRangeInfo = ProgressBarRangeInfo(player.positionMillis.toFloat(), 0f..duration.toFloat())
-                setProgress { target -> seek(target.toLong().coerceIn(0, duration)); true }
+                setProgress { target ->
+                    seek(target.toLong().coerceIn(0, duration))
+                    true
+                }
             },
     ) {
         val accent = ChalnaTheme.colors.accent
         androidx.compose.foundation.Canvas(Modifier.width(maxWidth).fillMaxHeight()) {
             val y = size.height / 2f
-            drawLine(Color.White.copy(.24f), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), 3.dp.toPx(), StrokeCap.Round)
-            drawLine(Color.White.copy(.42f), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width * buffered, y), 3.dp.toPx(), StrokeCap.Round)
-            drawLine(accent, androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width * fraction, y), 3.dp.toPx(), StrokeCap.Round)
-            drawCircle(accent, 7.dp.toPx(), androidx.compose.ui.geometry.Offset(size.width * fraction, y))
+            drawLine(
+                Color.White.copy(.24f),
+                androidx.compose.ui.geometry
+                    .Offset(0f, y),
+                androidx.compose.ui.geometry
+                    .Offset(size.width, y),
+                3.dp.toPx(),
+                StrokeCap.Round,
+            )
+            drawLine(
+                Color.White.copy(.42f),
+                androidx.compose.ui.geometry
+                    .Offset(0f, y),
+                androidx.compose.ui.geometry
+                    .Offset(size.width * buffered, y),
+                3.dp.toPx(),
+                StrokeCap.Round,
+            )
+            drawLine(
+                accent,
+                androidx.compose.ui.geometry
+                    .Offset(0f, y),
+                androidx.compose.ui.geometry
+                    .Offset(size.width * fraction, y),
+                3.dp.toPx(),
+                StrokeCap.Round,
+            )
+            drawCircle(
+                accent,
+                7.dp.toPx(),
+                androidx.compose.ui.geometry
+                    .Offset(size.width * fraction, y),
+            )
         }
     }
 }
 
 @Composable
-private fun PlayerDetailsPanel(item: MediaItemUi, close: () -> Unit) = Box(
+private fun PlayerDetailsPanel(
+    item: MediaItemUi,
+    close: () -> Unit,
+) = Box(
     Modifier.fillMaxSize().background(Color.Black.copy(.55f)).clickableNoRipple(onClick = close),
     contentAlignment = Alignment.BottomCenter,
 ) {
     Column(
-        Modifier.fillMaxWidth().background(ChalnaTheme.colors.surfaceHigh).safeDrawingPadding().padding(20.dp)
+        Modifier
+            .fillMaxWidth()
+            .background(ChalnaTheme.colors.surfaceHigh)
+            .safeDrawingPadding()
+            .padding(20.dp)
             .clickableNoRipple(onClick = {}),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -847,7 +1063,12 @@ private fun PlayerDetailsPanel(item: MediaItemUi, close: () -> Unit) = Box(
         if (item.rotationDegrees != 0) DetailLine(R.string.detail_rotation, "${item.rotationDegrees}°")
         if (item.sizeBytes > 0) DetailLine(R.string.detail_size, Formatter.formatFileSize(LocalContext.current, item.sizeBytes))
         DetailLine(R.string.detail_storage, destinationLabel(item.destination))
-        item.hasAudio?.let { DetailLine(R.string.detail_audio, stringResource(if (it) R.string.audio_included else R.string.audio_not_included)) }
+        item.hasAudio?.let {
+            DetailLine(
+                R.string.detail_audio,
+                stringResource(if (it) R.string.audio_included else R.string.audio_not_included),
+            )
+        }
         item.codec?.let { DetailLine(R.string.detail_codec, it) }
         item.frameRate?.let { DetailLine(R.string.detail_frame_rate, stringResource(R.string.frame_rate_value, it)) }
         DetailLine(R.string.detail_type, item.mimeType)
@@ -855,12 +1076,19 @@ private fun PlayerDetailsPanel(item: MediaItemUi, close: () -> Unit) = Box(
 }
 
 @Composable
-private fun PlayerDeleteDialog(cancel: () -> Unit, confirm: () -> Unit) = Box(
+private fun PlayerDeleteDialog(
+    cancel: () -> Unit,
+    confirm: () -> Unit,
+) = Box(
     Modifier.fillMaxSize().background(Color.Black.copy(.62f)),
     contentAlignment = Alignment.Center,
 ) {
     Column(
-        Modifier.fillMaxWidth(.86f).clip(RoundedCornerShape(20.dp)).background(ChalnaTheme.colors.surfaceHigh).padding(20.dp),
+        Modifier
+            .fillMaxWidth(.86f)
+            .clip(RoundedCornerShape(20.dp))
+            .background(ChalnaTheme.colors.surfaceHigh)
+            .padding(20.dp),
     ) {
         ChalnaText(stringResource(R.string.delete_confirm), 17, weight = FontWeight.SemiBold)
         Spacer(Modifier.height(16.dp))
@@ -872,13 +1100,19 @@ private fun PlayerDeleteDialog(cancel: () -> Unit, confirm: () -> Unit) = Box(
 }
 
 @Composable
-private fun DetailLine(label: Int, value: String) = Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+private fun DetailLine(
+    label: Int,
+    value: String,
+) = Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
     ChalnaText(stringResource(label), Modifier.width(112.dp), 13, ChalnaTheme.colors.muted)
     ChalnaText(value, Modifier.weight(1f), 13)
 }
 
 @Composable
-internal fun HelpScreen(dependencies: UiDependencies, back: () -> Unit) = ScreenColumn {
+internal fun HelpScreen(
+    dependencies: UiDependencies,
+    back: () -> Unit,
+) = ScreenColumn {
     TopBar(stringResource(R.string.help), back)
     HelpSection(R.string.help_use, R.string.help_use_detail)
     Hairline()
@@ -896,34 +1130,43 @@ internal fun HelpScreen(dependencies: UiDependencies, back: () -> Unit) = Screen
 }
 
 @Composable
-private fun HelpSection(title: Int, detail: Int) = Column(Modifier.padding(vertical = 18.dp)) {
+private fun HelpSection(
+    title: Int,
+    detail: Int,
+) = Column(Modifier.padding(vertical = 18.dp)) {
     ChalnaText(stringResource(title), 16, weight = FontWeight.SemiBold)
     Spacer(Modifier.height(6.dp))
     Body(stringResource(detail))
 }
 
 @Composable
-internal fun PrivacyScreen(back: () -> Unit) = ScreenColumn {
-    TopBar(stringResource(R.string.privacy), back)
-    Spacer(Modifier.height(14.dp))
-    Heading(stringResource(R.string.privacy_facts_title))
-    Spacer(Modifier.height(10.dp))
-    PrivacyFact(R.string.privacy_storage_fact)
-    PrivacyFact(R.string.privacy_network_fact)
-    PrivacyFact(R.string.privacy_no_early_recording_fact)
-    PrivacyFact(R.string.privacy_trigger_fact)
-    PrivacyFact(R.string.privacy_vault_uninstall_fact)
-}
+internal fun PrivacyScreen(back: () -> Unit) =
+    ScreenColumn {
+        TopBar(stringResource(R.string.privacy), back)
+        Spacer(Modifier.height(14.dp))
+        Heading(stringResource(R.string.privacy_facts_title))
+        Spacer(Modifier.height(10.dp))
+        PrivacyFact(R.string.privacy_storage_fact)
+        PrivacyFact(R.string.privacy_network_fact)
+        PrivacyFact(R.string.privacy_no_early_recording_fact)
+        PrivacyFact(R.string.privacy_trigger_fact)
+        PrivacyFact(R.string.privacy_vault_uninstall_fact)
+    }
 
 @Composable
-private fun PrivacyFact(resource: Int) = Row(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-    ChalnaIconCanvas(ChalnaIcon.CHECK, Modifier.size(18.dp), ChalnaTheme.colors.positive)
-    Spacer(Modifier.width(12.dp))
-    Body(stringResource(resource), Modifier.weight(1f))
-}
+private fun PrivacyFact(resource: Int) =
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        ChalnaIconCanvas(ChalnaIcon.CHECK, Modifier.size(18.dp), ChalnaTheme.colors.positive)
+        Spacer(Modifier.width(12.dp))
+        Body(stringResource(resource), Modifier.weight(1f))
+    }
 
 @Composable
-internal fun MediaThumbnail(item: MediaItemUi, dependencies: UiDependencies, modifier: Modifier = Modifier) {
+internal fun MediaThumbnail(
+    item: MediaItemUi,
+    dependencies: UiDependencies,
+    modifier: Modifier = Modifier,
+) {
     BoxWithConstraints(modifier.background(ChalnaTheme.colors.surfaceHigh), contentAlignment = Alignment.Center) {
         val density = LocalDensity.current
         val requestedPx = with(density) { maxOf(maxWidth, maxHeight).roundToPx().coerceIn(96, 720) }
@@ -931,8 +1174,11 @@ internal fun MediaThumbnail(item: MediaItemUi, dependencies: UiDependencies, mod
         val signal = remember(key) { CancellationSignal() }
         DisposableEffect(signal) { onDispose { signal.cancel() } }
         val bitmap by produceState<Bitmap?>(ThumbnailMemoryCache.get(key), key) {
-            if (value == null) value = withContext(Dispatchers.IO) {
-                dependencies.loadThumbnail(item.contentUri, requestedPx, signal)?.also { ThumbnailMemoryCache.put(key, it) }
+            if (value == null) {
+                value =
+                    withContext(Dispatchers.IO) {
+                        dependencies.loadThumbnail(item.contentUri, requestedPx, signal)?.also { ThumbnailMemoryCache.put(key, it) }
+                    }
             }
         }
         bitmap?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
@@ -943,48 +1189,116 @@ internal fun MediaThumbnail(item: MediaItemUi, dependencies: UiDependencies, mod
 internal object ThumbnailMemoryCache : android.util.LruCache<String, Bitmap>(
     (Runtime.getRuntime().maxMemory() / 20L).coerceAtMost(20L * 1024L * 1024L).toInt(),
 ) {
-    override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
+    override fun sizeOf(
+        key: String,
+        value: Bitmap,
+    ): Int = value.allocationByteCount
 
     fun trim(level: Int) {
         @Suppress("DEPRECATION")
         val complete = android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE
-        if (level >= complete) evictAll()
-        else trimToSize(maxSize() / 2)
+        if (level >= complete) {
+            evictAll()
+        } else {
+            trimToSize(maxSize() / 2)
+        }
     }
 }
 
 @Composable
-private fun phaseTitle(phase: CapturePhase): String = stringResource(
-    when (phase) {
-        CapturePhase.SETUP_REQUIRED -> R.string.phase_setup_required
-        CapturePhase.READY -> R.string.phase_ready
-        CapturePhase.STARTING -> R.string.phase_starting
-        CapturePhase.RECORDING -> R.string.phase_recording
-        CapturePhase.STOPPING -> R.string.phase_stopping
-        CapturePhase.SAVED -> R.string.phase_saved
-        CapturePhase.ERROR -> R.string.phase_error
-    },
-)
+private fun phaseTitle(phase: CapturePhase): String =
+    stringResource(
+        when (phase) {
+            CapturePhase.SETUP_REQUIRED -> R.string.phase_setup_required
+            CapturePhase.READY -> R.string.phase_ready
+            CapturePhase.STARTING -> R.string.phase_starting
+            CapturePhase.RECORDING -> R.string.phase_recording
+            CapturePhase.STOPPING -> R.string.phase_stopping
+            CapturePhase.SAVED -> R.string.phase_saved
+            CapturePhase.ERROR -> R.string.phase_error
+        },
+    )
 
 @Composable
-private fun captureErrorText(code: String?): String = stringResource(
-    when (code) {
-        CaptureFailureCode.CAMERA_BUSY.name -> R.string.capture_error_camera_busy
-        CaptureFailureCode.CAMERA_PERMISSION.name -> R.string.capture_error_camera_permission
-        CaptureFailureCode.MICROPHONE_PERMISSION.name -> R.string.capture_error_microphone_permission
-        CaptureFailureCode.LOW_STORAGE.name -> R.string.capture_error_storage
-        CaptureFailureCode.STORAGE_UNAVAILABLE.name -> R.string.capture_error_storage_unavailable
-        else -> R.string.capture_error_camera
-    },
-)
+private fun captureErrorText(code: String?): String =
+    stringResource(
+        when (code) {
+            CaptureFailureCode.CAMERA_BUSY.name -> R.string.capture_error_camera_busy
+            CaptureFailureCode.CAMERA_PERMISSION.name -> R.string.capture_error_camera_permission
+            CaptureFailureCode.MICROPHONE_PERMISSION.name -> R.string.capture_error_microphone_permission
+            CaptureFailureCode.LOW_STORAGE.name -> R.string.capture_error_storage
+            CaptureFailureCode.STORAGE_UNAVAILABLE.name -> R.string.capture_error_storage_unavailable
+            else -> R.string.capture_error_camera
+        },
+    )
 
-@Composable private fun qualityLabel(value: VideoQuality) = stringResource(when (value) { VideoQuality.AUTO -> R.string.quality_auto; VideoQuality.FHD -> R.string.quality_fhd; VideoQuality.HD -> R.string.quality_hd })
-@Composable private fun appearanceLabel(value: AppearanceMode) = stringResource(when (value) { AppearanceMode.SYSTEM -> R.string.system; AppearanceMode.NIGHT -> R.string.night; AppearanceMode.MIST -> R.string.mist })
-@Composable private fun motionLabel(value: MotionMode) = stringResource(when (value) { MotionMode.SYSTEM -> R.string.motion_system; MotionMode.FULL -> R.string.motion_full; MotionMode.REDUCED -> R.string.motion_reduced })
-@Composable private fun destinationLabel(value: StorageDestinationUi) = stringResource(if (value == StorageDestinationUi.CHALNA_VAULT) R.string.chalna_vault else R.string.device_gallery)
-@Composable private fun filterLabel(value: GalleryFilter) = stringResource(when (value) { GalleryFilter.ALL -> R.string.filter_all; GalleryFilter.DEVICE_GALLERY -> R.string.device_gallery; GalleryFilter.CHALNA_VAULT -> R.string.chalna_vault; GalleryFilter.FAVORITES -> R.string.favorites; GalleryFilter.TRASH -> R.string.recently_deleted })
-@Composable private fun sortLabel(value: GallerySortUi) = stringResource(when (value) { GallerySortUi.NEWEST -> R.string.sort_newest; GallerySortUi.OLDEST -> R.string.sort_oldest; GallerySortUi.LONGEST -> R.string.sort_longest; GallerySortUi.LARGEST -> R.string.sort_largest })
-@Composable private fun autoStopLabel(seconds: Int) = if (seconds == 0) stringResource(R.string.no_limit) else pluralStringResource(R.plurals.seconds_value, seconds, seconds)
+@Composable private fun qualityLabel(value: VideoQuality) =
+    stringResource(
+        when (value) {
+            VideoQuality.AUTO -> R.string.quality_auto
+            VideoQuality.FHD -> R.string.quality_fhd
+            VideoQuality.HD -> R.string.quality_hd
+        },
+    )
+
+@Composable private fun appearanceLabel(value: AppearanceMode) =
+    stringResource(
+        when (value) {
+            AppearanceMode.SYSTEM -> R.string.system
+            AppearanceMode.NIGHT -> R.string.night
+            AppearanceMode.MIST -> R.string.mist
+        },
+    )
+
+@Composable private fun motionLabel(value: MotionMode) =
+    stringResource(
+        when (value) {
+            MotionMode.SYSTEM -> R.string.motion_system
+            MotionMode.FULL -> R.string.motion_full
+            MotionMode.REDUCED -> R.string.motion_reduced
+        },
+    )
+
+@Composable private fun destinationLabel(value: StorageDestinationUi) =
+    stringResource(
+        if (value ==
+            StorageDestinationUi.CHALNA_VAULT
+        ) {
+            R.string.chalna_vault
+        } else {
+            R.string.device_gallery
+        },
+    )
+
+@Composable private fun filterLabel(value: GalleryFilter) =
+    stringResource(
+        when (value) {
+            GalleryFilter.ALL -> R.string.filter_all
+            GalleryFilter.DEVICE_GALLERY -> R.string.device_gallery
+            GalleryFilter.CHALNA_VAULT -> R.string.chalna_vault
+            GalleryFilter.FAVORITES -> R.string.favorites
+            GalleryFilter.TRASH -> R.string.recently_deleted
+        },
+    )
+
+@Composable private fun sortLabel(value: GallerySortUi) =
+    stringResource(
+        when (value) {
+            GallerySortUi.NEWEST -> R.string.sort_newest
+            GallerySortUi.OLDEST -> R.string.sort_oldest
+            GallerySortUi.LONGEST -> R.string.sort_longest
+            GallerySortUi.LARGEST -> R.string.sort_largest
+        },
+    )
+
+@Composable private fun autoStopLabel(seconds: Int) =
+    if (seconds ==
+        0
+    ) {
+        stringResource(R.string.no_limit)
+    } else {
+        pluralStringResource(R.plurals.seconds_value, seconds, seconds)
+    }
 
 @Composable
 private fun formatMediaDate(millis: Long): String {
@@ -998,18 +1312,21 @@ private fun dayLabel(day: LocalDate): String {
     return when (day) {
         today -> stringResource(R.string.today)
         today.minusDays(1) -> stringResource(R.string.yesterday)
-        else -> DateFormat.getDateInstance(DateFormat.LONG, LocalConfiguration.current.locales[0])
-            .format(Date.from(day.atStartOfDay(ZoneId.systemDefault()).toInstant()))
+        else ->
+            DateFormat
+                .getDateInstance(DateFormat.LONG, LocalConfiguration.current.locales[0])
+                .format(Date.from(day.atStartOfDay(ZoneId.systemDefault()).toInstant()))
     }
 }
 
 @Composable
-private fun galleryItemDescription(item: MediaItemUi): String = stringResource(
-    R.string.gallery_item_description,
-    formatMediaDate(item.capturedAtMillis),
-    if (item.durationMillis > 0) formatDuration(item.durationMillis) else stringResource(R.string.duration_unknown),
-    destinationLabel(item.destination),
-)
+private fun galleryItemDescription(item: MediaItemUi): String =
+    stringResource(
+        R.string.gallery_item_description,
+        formatMediaDate(item.capturedAtMillis),
+        if (item.durationMillis > 0) formatDuration(item.durationMillis) else stringResource(R.string.duration_unknown),
+        destinationLabel(item.destination),
+    )
 
 private fun MediaItemUi.videoRatio(): Float {
     if (width <= 0 || height <= 0) return 16f / 9f

@@ -41,10 +41,6 @@ import app.chalna.capture.media.AndroidGalleryMedia
 import app.chalna.capture.media.CaptureDestinationFactory
 import app.chalna.capture.media.CaptureOutputTarget
 import app.chalna.capture.media.PreparedCaptureOutput
-import java.io.File
-import java.util.UUID
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -57,21 +53,27 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
+import java.util.UUID
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
-class StorageCapacityChecker(private val context: Context) {
-    fun availableBytes(destination: StorageDestination): Long? = runCatching {
-        val root = when (destination) {
-            StorageDestination.CHALNA_VAULT -> context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
-            StorageDestination.DEVICE_GALLERY -> context.getExternalFilesDir(null)
-        } ?: return null
-        StatFs(root.path).availableBytes
-    }.getOrNull()
+class StorageCapacityChecker(
+    private val context: Context,
+) {
+    fun availableBytes(destination: StorageDestination): Long? =
+        runCatching {
+            val root =
+                when (destination) {
+                    StorageDestination.CHALNA_VAULT -> context.getExternalFilesDir(android.os.Environment.DIRECTORY_MOVIES)
+                    StorageDestination.DEVICE_GALLERY -> context.getExternalFilesDir(null)
+                } ?: return null
+            StatFs(root.path).availableBytes
+        }.getOrNull()
 
-    fun startAllowed(destination: StorageDestination): Boolean =
-        availableBytes(destination)?.let { it >= START_FREE_BYTES } == true
+    fun startAllowed(destination: StorageDestination): Boolean = availableBytes(destination)?.let { it >= START_FREE_BYTES } == true
 
-    fun critical(destination: StorageDestination): Boolean =
-        availableBytes(destination)?.let { it < CRITICAL_FREE_BYTES } != false
+    fun critical(destination: StorageDestination): Boolean = availableBytes(destination)?.let { it < CRITICAL_FREE_BYTES } != false
 
     companion object {
         const val START_FREE_BYTES = 96L * 1024L * 1024L
@@ -83,20 +85,21 @@ class AndroidCapturePreflight(
     private val context: Context,
     private val storage: StorageCapacityChecker = StorageCapacityChecker(context),
 ) : CapturePreflight {
-    override suspend fun check(settings: CaptureSessionSettings): CaptureFailure? = withContext(Dispatchers.IO) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            return@withContext CaptureFailure(CaptureFailureCode.CAMERA_PERMISSION, true, "camera_permission")
+    override suspend fun check(settings: CaptureSessionSettings): CaptureFailure? =
+        withContext(Dispatchers.IO) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                return@withContext CaptureFailure(CaptureFailureCode.CAMERA_PERMISSION, true, "camera_permission")
+            }
+            if (settings.audioEnabled &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return@withContext CaptureFailure(CaptureFailureCode.MICROPHONE_PERMISSION, true, "microphone_permission")
+            }
+            if (!storage.startAllowed(settings.storageDestination)) {
+                return@withContext CaptureFailure(CaptureFailureCode.LOW_STORAGE, true, "preflight_free_space")
+            }
+            null
         }
-        if (settings.audioEnabled &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return@withContext CaptureFailure(CaptureFailureCode.MICROPHONE_PERMISSION, true, "microphone_permission")
-        }
-        if (!storage.startAllowed(settings.storageDestination)) {
-            return@withContext CaptureFailure(CaptureFailureCode.LOW_STORAGE, true, "preflight_free_space")
-        }
-        null
-    }
 }
 
 class CameraXCaptureEngine(
@@ -110,9 +113,13 @@ class CameraXCaptureEngine(
     private val storage: StorageCapacityChecker = StorageCapacityChecker(context),
 ) : CaptureEngine {
     private var provider: ProcessCameraProvider? = null
+
     @Volatile private var recording: Recording? = null
+
     @Volatile private var preparedOutput: PreparedCaptureOutput? = null
+
     @Volatile private var actualStart: CaptureStart? = null
+
     @Volatile private var cancelledCapture: LastCapture? = null
     private var finalized: CompletableDeferred<LastCapture>? = null
     private val callbackScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -134,18 +141,21 @@ class CameraXCaptureEngine(
             )
         }
         val effectiveQuality = selectQuality(cameraProvider, selector, request.settings.preferredQuality)
-        val recorder = Recorder.Builder()
-            .setQualitySelector(QualitySelector.from(effectiveQuality))
-            .build()
+        val recorder =
+            Recorder
+                .Builder()
+                .setQualitySelector(QualitySelector.from(effectiveQuality))
+                .build()
         val video = VideoCapture.withOutput(recorder).apply { targetRotation = currentDisplayRotation() }
         val captureId = UUID.randomUUID().toString()
         val displayName = CaptureFileNames.video(request.createdAtEpochMillis, captureId)
-        val output = destinationFactory.prepare(
-            request.settings.storageDestination,
-            captureId,
-            displayName,
-            request.createdAtEpochMillis,
-        )
+        val output =
+            destinationFactory.prepare(
+                request.settings.storageDestination,
+                captureId,
+                displayName,
+                request.createdAtEpochMillis,
+            )
         preparedOutput = output
         val attemptElapsed = monotonicClock.nowNanos()
         val startedDeferred = CompletableDeferred<CaptureStart>()
@@ -175,16 +185,17 @@ class CameraXCaptureEngine(
                 ) { "Microphone permission was revoked before recorder start" }
                 pending = pending.withAudioEnabled()
             }
-            val active = pending.start(ContextCompat.getMainExecutor(context)) { event ->
-                handleEvent(
-                    request = request,
-                    output = output,
-                    effectiveQuality = effectiveQuality,
-                    event = event,
-                    started = startedDeferred,
-                    onProgress = onProgress,
-                )
-            }
+            val active =
+                pending.start(ContextCompat.getMainExecutor(context)) { event ->
+                    handleEvent(
+                        request = request,
+                        output = output,
+                        effectiveQuality = effectiveQuality,
+                        event = event,
+                        started = startedDeferred,
+                        onProgress = onProgress,
+                    )
+                }
             recording = active
             output.close()
             return withTimeout(START_TIMEOUT_MILLIS) { startedDeferred.await() }
@@ -275,57 +286,67 @@ class CameraXCaptureEngine(
             output.close()
             val stats = event.recordingStats
             val start = actualStart
-            val candidate = LastCapture(
-                uri = output.contentUri,
-                durationMillis = (stats.recordedDurationNanos / 1_000_000L).coerceAtLeast(0),
-                createdAtMillis = start?.startedAtEpochMillis ?: request.createdAtEpochMillis,
-                displayName = output.displayName,
-                quality = effectiveQuality.toCaptureQuality(),
-                audioIncluded = request.settings.audioEnabled,
-                id = output.id,
-                storageDestination = output.destination,
-                privateRef = output.privateRef,
-                sizeBytes = stats.numBytesRecorded.takeIf { it > 0 },
-                audioKnown = request.settings.audioEnabled,
-                state = CaptureRecordState.METADATA_PENDING,
-            )
-            val validated = try {
-                galleryMedia.validate(app.chalna.capture.domain.CaptureItem.from(candidate))
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                null
-            }
+            val candidate =
+                LastCapture(
+                    uri = output.contentUri,
+                    durationMillis = (stats.recordedDurationNanos / 1_000_000L).coerceAtLeast(0),
+                    createdAtMillis = start?.startedAtEpochMillis ?: request.createdAtEpochMillis,
+                    displayName = output.displayName,
+                    quality = effectiveQuality.toCaptureQuality(),
+                    audioIncluded = request.settings.audioEnabled,
+                    id = output.id,
+                    storageDestination = output.destination,
+                    privateRef = output.privateRef,
+                    sizeBytes = stats.numBytesRecorded.takeIf { it > 0 },
+                    audioKnown = request.settings.audioEnabled,
+                    state = CaptureRecordState.METADATA_PENDING,
+                )
+            val validated =
+                try {
+                    galleryMedia.validate(
+                        app.chalna.capture.domain.CaptureItem
+                            .from(candidate),
+                    )
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    null
+                }
             if (validated == null) {
                 destinationFactory.discard(output)
                 attemptStore.clear()
-                val failure = CaptureOperationException(
-                    CaptureFailure(CaptureFailureCode.OUTPUT_INVALID, false, "recorded_output_invalid"),
-                )
+                val failure =
+                    CaptureOperationException(
+                        CaptureFailure(CaptureFailureCode.OUTPUT_INVALID, false, "recorded_output_invalid"),
+                    )
                 if (!started.isCompleted) started.completeExceptionally(failure)
                 finalized?.completeExceptionally(failure)
                 resetAttemptState()
                 return@launch
             }
-            val published = try {
-                destinationFactory.publish(output)
-                true
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                false
-            }
-            val capture = validated.copy(
-                state = if (published) CaptureRecordState.READY else CaptureRecordState.METADATA_PENDING,
-            ).toLastCapture()
+            val published =
+                try {
+                    destinationFactory.publish(output)
+                    true
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    false
+                }
+            val capture =
+                validated
+                    .copy(
+                        state = if (published) CaptureRecordState.READY else CaptureRecordState.METADATA_PENDING,
+                    ).toLastCapture()
             runCatching { attemptStore.updateStage(CaptureAttemptStage.MEDIA_SAVED) }
             CaptureTelemetryRegistry.mark(request.invocationId, "output_validated")
             if (event.hasError()) {
-                val code = if (event.error == VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE) {
-                    CaptureFailureCode.LOW_STORAGE
-                } else {
-                    CaptureFailureCode.FINALIZE
-                }
+                val code =
+                    if (event.error == VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE) {
+                        CaptureFailureCode.LOW_STORAGE
+                    } else {
+                        CaptureFailureCode.FINALIZE
+                    }
                 finalized?.completeExceptionally(
                     CaptureOperationException(
                         CaptureFailure(code, true, "camerax_finalize_${event.error}"),
@@ -358,13 +379,14 @@ class CameraXCaptureEngine(
         var preserved: LastCapture? = null
         if (active != null) {
             runCatching { active.stop() }
-            preserved = try {
-                withTimeoutOrNull(CANCEL_FINALIZE_TIMEOUT_MILLIS) { finalized?.await() }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                null
-            }
+            preserved =
+                try {
+                    withTimeoutOrNull(CANCEL_FINALIZE_TIMEOUT_MILLIS) { finalized?.await() }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    null
+                }
             runCatching { active.close() }
         }
         if (preserved == null) {
@@ -375,56 +397,67 @@ class CameraXCaptureEngine(
         resetAttemptState()
     }
 
-    private fun prepare(recorder: Recorder, output: PreparedCaptureOutput): PendingRecording = when (val target = output.target) {
-        is CaptureOutputTarget.DeviceGallery -> recorder.prepareRecording(context, target.options)
-        is CaptureOutputTarget.Vault -> recorder.prepareRecording(context, target.options)
-    }
+    private fun prepare(
+        recorder: Recorder,
+        output: PreparedCaptureOutput,
+    ): PendingRecording =
+        when (val target = output.target) {
+            is CaptureOutputTarget.DeviceGallery -> recorder.prepareRecording(context, target.options)
+            is CaptureOutputTarget.Vault -> recorder.prepareRecording(context, target.options)
+        }
 
     private fun selectQuality(
         cameraProvider: ProcessCameraProvider,
         selector: CameraSelector,
         preferred: CaptureQuality,
     ): Quality {
-        val supported = Recorder.getVideoCapabilities(cameraProvider.getCameraInfo(selector))
-            .getSupportedQualities(DynamicRange.SDR)
-        val order = when (preferred) {
-            CaptureQuality.AUTO, CaptureQuality.FHD -> listOf(Quality.FHD, Quality.HD, Quality.SD)
-            CaptureQuality.HD -> listOf(Quality.HD, Quality.SD, Quality.FHD)
-            CaptureQuality.SD -> listOf(Quality.SD, Quality.HD, Quality.FHD)
-            CaptureQuality.UNKNOWN -> listOf(Quality.FHD, Quality.HD, Quality.SD)
-        }
+        val supported =
+            Recorder
+                .getVideoCapabilities(cameraProvider.getCameraInfo(selector))
+                .getSupportedQualities(DynamicRange.SDR)
+        val order =
+            when (preferred) {
+                CaptureQuality.AUTO, CaptureQuality.FHD -> listOf(Quality.FHD, Quality.HD, Quality.SD)
+                CaptureQuality.HD -> listOf(Quality.HD, Quality.SD, Quality.FHD)
+                CaptureQuality.SD -> listOf(Quality.SD, Quality.HD, Quality.FHD)
+                CaptureQuality.UNKNOWN -> listOf(Quality.FHD, Quality.HD, Quality.SD)
+            }
         return order.firstOrNull(supported::contains) ?: supported.firstOrNull()
             ?: throw CaptureOperationException(
                 CaptureFailure(CaptureFailureCode.CAMERA_UNAVAILABLE, false, "no_supported_video_quality"),
             )
     }
 
-    private fun Quality.toCaptureQuality(): CaptureQuality = when (this) {
-        Quality.FHD -> CaptureQuality.FHD
-        Quality.HD -> CaptureQuality.HD
-        Quality.SD -> CaptureQuality.SD
-        else -> CaptureQuality.UNKNOWN
-    }
+    private fun Quality.toCaptureQuality(): CaptureQuality =
+        when (this) {
+            Quality.FHD -> CaptureQuality.FHD
+            Quality.HD -> CaptureQuality.HD
+            Quality.SD -> CaptureQuality.SD
+            else -> CaptureQuality.UNKNOWN
+        }
 
-    private fun currentDisplayRotation(): Int = context.getSystemService(DisplayManager::class.java)
-        .getDisplay(Display.DEFAULT_DISPLAY)
-        ?.rotation
-        ?: Surface.ROTATION_0
+    private fun currentDisplayRotation(): Int =
+        context
+            .getSystemService(DisplayManager::class.java)
+            .getDisplay(Display.DEFAULT_DISPLAY)
+            ?.rotation
+            ?: Surface.ROTATION_0
 
-    private suspend fun awaitProvider(): ProcessCameraProvider = provider ?: suspendCancellableCoroutine { continuation ->
-        val future = ProcessCameraProvider.getInstance(context)
-        future.addListener(
-            {
-                try {
-                    val value = future.get().also { provider = it }
-                    if (continuation.isActive) continuation.resume(value)
-                } catch (failure: Exception) {
-                    if (continuation.isActive) continuation.resumeWithException(failure)
-                }
-            },
-            ContextCompat.getMainExecutor(context),
-        )
-    }
+    private suspend fun awaitProvider(): ProcessCameraProvider =
+        provider ?: suspendCancellableCoroutine { continuation ->
+            val future = ProcessCameraProvider.getInstance(context)
+            future.addListener(
+                {
+                    try {
+                        val value = future.get().also { provider = it }
+                        if (continuation.isActive) continuation.resume(value)
+                    } catch (failure: Exception) {
+                        if (continuation.isActive) continuation.resumeWithException(failure)
+                    }
+                },
+                ContextCompat.getMainExecutor(context),
+            )
+        }
 
     private fun activeInvocationId(): String = actualStart?.invocationId ?: "capture"
 

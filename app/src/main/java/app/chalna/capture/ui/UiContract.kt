@@ -4,25 +4,51 @@ import android.graphics.Bitmap
 import android.os.CancellationSignal
 import android.view.SurfaceView
 import androidx.paging.PagingData
-import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import java.time.LocalDate
 
 enum class CapturePhase { SETUP_REQUIRED, READY, STARTING, RECORDING, STOPPING, SAVED, ERROR }
+
 enum class VideoQuality { AUTO, FHD, HD }
+
 enum class AppearanceMode { NIGHT, MIST, SYSTEM }
+
 enum class MotionMode { SYSTEM, FULL, REDUCED }
+
 enum class StorageDestinationUi { DEVICE_GALLERY, CHALNA_VAULT }
+
 enum class GalleryFilter { ALL, DEVICE_GALLERY, CHALNA_VAULT, FAVORITES, TRASH }
+
 enum class GallerySortUi { NEWEST, OLDEST, LONGEST, LARGEST }
+
 enum class PlayerPhase { PREPARING, BUFFERING, READY, ENDED, ERROR, SOURCE_MISSING }
 
 sealed interface UiOperationEvent {
-    data class Started(val operation: String, val total: Int) : UiOperationEvent
-    data class Progress(val operation: String, val completed: Int, val total: Int) : UiOperationEvent
-    data class Succeeded(val messageResource: Int) : UiOperationEvent
-    data class PartiallyFailed(val messageResource: Int, val succeeded: Int, val failed: Int) : UiOperationEvent
-    data class Failed(val messageResource: Int) : UiOperationEvent
+    data class Started(
+        val operation: String,
+        val total: Int,
+    ) : UiOperationEvent
+
+    data class Progress(
+        val operation: String,
+        val completed: Int,
+        val total: Int,
+    ) : UiOperationEvent
+
+    data class Succeeded(
+        val messageResource: Int,
+    ) : UiOperationEvent
+
+    data class PartiallyFailed(
+        val messageResource: Int,
+        val succeeded: Int,
+        val failed: Int,
+    ) : UiOperationEvent
+
+    data class Failed(
+        val messageResource: Int,
+    ) : UiOperationEvent
 }
 
 data class MediaItemUi(
@@ -45,8 +71,13 @@ data class MediaItemUi(
 )
 
 sealed interface GalleryPagingItem {
-    data class Day(val date: LocalDate) : GalleryPagingItem
-    data class Media(val item: MediaItemUi) : GalleryPagingItem
+    data class Day(
+        val date: LocalDate,
+    ) : GalleryPagingItem
+
+    data class Media(
+        val item: MediaItemUi,
+    ) : GalleryPagingItem
 }
 
 data class PlayerUiState(
@@ -108,53 +139,104 @@ data class ChalnaUiState(
 interface UiDependencies {
     val state: StateFlow<ChalnaUiState>
     val galleryPaging: Flow<PagingData<GalleryPagingItem>>
+
     fun toggleCapture()
+
     fun requestCamera()
+
     fun requestMicrophone()
+
     fun requestNotifications()
+
     fun openAssistantSettings()
+
     fun openAppSettings()
+
     fun openNotificationSettings()
+
     fun refreshSetup()
+
     fun finishSetup()
+
     fun setQuality(value: VideoQuality)
+
     fun setAppearance(value: AppearanceMode)
+
     fun setHaptics(value: Boolean)
+
     fun setSound(value: Boolean)
+
     fun setAutoStop(seconds: Int)
+
     fun setMotion(value: MotionMode)
+
     fun setStorageDestination(value: StorageDestinationUi)
+
     fun openLastCapture()
+
     fun reviewSetup()
+
     fun requestQuickTile()
 
     fun refreshGallery()
-    fun loadThumbnail(uri: String, sizePx: Int, cancellationSignal: CancellationSignal): Bitmap?
+
+    fun loadThumbnail(
+        uri: String,
+        sizePx: Int,
+        cancellationSignal: CancellationSignal,
+    ): Bitmap?
+
     fun setGalleryFilter(value: GalleryFilter)
+
     fun setGallerySort(value: GallerySortUi)
+
     fun toggleMediaSelection(id: String)
+
     fun selectAllMedia()
+
     fun clearMediaSelection()
+
     fun trashSelectedMedia()
+
     fun restoreSelectedMedia()
+
     fun deleteSelectedMediaPermanently()
+
     fun favoriteSelectedMedia(favorite: Boolean)
+
     fun shareSelectedMedia()
+
     fun exportSelectedMedia(forceCopy: Boolean = false)
+
     fun emptyTrash()
+
     fun exportAllVault()
+
     fun openPlayer(id: String)
+
     fun closePlayer()
+
     fun bindPlayerView(view: SurfaceView?)
+
     fun togglePlayback()
+
     fun seekPlayer(positionMillis: Long)
+
     fun seekPlayerBy(deltaMillis: Long)
+
     fun setPlayerMuted(muted: Boolean)
+
     fun setPlaybackSpeed(speed: Float)
+
     fun retryPlayback()
+
     fun shareCurrentMedia()
+
     fun trashCurrentMedia()
+
     fun exportCurrentMedia(forceCopy: Boolean = false)
+
     fun openCurrentMediaExternally()
+
     fun consumeOperationEvent()
 }

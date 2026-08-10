@@ -12,64 +12,73 @@ import org.junit.Test
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CaptureCoordinatorTest {
-    @Test fun serializedStartThenStopFinalizesExactlyOnce() = runTest {
-        val engine = FakeEngine()
-        val fixture = actor(engine)
-        fixture.actor.submit(request("11111111-1111-1111-1111-111111111111", CaptureCommand.START))
-        advanceUntilIdle()
-        assertTrue(fixture.states.state.value is CaptureState.Recording)
-        fixture.actor.submit(request("22222222-2222-2222-2222-222222222222", CaptureCommand.STOP))
-        advanceUntilIdle()
-        assertTrue(fixture.states.state.value is CaptureState.Saved)
-        assertEquals(1, engine.starts)
-        assertEquals(1, engine.stops)
-        assertEquals(1, fixture.persisted.size)
-        fixture.actor.destroy()
-    }
+    @Test fun serializedStartThenStopFinalizesExactlyOnce() =
+        runTest {
+            val engine = FakeEngine()
+            val fixture = actor(engine)
+            fixture.actor.submit(request("11111111-1111-1111-1111-111111111111", CaptureCommand.START))
+            advanceUntilIdle()
+            assertTrue(fixture.states.state.value is CaptureState.Recording)
+            fixture.actor.submit(request("22222222-2222-2222-2222-222222222222", CaptureCommand.STOP))
+            advanceUntilIdle()
+            assertTrue(fixture.states.state.value is CaptureState.Saved)
+            assertEquals(1, engine.starts)
+            assertEquals(1, engine.stops)
+            assertEquals(1, fixture.persisted.size)
+            fixture.actor.destroy()
+        }
 
-    @Test fun secondInvocationDuringStartingCancelsAndReleasesCamera() = runTest {
-        val engine = FakeEngine(blockStart = true)
-        val fixture = actor(engine)
-        fixture.actor.submit(request("11111111-1111-1111-1111-111111111111", CaptureCommand.START))
-        advanceUntilIdle()
-        fixture.actor.submit(request("22222222-2222-2222-2222-222222222222", CaptureCommand.CANCEL_START))
-        advanceUntilIdle()
-        assertEquals(CaptureState.Idle, fixture.states.state.value)
-        assertEquals(1, engine.cancels)
-        assertEquals(0, engine.stops)
-        fixture.actor.destroy()
-    }
+    @Test fun secondInvocationDuringStartingCancelsAndReleasesCamera() =
+        runTest {
+            val engine = FakeEngine(blockStart = true)
+            val fixture = actor(engine)
+            fixture.actor.submit(request("11111111-1111-1111-1111-111111111111", CaptureCommand.START))
+            advanceUntilIdle()
+            fixture.actor.submit(request("22222222-2222-2222-2222-222222222222", CaptureCommand.CANCEL_START))
+            advanceUntilIdle()
+            assertEquals(CaptureState.Idle, fixture.states.state.value)
+            assertEquals(1, engine.cancels)
+            assertEquals(0, engine.stops)
+            fixture.actor.destroy()
+        }
 
-    @Test fun cancellationExceptionIsNotConvertedToFailure() = runTest {
-        val engine = FakeEngine(blockStart = true)
-        val fixture = actor(engine)
-        fixture.actor.submit(request("11111111-1111-1111-1111-111111111111", CaptureCommand.START))
-        advanceUntilIdle()
-        fixture.actor.submit(request("22222222-2222-2222-2222-222222222222", CaptureCommand.CANCEL_START))
-        advanceUntilIdle()
-        assertTrue(fixture.states.state.value !is CaptureState.Failed)
-        fixture.actor.destroy()
-    }
+    @Test fun cancellationExceptionIsNotConvertedToFailure() =
+        runTest {
+            val engine = FakeEngine(blockStart = true)
+            val fixture = actor(engine)
+            fixture.actor.submit(request("11111111-1111-1111-1111-111111111111", CaptureCommand.START))
+            advanceUntilIdle()
+            fixture.actor.submit(request("22222222-2222-2222-2222-222222222222", CaptureCommand.CANCEL_START))
+            advanceUntilIdle()
+            assertTrue(fixture.states.state.value !is CaptureState.Failed)
+            fixture.actor.destroy()
+        }
 
     private fun kotlinx.coroutines.test.TestScope.actor(engine: FakeEngine): Fixture {
         val states = CaptureStateRepository(FakeMonotonicClock())
         val persisted = mutableListOf<LastCapture>()
-        val actor = CaptureCommandActor(
-            scope = this,
-            states = states,
-            engine = engine,
-            settingsSnapshot = { CaptureSettings(audioEnabled = false) },
-            preflight = CapturePreflight { null },
-            epochClock = object : EpochClock { override fun nowMillis() = 1_700_000_000_000L },
-            monotonicClock = FakeMonotonicClock(),
-            effects = object : CaptureActorEffects {
-                override suspend fun onState(state: CaptureState) = Unit
-                override suspend fun persist(capture: LastCapture): Boolean {
-                    persisted += capture
-                    return true
-                }
-            },
-        )
+        val actor =
+            CaptureCommandActor(
+                scope = this,
+                states = states,
+                engine = engine,
+                settingsSnapshot = { CaptureSettings(audioEnabled = false) },
+                preflight = CapturePreflight { null },
+                epochClock =
+                    object : EpochClock {
+                        override fun nowMillis() = 1_700_000_000_000L
+                    },
+                monotonicClock = FakeMonotonicClock(),
+                effects =
+                    object : CaptureActorEffects {
+                        override suspend fun onState(state: CaptureState) = Unit
+
+                        override suspend fun persist(capture: LastCapture): Boolean {
+                            persisted += capture
+                            return true
+                        }
+                    },
+            )
         return Fixture(actor, states, persisted)
     }
 
@@ -79,7 +88,9 @@ class CaptureCoordinatorTest {
         val persisted: MutableList<LastCapture>,
     )
 
-    private inner class FakeEngine(private val blockStart: Boolean = false) : CaptureEngine {
+    private inner class FakeEngine(
+        private val blockStart: Boolean = false,
+    ) : CaptureEngine {
         var starts = 0
         var stops = 0
         var cancels = 0
@@ -111,22 +122,27 @@ class CaptureCoordinatorTest {
 
     private class FakeMonotonicClock : MonotonicClock {
         private var value = 1_000_000L
+
         override fun nowNanos(): Long = value.also { value += 1_000_000L }
     }
 
-    private fun request(id: String, command: CaptureCommand) = CaptureRequest(
+    private fun request(
+        id: String,
+        command: CaptureCommand,
+    ) = CaptureRequest(
         invocationId = id,
         command = command,
         trigger = CaptureTrigger.ASSISTANT,
         receivedElapsedNanos = 1,
     )
 
-    private fun validCapture() = LastCapture(
-        uri = "content://media/external/video/media/1",
-        durationMillis = 1_000,
-        createdAtMillis = 1_700_000_000_000L,
-        id = "33333333-3333-3333-3333-333333333333",
-        displayName = "CHALNA_test.mp4",
-        sizeBytes = 1_024,
-    )
+    private fun validCapture() =
+        LastCapture(
+            uri = "content://media/external/video/media/1",
+            durationMillis = 1_000,
+            createdAtMillis = 1_700_000_000_000L,
+            id = "33333333-3333-3333-3333-333333333333",
+            displayName = "CHALNA_test.mp4",
+            sizeBytes = 1_024,
+        )
 }

@@ -21,10 +21,10 @@ import app.chalna.capture.domain.GalleryScope
 import app.chalna.capture.domain.GallerySort
 import app.chalna.capture.domain.LastCapture
 import app.chalna.capture.domain.StorageDestination
-import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 
 data class CaptureMetadata(
     val durationMillis: Long? = null,
@@ -44,17 +44,29 @@ fun interface CaptureMetadataExtractor {
 }
 
 sealed interface TrashMediaResult {
-    data class Trashed(val item: CaptureItem) : TrashMediaResult
+    data class Trashed(
+        val item: CaptureItem,
+    ) : TrashMediaResult
+
     data object PermanentDeleteRequired : TrashMediaResult
+
     data object Failed : TrashMediaResult
 }
 
 interface GalleryMediaGateway {
     suspend fun exists(item: CaptureItem): Boolean
+
     suspend fun validate(item: CaptureItem): CaptureItem?
-    suspend fun moveToTrash(item: CaptureItem, trashedAtEpochMillis: Long): TrashMediaResult
+
+    suspend fun moveToTrash(
+        item: CaptureItem,
+        trashedAtEpochMillis: Long,
+    ): TrashMediaResult
+
     suspend fun restore(item: CaptureItem): CaptureItem?
+
     suspend fun deletePermanently(item: CaptureItem): Boolean
+
     suspend fun exportVaultToDeviceGallery(item: CaptureItem): CaptureItem
 }
 
@@ -87,18 +99,23 @@ class GalleryRepository(
         return captureDao.countAll()
     }
 
-    fun observeActive(): Flow<List<CaptureItem>> = captureDao.observeActive().map { entities ->
-        entities.mapNotNull(CaptureEntity::toDomain)
-    }
+    fun observeActive(): Flow<List<CaptureItem>> =
+        captureDao.observeActive().map { entities ->
+            entities.mapNotNull(CaptureEntity::toDomain)
+        }
 
-    fun paging(query: GalleryQuery): Flow<PagingData<CaptureItem>> = Pager(
-        config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
-        pagingSourceFactory = { captureDao.pagingSource(buildPagingQuery(query)) },
-    ).flow.map { data -> data.map { entity -> requireNotNull(entity.toDomain()) } }
+    fun paging(query: GalleryQuery): Flow<PagingData<CaptureItem>> =
+        Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, prefetchDistance = PAGE_SIZE / 2, enablePlaceholders = false),
+            pagingSourceFactory = { captureDao.pagingSource(buildPagingQuery(query)) },
+        ).flow.map { data -> data.map { entity -> requireNotNull(entity.toDomain()) } }
 
     suspend fun ids(query: GalleryQuery): Set<String> = captureDao.idList(buildPagingQuery(query, "id")).toSet()
 
-    suspend fun items(query: GalleryQuery = GalleryQuery(), limit: Int = LEGACY_UI_LIMIT): List<CaptureItem> {
+    suspend fun items(
+        query: GalleryQuery = GalleryQuery(),
+        limit: Int = LEGACY_UI_LIMIT,
+    ): List<CaptureItem> {
         val page = captureDao.activePage(limit).mapNotNull(CaptureEntity::toDomain)
         return GalleryFilter.apply(page, query)
     }
@@ -122,10 +139,11 @@ class GalleryRepository(
     }
 
     suspend fun recordMetadataPending(capture: LastCapture) {
-        val item = CaptureItem.from(capture).copy(
-            state = CaptureRecordState.METADATA_PENDING,
-            metadataKnown = false,
-        )
+        val item =
+            CaptureItem.from(capture).copy(
+                state = CaptureRecordState.METADATA_PENDING,
+                metadataKnown = false,
+            )
         runCatching { captureDao.upsert(item.toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION)) }
         database.pendingOperationDao().upsert(
             PendingOperationEntity(
@@ -141,8 +159,10 @@ class GalleryRepository(
     }
 
     suspend fun reconcile(limit: Int = RECONCILE_MANUAL_BATCH): BatchOperationResult {
-        val candidates = captureDao.reconciliationBatch(nowEpochMillis() - REVERIFY_AFTER_MILLIS, limit)
-            .mapNotNull(CaptureEntity::toDomain)
+        val candidates =
+            captureDao
+                .reconciliationBatch(nowEpochMillis() - REVERIFY_AFTER_MILLIS, limit)
+                .mapNotNull(CaptureEntity::toDomain)
         val succeeded = mutableSetOf<String>()
         val failed = mutableSetOf<String>()
         candidates.forEach { item ->
@@ -169,25 +189,32 @@ class GalleryRepository(
         return BatchOperationResult(succeeded, failed)
     }
 
-    suspend fun setFavorite(ids: Set<String>, favorite: Boolean): BatchOperationResult {
+    suspend fun setFavorite(
+        ids: Set<String>,
+        favorite: Boolean,
+    ): BatchOperationResult {
         val valid = captureDao.byIds(ids).mapTo(mutableSetOf(), CaptureEntity::id)
         captureDao.setFavorite(valid, favorite, LegacyCaptureIndexImporter.CURRENT_DATA_VERSION)
         return BatchOperationResult(valid, ids - valid)
     }
 
     suspend fun trash(ids: Set<String>): BatchOperationResult {
-        val items = captureDao.byIds(ids).mapNotNull(CaptureEntity::toDomain)
-            .filter { it.state != CaptureRecordState.TRASHED }
+        val items =
+            captureDao
+                .byIds(ids)
+                .mapNotNull(CaptureEntity::toDomain)
+                .filter { it.state != CaptureRecordState.TRASHED }
         val succeeded = mutableSetOf<String>()
         val failed = (ids - items.mapTo(mutableSetOf(), CaptureItem::id)).toMutableSet()
         items.forEach { item ->
             when (val result = media.moveToTrash(item, nowEpochMillis())) {
                 is TrashMediaResult.Trashed -> {
                     captureDao.upsert(
-                        result.item.copy(
-                            state = CaptureRecordState.TRASHED,
-                            trashedAtMillis = nowEpochMillis(),
-                        ).toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION),
+                        result.item
+                            .copy(
+                                state = CaptureRecordState.TRASHED,
+                                trashedAtMillis = nowEpochMillis(),
+                            ).toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION),
                     )
                     succeeded += item.id
                 }
@@ -202,21 +229,28 @@ class GalleryRepository(
     suspend fun delete(ids: Set<String>): BatchOperationResult = trash(ids)
 
     suspend fun restore(ids: Set<String>): BatchOperationResult {
-        val items = captureDao.byIds(ids).mapNotNull(CaptureEntity::toDomain)
-            .filter { it.state == CaptureRecordState.TRASHED }
+        val items =
+            captureDao
+                .byIds(ids)
+                .mapNotNull(CaptureEntity::toDomain)
+                .filter { it.state == CaptureRecordState.TRASHED }
         val succeeded = mutableSetOf<String>()
         val failed = (ids - items.mapTo(mutableSetOf(), CaptureItem::id)).toMutableSet()
         items.forEach { item ->
-            val restored = try {
-                media.restore(item)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                null
-            }
-            if (restored == null) failed += item.id else {
+            val restored =
+                try {
+                    media.restore(item)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    null
+                }
+            if (restored == null) {
+                failed += item.id
+            } else {
                 captureDao.upsert(
-                    restored.copy(state = CaptureRecordState.READY, trashedAtMillis = null)
+                    restored
+                        .copy(state = CaptureRecordState.READY, trashedAtMillis = null)
                         .toEntity(LegacyCaptureIndexImporter.CURRENT_DATA_VERSION),
                 )
                 succeeded += item.id
@@ -230,20 +264,23 @@ class GalleryRepository(
         val succeeded = mutableSetOf<String>()
         val failed = (ids - items.mapTo(mutableSetOf(), CaptureItem::id)).toMutableSet()
         items.forEach { item ->
-            val deleted = try {
-                media.deletePermanently(item)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                false
-            }
+            val deleted =
+                try {
+                    media.deletePermanently(item)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    false
+                }
             if (deleted) {
                 database.withTransaction {
                     captureDao.deleteById(item.id)
                     database.playbackStateDao().delete(item.id)
                 }
                 succeeded += item.id
-            } else failed += item.id
+            } else {
+                failed += item.id
+            }
         }
         repairLastCapture()
         return BatchOperationResult(succeeded, failed)
@@ -255,9 +292,15 @@ class GalleryRepository(
         return deletePermanently(ids)
     }
 
-    suspend fun exportVault(ids: Set<String>, forceCopy: Boolean = false): BatchOperationResult {
-        val sources = captureDao.byIds(ids).mapNotNull(CaptureEntity::toDomain)
-            .filter { it.storageDestination == StorageDestination.CHALNA_VAULT && it.state != CaptureRecordState.TRASHED }
+    suspend fun exportVault(
+        ids: Set<String>,
+        forceCopy: Boolean = false,
+    ): BatchOperationResult {
+        val sources =
+            captureDao
+                .byIds(ids)
+                .mapNotNull(CaptureEntity::toDomain)
+                .filter { it.storageDestination == StorageDestination.CHALNA_VAULT && it.state != CaptureRecordState.TRASHED }
         val succeeded = mutableSetOf<String>()
         val failed = (ids - sources.mapTo(mutableSetOf(), CaptureItem::id)).toMutableSet()
         val produced = mutableListOf<CaptureItem>()
@@ -271,14 +314,15 @@ class GalleryRepository(
             if (existing == null && source.exportedCopyId != null) {
                 captureDao.linkExport(source.id, null, LegacyCaptureIndexImporter.CURRENT_DATA_VERSION)
             }
-            val copy = try {
-                media.exportVaultToDeviceGallery(source)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                failed += source.id
-                return@forEach
-            }
+            val copy =
+                try {
+                    media.exportVaultToDeviceGallery(source)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    failed += source.id
+                    return@forEach
+                }
             try {
                 database.withTransaction {
                     captureDao.upsert(
@@ -310,21 +354,25 @@ class GalleryRepository(
         return BatchOperationResult(succeeded, failed, produced)
     }
 
-    suspend fun shareUris(ids: Set<String>): List<String> = captureDao.byIds(ids)
-        .mapNotNull(CaptureEntity::toDomain)
-        .filter { it.state != CaptureRecordState.TRASHED && media.exists(it) }
-        .map(CaptureItem::contentUri)
+    suspend fun shareUris(ids: Set<String>): List<String> =
+        captureDao
+            .byIds(ids)
+            .mapNotNull(CaptureEntity::toDomain)
+            .filter { it.state != CaptureRecordState.TRASHED && media.exists(it) }
+            .map(CaptureItem::contentUri)
 
-    suspend fun externalOpenUri(id: String): String? = byId(id)
-        ?.takeIf { it.state != CaptureRecordState.TRASHED }
-        ?.contentUri
+    suspend fun externalOpenUri(id: String): String? =
+        byId(id)
+            ?.takeIf { it.state != CaptureRecordState.TRASHED }
+            ?.contentUri
 
-    suspend fun storageSummary(): StorageSummary = StorageSummary(
-        deviceGalleryCount = captureDao.countByDestination(StorageDestination.DEVICE_GALLERY.name),
-        vaultCount = captureDao.countByDestination(StorageDestination.CHALNA_VAULT.name),
-        vaultBytes = captureDao.bytesByDestination(StorageDestination.CHALNA_VAULT.name),
-        trashBytes = captureDao.trashBytes(),
-    )
+    suspend fun storageSummary(): StorageSummary =
+        StorageSummary(
+            deviceGalleryCount = captureDao.countByDestination(StorageDestination.DEVICE_GALLERY.name),
+            vaultCount = captureDao.countByDestination(StorageDestination.CHALNA_VAULT.name),
+            vaultBytes = captureDao.bytesByDestination(StorageDestination.CHALNA_VAULT.name),
+            trashBytes = captureDao.trashBytes(),
+        )
 
     private suspend fun removeMissing(item: CaptureItem) {
         database.withTransaction {
@@ -340,7 +388,10 @@ class GalleryRepository(
         if (!exists) settings.saveLastCapture(captureDao.latestActive()?.toDomain()?.toLastCapture())
     }
 
-    private fun buildPagingQuery(query: GalleryQuery, projection: String = "*"): SimpleSQLiteQuery {
+    private fun buildPagingQuery(
+        query: GalleryQuery,
+        projection: String = "*",
+    ): SimpleSQLiteQuery {
         val where = mutableListOf<String>()
         val args = mutableListOf<Any>()
         when (query.scope) {
@@ -355,12 +406,13 @@ class GalleryRepository(
             where += "storageDestination = ?"
             args += it.name
         }
-        val order = when (query.sort) {
-            GallerySort.NEWEST_FIRST -> "createdAtEpochMillis DESC, id DESC"
-            GallerySort.OLDEST_FIRST -> "createdAtEpochMillis ASC, id ASC"
-            GallerySort.LONGEST_FIRST -> "durationMillis DESC, createdAtEpochMillis DESC"
-            GallerySort.LARGEST_FIRST -> "COALESCE(sizeBytes, -1) DESC, createdAtEpochMillis DESC"
-        }
+        val order =
+            when (query.sort) {
+                GallerySort.NEWEST_FIRST -> "createdAtEpochMillis DESC, id DESC"
+                GallerySort.OLDEST_FIRST -> "createdAtEpochMillis ASC, id ASC"
+                GallerySort.LONGEST_FIRST -> "durationMillis DESC, createdAtEpochMillis DESC"
+                GallerySort.LARGEST_FIRST -> "COALESCE(sizeBytes, -1) DESC, createdAtEpochMillis DESC"
+            }
         return SimpleSQLiteQuery(
             "SELECT $projection FROM captures WHERE ${where.joinToString(" AND ")} ORDER BY $order",
             args.toTypedArray(),

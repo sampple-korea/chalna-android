@@ -12,9 +12,10 @@ class CaptureStateRepositoryTest {
     @Test fun sameInvocationIdOneHundredTimesHasOneAuthoritativeReceipt() {
         val repository = CaptureStateRepository(FakeClock())
         val id = "11111111-1111-1111-1111-111111111111"
-        val results = (0 until 100).map {
-            repository.reserve(id, CaptureCommandResult.AcceptedStart(id))
-        }
+        val results =
+            (0 until 100).map {
+                repository.reserve(id, CaptureCommandResult.AcceptedStart(id))
+            }
         assertTrue(results.first() is CaptureCommandResult.AcceptedStart)
         assertEquals(99, results.drop(1).count { it is CaptureCommandResult.Duplicate })
     }
@@ -47,7 +48,9 @@ class CaptureStateRepositoryTest {
         assertTrue(!repository.isAnonymousFinalizeGuardActive("anonymous-a"))
     }
 
-    private class FakeClock(var value: Long = 0) : MonotonicClock {
+    private class FakeClock(
+        var value: Long = 0,
+    ) : MonotonicClock {
         override fun nowNanos(): Long = value
     }
 }

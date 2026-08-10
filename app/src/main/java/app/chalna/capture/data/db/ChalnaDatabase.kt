@@ -17,21 +17,26 @@ import androidx.room.RoomDatabase
 )
 abstract class ChalnaDatabase : RoomDatabase() {
     abstract fun captureDao(): CaptureDao
+
     abstract fun pendingOperationDao(): PendingOperationDao
+
     abstract fun playbackStateDao(): PlaybackStateDao
+
     abstract fun migrationMarkerDao(): MigrationMarkerDao
 
     companion object {
         @Volatile private var instance: ChalnaDatabase? = null
 
-        fun get(context: Context): ChalnaDatabase = instance ?: synchronized(this) {
-            instance ?: Room.databaseBuilder(
-                context.applicationContext,
-                ChalnaDatabase::class.java,
-                "chalna.db",
-            ).setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .build()
-                .also { instance = it }
-        }
+        fun get(context: Context): ChalnaDatabase =
+            instance ?: synchronized(this) {
+                instance ?: Room
+                    .databaseBuilder(
+                        context.applicationContext,
+                        ChalnaDatabase::class.java,
+                        "chalna.db",
+                    ).setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
+                    .build()
+                    .also { instance = it }
+            }
     }
 }

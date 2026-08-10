@@ -16,9 +16,9 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 
@@ -36,17 +36,19 @@ internal fun InvocationGlow(
     val reveal by transition.animateFloat(
         transitionSpec = {
             keyframes {
-                durationMillis = when (targetState) {
-                    CapturePhase.STARTING -> 560
-                    CapturePhase.STOPPING -> 420
-                    CapturePhase.ERROR -> 360
-                    else -> 280
-                }
+                durationMillis =
+                    when (targetState) {
+                        CapturePhase.STARTING -> 560
+                        CapturePhase.STOPPING -> 420
+                        CapturePhase.ERROR -> 360
+                        else -> 280
+                    }
                 0f at 0
                 1.12f at 210
                 1f at durationMillis
             }
-        }, label = "glowReveal",
+        },
+        label = "glowReveal",
     ) { target ->
         when (target) {
             CapturePhase.SETUP_REQUIRED -> 0f
@@ -55,42 +57,85 @@ internal fun InvocationGlow(
             else -> 1f
         }
     }
-    val breathing = if (phase == CapturePhase.RECORDING && !reducedMotion && deterministicProgress == null) {
-        val infinite = rememberInfiniteTransition(label = "glowBreath")
-        val value by infinite.animateFloat(.92f, 1.06f, infiniteRepeatable(keyframes { durationMillis = 1450; .92f at 0; 1.06f at 620; .98f at 1120; .92f at 1450 }, RepeatMode.Restart), label = "breath")
-        value
-    } else 1f
-    val ambientPhase = if (enabled && !reducedMotion && deterministicProgress == null) {
-        val infinite = rememberInfiniteTransition(label = "haloPhase")
-        val value by infinite.animateFloat(0f, 1f, infiniteRepeatable(keyframes { durationMillis = if (phase == CapturePhase.RECORDING) 8_500 else 13_000; 0f at 0; .46f at durationMillis / 2; 1f at durationMillis }), label = "haloPhaseValue")
-        value
-    } else deterministicProgress ?: .18f
+    val breathing =
+        if (phase == CapturePhase.RECORDING && !reducedMotion && deterministicProgress == null) {
+            val infinite = rememberInfiniteTransition(label = "glowBreath")
+            val value by infinite.animateFloat(
+                .92f,
+                1.06f,
+                infiniteRepeatable(
+                    keyframes {
+                        durationMillis = 1450
+                        .92f at 0
+                        1.06f at 620
+                        .98f at
+                            1120
+                        .92f at 1450
+                    },
+                    RepeatMode.Restart,
+                ),
+                label = "breath",
+            )
+            value
+        } else {
+            1f
+        }
+    val ambientPhase =
+        if (enabled && !reducedMotion && deterministicProgress == null) {
+            val infinite = rememberInfiniteTransition(label = "haloPhase")
+            val value by infinite.animateFloat(
+                0f,
+                1f,
+                infiniteRepeatable(
+                    keyframes {
+                        durationMillis =
+                            if (phase ==
+                                CapturePhase.RECORDING
+                            ) {
+                                8_500
+                            } else {
+                                13_000
+                            }
+                        ; 0f at 0
+                        .46f at durationMillis / 2
+                        1f at durationMillis
+                    },
+                ),
+                label = "haloPhaseValue",
+            )
+            value
+        } else {
+            deterministicProgress ?: .18f
+        }
     val strength = deterministicProgress ?: reveal
     val colors = ChalnaTheme.colors
     Canvas(
         modifier.clearAndSetSemantics { }.drawWithCache {
             val radius = size.minDimension / 2f
-            val atmosphere = when (phase) {
-                CapturePhase.SETUP_REQUIRED -> colors.outline
-                CapturePhase.ERROR -> colors.danger
-                CapturePhase.SAVED -> colors.positive
-                CapturePhase.STOPPING -> colors.accent2
-                else -> colors.accent
-            }
-            val outer = Brush.radialGradient(
-                listOf(Color.Transparent, atmosphere.copy(.05f), atmosphere.copy(.16f), Color.Transparent),
-                radius = radius,
-            )
-            val bloom = Brush.sweepGradient(
+            val atmosphere =
                 when (phase) {
-                    CapturePhase.SETUP_REQUIRED -> listOf(colors.outline, colors.muted, colors.outline)
-                    CapturePhase.RECORDING -> listOf(colors.accent, Color(0xFFFF719C), Color(0xFFD965F5), colors.accent2, colors.accent)
-                    CapturePhase.STOPPING -> listOf(colors.accent2, Color(0xFFFF8ABB), colors.accent, colors.accent2)
-                    CapturePhase.ERROR -> listOf(Color(0xFFFFB35E), colors.danger, Color(0xFFFFD09A), Color(0xFFFFB35E))
-                    CapturePhase.SAVED -> listOf(colors.positive, colors.accent, colors.accent2, colors.positive)
-                    else -> listOf(colors.accent, Color(0xFF5F8BFF), colors.accent2, colors.accent)
-                },
-            )
+                    CapturePhase.SETUP_REQUIRED -> colors.outline
+                    CapturePhase.ERROR -> colors.danger
+                    CapturePhase.SAVED -> colors.positive
+                    CapturePhase.STOPPING -> colors.accent2
+                    else -> colors.accent
+                }
+            val outer =
+                Brush.radialGradient(
+                    listOf(Color.Transparent, atmosphere.copy(.05f), atmosphere.copy(.16f), Color.Transparent),
+                    radius = radius,
+                )
+            val bloom =
+                Brush.sweepGradient(
+                    when (phase) {
+                        CapturePhase.SETUP_REQUIRED -> listOf(colors.outline, colors.muted, colors.outline)
+                        CapturePhase.RECORDING -> listOf(colors.accent, Color(0xFFFF719C), Color(0xFFD965F5), colors.accent2, colors.accent)
+                        CapturePhase.STOPPING -> listOf(colors.accent2, Color(0xFFFF8ABB), colors.accent, colors.accent2)
+                        CapturePhase.ERROR -> listOf(Color(0xFFFFB35E), colors.danger, Color(0xFFFFD09A), Color(0xFFFFB35E))
+                        CapturePhase.SAVED -> listOf(colors.positive, colors.accent, colors.accent2, colors.positive)
+                        else -> listOf(colors.accent, Color(0xFF5F8BFF), colors.accent2, colors.accent)
+                    },
+                )
             val opticalBlend = if (colors.background.luminance() > .5f) BlendMode.SrcOver else BlendMode.Screen
             onDrawBehind {
                 if (active || strength > .01f) {
@@ -127,7 +172,9 @@ internal fun InvocationGlow(
                             sweepAngle = if (phase == CapturePhase.STOPPING) 178f else 224f,
                             useCenter = false,
                             topLeft = Offset(radius * .70f, radius * .70f),
-                            size = androidx.compose.ui.geometry.Size(radius * .60f, radius * .60f),
+                            size =
+                                androidx.compose.ui.geometry
+                                    .Size(radius * .60f, radius * .60f),
                             alpha = (.78f * energy).coerceIn(0f, 1f),
                             style = Stroke(3.dp.toPx(), cap = StrokeCap.Round),
                             blendMode = opticalBlend,
@@ -136,7 +183,17 @@ internal fun InvocationGlow(
                     drawCircle(colors.background.copy(alpha = .82f), radius * .16f)
                 } else {
                     drawCircle(colors.surfaceHigh, radius * .40f)
-                    drawArc(colors.outline, -90f, 218f, false, topLeft = Offset(radius * .60f, radius * .60f), size = androidx.compose.ui.geometry.Size(radius * .80f, radius * .80f), style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+                    drawArc(
+                        colors.outline,
+                        -90f,
+                        218f,
+                        false,
+                        topLeft = Offset(radius * .60f, radius * .60f),
+                        size =
+                            androidx.compose.ui.geometry
+                                .Size(radius * .80f, radius * .80f),
+                        style = Stroke(2.dp.toPx(), cap = StrokeCap.Round),
+                    )
                 }
             }
         },
