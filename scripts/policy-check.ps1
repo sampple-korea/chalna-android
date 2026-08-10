@@ -63,6 +63,12 @@ foreach ($dependency in $forbiddenDependencies) {
   if ($gradleText.Contains($dependency)) { Add-Failure "Forbidden dependency: $dependency" }
 }
 if ($gradleText -match '(?m)version\s*=\s*"\+"|:[0-9][^"'']*\+[''\"]') { Add-Failure "Dynamic dependency version found" }
+foreach ($requiredFile in @("app/gradle.lockfile", "benchmark/gradle.lockfile", "gradle/verification-metadata.xml")) {
+  $resolved = Join-Path $root $requiredFile
+  if (-not (Test-Path $resolved) -or (Get-Item $resolved).Length -eq 0) {
+    Add-Failure "Dependency integrity file is missing or empty: $requiredFile"
+  }
+}
 
 $mainSources = Get-ChildItem (Join-Path $root "app/src/main") -Recurse -File -Include *.kt,*.kts,*.java,*.xml
 foreach ($file in $mainSources) {

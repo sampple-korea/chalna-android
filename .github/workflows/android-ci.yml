@@ -50,7 +50,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --stacktrace --write-locks --write-verification-metadata sha256 :app:dependencies :benchmark:dependencies | tee dependency-report.txt
+          ./gradlew --no-daemon --stacktrace :app:dependencies :benchmark:dependencies > full-dependency-report.txt
+          ./gradlew --no-daemon --stacktrace :app:dependencies --configuration releaseRuntimeClasspath | tee dependency-report.txt
           if grep -Ei 'androidx\.compose\.material(3)?:|com\.google\.android\.material:|material-icons-(core|extended)|androidx\.media3:media3-ui-compose-material3' dependency-report.txt | grep -Ev '\(c\)$'; then
             echo "Resolved dependency graph contains a forbidden Material dependency." >&2
             exit 1
@@ -88,3 +89,4 @@ jobs:
             benchmark/gradle.lockfile
             gradle/verification-metadata.xml
             dependency-report.txt
+            full-dependency-report.txt
