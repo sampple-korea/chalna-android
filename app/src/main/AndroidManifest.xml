@@ -60,8 +60,7 @@
             android:name=".assistant.ChalnaVoiceInteractionService"
             android:directBootAware="false"
             android:exported="true"
-            android:permission="android.permission.BIND_VOICE_INTERACTION"
-            android:process=":interactor">
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
             <intent-filter>
                 <action android:name="android.service.voice.VoiceInteractionService" />
             </intent-filter>
@@ -73,15 +72,13 @@
         <service
             android:name=".assistant.ChalnaVoiceInteractionSessionService"
             android:exported="true"
-            android:permission="android.permission.BIND_VOICE_INTERACTION"
-            android:process=":session" />
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
 
         <service
             android:name=".assistant.ChalnaRecognitionService"
             android:directBootAware="false"
             android:exported="true"
-            android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE"
-            android:process=":recognizer">
+            android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE">
             <intent-filter>
                 <action android:name="android.speech.RecognitionService" />
             </intent-filter>
@@ -95,6 +92,20 @@
             android:exported="false"
             android:foregroundServiceType="camera|microphone"
             android:stopWithTask="false" />
+
+        <service
+            android:name=".capture.ChalnaCaptureTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_chalna"
+            android:label="@string/quick_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

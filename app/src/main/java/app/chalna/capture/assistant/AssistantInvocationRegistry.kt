@@ -1,0 +1,46 @@
+package app.chalna.capture.assistant
+
+import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.service.voice.VoiceInteractionSession
+import app.chalna.capture.domain.CaptureCommandResult
+import java.util.LinkedHashMap
+import java.util.UUID
+
+data class AssistantInvocation(
+    val id: String,
+    val result: CaptureCommandResult,
+)
+
+object AssistantInvocationRegistry {
+    private val entries = LinkedHashMap<String, AssistantInvocation>()
+
+    @Synchronized
+    fun put(sessionKey: String, invocation: AssistantInvocation) {
+        entries[sessionKey] = invocation
+        while (entries.size > MAX_ENTRIES) entries.remove(entries.keys.first())
+    }
+
+    @Synchronized
+    fun take(sessionKey: String): AssistantInvocation? = entries.remove(sessionKey)
+
+    @Synchronized
+    fun discard(sessionKey: String) {
+        entries.remove(sessionKey)
+    }
+
+    fun sessionKey(args: Bundle?): String? = when {
+        Build.VERSION.SDK_INT >= 34 -> args?.getString(VoiceInteractionSession.KEY_SHOW_SESSION_ID)
+        else -> args?.getLong(Intent.EXTRA_TIME, Long.MIN_VALUE)
+            ?.takeIf { it != Long.MIN_VALUE }
+            ?.let { "time-$it" }
+    }
+
+    fun invocationId(args: Bundle?): String {
+        val key = sessionKey(args)
+        return if (key != null) "assistant-$key" else "anonymous-${UUID.randomUUID()}"
+    }
+
+    private const val MAX_ENTRIES = 32
+}

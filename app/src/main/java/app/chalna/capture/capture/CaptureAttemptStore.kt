@@ -1,15 +1,11 @@
 package app.chalna.capture.capture
 
-import android.app.NotificationManager
-import android.content.ContentUris
 import android.content.Context
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.AtomicFile
+import app.chalna.capture.domain.CaptureQuality
+import app.chalna.capture.domain.CaptureSessionSettings
 import app.chalna.capture.domain.StorageDestination
-import app.chalna.capture.media.AndroidCaptureDestinationFactory
 import app.chalna.capture.media.PreparedCaptureOutput
-import app.chalna.capture.notifications.CaptureNotifications
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -18,111 +14,125 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Durable identity for the one output that may be incomplete after abrupt process death. */
+enum class CaptureAttemptStage {
+    OUTPUT_CREATED,
+    CAMERA_BOUND,
+    RECORDER_START_REQUESTED,
+    RECORDING,
+    FINALIZING,
+    MEDIA_SAVED,
+}
+
+data class CaptureAttempt(
+    val invocationId: String,
+    val captureId: String,
+    val destination: StorageDestination,
+    val contentUri: String,
+    val privateRef: String?,
+    val displayName: String,
+    val startedAtEpochMillis: Long,
+    val startedAtElapsedNanos: Long,
+    val requestedAudio: Boolean,
+    val requestedQuality: CaptureQuality,
+    val stage: CaptureAttemptStage,
+)
+
+/** Durable journal for the single output that may outlive an abrupt process death. */
 class CaptureAttemptStore(context: Context) {
-    private val appContext = context.applicationContext
-    private val file = AtomicFile(File(appContext.filesDir, FILE_NAME))
+    private val file = AtomicFile(File(context.applicationContext.filesDir, FILE_NAME))
 
-    fun hasAttempt(): Boolean = file.baseFile.exists()
+    fun hasAttempt(): Boolean = file.baseFile.isFile
 
-    suspend fun mark(output: PreparedCaptureOutput) = recoveryMutex.withLock {
-        withContext(Dispatchers.IO) {
-            val stream = file.startWrite()
-            try {
-                DataOutputStream(stream).apply {
-                    writeUTF(output.id)
-                    writeUTF(output.destination.name)
-                    writeUTF(output.displayName)
-                    writeUTF(output.privateRef.orEmpty())
-                    flush()
-                }
-                file.finishWrite(stream)
-            } catch (failure: Throwable) {
-                file.failWrite(stream)
-                throw failure
-            }
-        }
+    suspend fun mark(
+        invocationId: String,
+        output: PreparedCaptureOutput,
+        settings: CaptureSessionSettings,
+        startedAtEpochMillis: Long,
+        startedAtElapsedNanos: Long,
+    ) = write(
+        CaptureAttempt(
+            invocationId = invocationId,
+            captureId = output.id,
+            destination = output.destination,
+            contentUri = output.contentUri,
+            privateRef = output.privateRef,
+            displayName = output.displayName,
+            startedAtEpochMillis = startedAtEpochMillis,
+            startedAtElapsedNanos = startedAtElapsedNanos,
+            requestedAudio = settings.audioEnabled,
+            requestedQuality = settings.preferredQuality,
+            stage = CaptureAttemptStage.OUTPUT_CREATED,
+        ),
+    )
+
+    suspend fun updateStage(stage: CaptureAttemptStage) = journalMutex.withLock {
+        val current = readUnsafe() ?: return@withLock
+        writeUnsafe(current.copy(stage = stage))
     }
 
-    suspend fun clear(): Boolean = recoveryMutex.withLock {
+    suspend fun read(): CaptureAttempt? = journalMutex.withLock { readUnsafe() }
+
+    suspend fun clear(): Boolean = journalMutex.withLock {
         withContext(Dispatchers.IO) {
             file.delete()
             !file.baseFile.exists()
         }
     }
 
-    suspend fun recover(cancelStaleNotification: Boolean = true) = recoveryMutex.withLock {
-        withContext(Dispatchers.IO) {
-            val attempt = readAttempt()
-            if (attempt != null && attempt.id.isNotBlank() && attempt.displayName.isValidCaptureName()) {
-                runCatching {
-                    when (attempt.destination) {
-                        StorageDestination.CHALNA_VAULT -> deleteVaultAttempt(attempt.privateRef)
-                        StorageDestination.DEVICE_GALLERY -> deletePendingMediaStoreAttempt(attempt.displayName)
-                    }
+    private suspend fun write(attempt: CaptureAttempt) = journalMutex.withLock { writeUnsafe(attempt) }
+
+    private suspend fun writeUnsafe(attempt: CaptureAttempt) = withContext(Dispatchers.IO) {
+        val stream = file.startWrite()
+        try {
+            val data = DataOutputStream(stream)
+            data.writeInt(FORMAT_VERSION)
+            data.writeUTF(attempt.invocationId)
+            data.writeUTF(attempt.captureId)
+            data.writeUTF(attempt.destination.name)
+            data.writeUTF(attempt.contentUri)
+            data.writeUTF(attempt.privateRef.orEmpty())
+            data.writeUTF(attempt.displayName)
+            data.writeLong(attempt.startedAtEpochMillis)
+            data.writeLong(attempt.startedAtElapsedNanos)
+            data.writeBoolean(attempt.requestedAudio)
+            data.writeUTF(attempt.requestedQuality.name)
+            data.writeUTF(attempt.stage.name)
+            data.flush()
+            file.finishWrite(stream)
+        } catch (failure: Exception) {
+            file.failWrite(stream)
+            throw failure
+        }
+    }
+
+    private suspend fun readUnsafe(): CaptureAttempt? = withContext(Dispatchers.IO) {
+        if (!file.baseFile.isFile) return@withContext null
+        runCatching {
+            file.openRead().use { input ->
+                DataInputStream(input).use { data ->
+                    check(data.readInt() == FORMAT_VERSION)
+                    CaptureAttempt(
+                        invocationId = data.readUTF(),
+                        captureId = data.readUTF(),
+                        destination = StorageDestination.valueOf(data.readUTF()),
+                        contentUri = data.readUTF(),
+                        privateRef = data.readUTF().ifBlank { null },
+                        displayName = data.readUTF(),
+                        startedAtEpochMillis = data.readLong(),
+                        startedAtElapsedNanos = data.readLong(),
+                        requestedAudio = data.readBoolean(),
+                        requestedQuality = runCatching { CaptureQuality.valueOf(data.readUTF()) }
+                            .getOrDefault(CaptureQuality.UNKNOWN),
+                        stage = CaptureAttemptStage.valueOf(data.readUTF()),
+                    )
                 }
             }
-            file.delete()
-            if (cancelStaleNotification) {
-                appContext.getSystemService(NotificationManager::class.java)
-                    .cancel(CaptureNotifications.NOTIFICATION_ID)
-            }
-        }
+        }.getOrNull()
     }
-
-    private fun readAttempt(): Attempt? = runCatching {
-        file.openRead().use { input ->
-            DataInputStream(input).use { data ->
-                Attempt(
-                    id = data.readUTF(),
-                    destination = StorageDestination.valueOf(data.readUTF()),
-                    displayName = data.readUTF(),
-                    privateRef = data.readUTF().ifBlank { null },
-                )
-            }
-        }
-    }.getOrNull()
-
-    private fun deleteVaultAttempt(privateRef: String?) {
-        if (privateRef.isNullOrBlank()) return
-        val root = appContext.getExternalFilesDir(Environment.DIRECTORY_MOVIES)?.canonicalFile ?: return
-        val candidate = File(root, privateRef).canonicalFile
-        if (candidate.path.startsWith(root.path + File.separator)) candidate.delete()
-    }
-
-    private fun deletePendingMediaStoreAttempt(displayName: String?) {
-        if (!displayName.isValidCaptureName()) return
-        val resolver = appContext.contentResolver
-        resolver.query(
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-            arrayOf(MediaStore.Video.Media._ID),
-            "${MediaStore.Video.Media.DISPLAY_NAME}=? AND ${MediaStore.Video.Media.RELATIVE_PATH}=? AND ${MediaStore.Video.Media.IS_PENDING}=1",
-            arrayOf(displayName, "${AndroidCaptureDestinationFactory.DEVICE_RELATIVE_PATH}/"),
-            null,
-        )?.use { cursor ->
-            while (cursor.moveToNext()) {
-                resolver.delete(
-                    ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cursor.getLong(0)),
-                    null,
-                    null,
-                )
-            }
-        }
-    }
-
-    private fun String?.isValidCaptureName(): Boolean =
-        this != null && startsWith("CHALNA_") && endsWith(".mp4", ignoreCase = true) &&
-            none { it == '/' || it == '\\' }
-
-    private data class Attempt(
-        val id: String,
-        val destination: StorageDestination,
-        val displayName: String,
-        val privateRef: String?,
-    )
 
     private companion object {
-        const val FILE_NAME = "active-capture-attempt"
-        val recoveryMutex = Mutex()
+        const val FILE_NAME = "active-capture-attempt-v2"
+        const val FORMAT_VERSION = 2
+        val journalMutex = Mutex()
     }
 }

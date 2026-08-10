@@ -1,8 +1,17 @@
 import java.time.Instant
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
+}
+
+val chalnaVersion = Properties().apply {
+    rootProject.file("version.properties").inputStream().use(::load)
 }
 
 android {
@@ -17,8 +26,8 @@ android {
         applicationId = "app.chalna.capture"
         minSdk = 29
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = requireNotNull(chalnaVersion.getProperty("VERSION_CODE")).toInt()
+        versionName = requireNotNull(chalnaVersion.getProperty("VERSION_NAME"))
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = false
         buildConfigField("String", "GIT_SHA", "\"${providers.environmentVariable("GITHUB_SHA").orElse("local").get().take(12)}\"")
@@ -75,11 +84,36 @@ android {
         animationsDisabled = true
     }
 
+    buildTypes.configureEach {
+        enableUnitTestCoverage = name == "debug"
+    }
+
     lint {
         abortOnError = true
         checkReleaseBuilds = true
         warningsAsErrors = true
         disable += setOf("GradleDependency", "AndroidGradlePluginVersion", "OldTargetApi")
+    }
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    parallel = true
+}
+
+ktlint {
+    version.set("1.7.1")
+    android.set(true)
+    outputToConsole.set(true)
+    ignoreFailures.set(false)
+    filter {
+        exclude("**/generated/**")
+        exclude("**/schemas/**")
     }
 }
 
@@ -103,16 +137,28 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.video)
     implementation(libs.media3.exoplayer)
+    implementation(libs.media3.common)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    implementation(libs.room.paging)
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
+    implementation(libs.navigation.compose)
+    implementation(libs.profileinstaller)
     implementation(libs.coroutines.android)
+
+    ksp(libs.room.compiler)
 
     testImplementation(libs.junit4)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.paging.runtime)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.room.testing)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 }

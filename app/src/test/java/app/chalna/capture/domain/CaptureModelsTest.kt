@@ -18,16 +18,17 @@ class CaptureModelsTest {
     }
 
     @Test fun filenameIsUtcStableAndSafe() {
-        assertEquals("CHALNA_19700101_000000_000.mp4", CaptureFileNames.video(0))
+        assertEquals("CHALNA_19700101_000000_000_ab12.mp4", CaptureFileNames.video(0, "ab-12"))
     }
 
     @Test fun recoveryNeverClaimsInterruptedCaptureIsActive() {
         assertEquals(CaptureState.Idle, ProcessRecovery.recovered(CaptureState.Idle))
-        assertTrue(ProcessRecovery.recovered(CaptureState.Recording("x", 1)) is CaptureState.Failed)
+        assertTrue(ProcessRecovery.recovered(CaptureState.Recording("x", 1, 1)) is CaptureState.Failed)
     }
 
     @Test fun lastCaptureRequiresContentUri() {
-        assertTrue(LastCapture("content://media/1", 0, 1).isUsable())
-        assertFalse(LastCapture("file:///tmp/x", 1, 1).isUsable())
+        val id = "11111111-1111-1111-1111-111111111111"
+        assertTrue(LastCapture("content://media/1", 1, 1, id = id, sizeBytes = 1).isUsable())
+        assertFalse(LastCapture("file:///tmp/x", 1, 1, id = id, sizeBytes = 1).isUsable())
     }
 }

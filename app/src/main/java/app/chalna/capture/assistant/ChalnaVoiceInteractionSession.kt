@@ -7,6 +7,7 @@ import android.app.assist.AssistContent
 import android.app.assist.AssistStructure
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -26,16 +27,20 @@ import android.view.View
 import android.view.RoundedCorner
 import android.view.animation.PathInterpolator
 import app.chalna.capture.capture.CaptureRuntime
-import app.chalna.capture.capture.CaptureService
 import app.chalna.capture.capture.CaptureTelemetryRegistry
+import app.chalna.capture.ChalnaApplication
+import app.chalna.capture.domain.CaptureCommand
+import app.chalna.capture.domain.CaptureCommandResult
 import app.chalna.capture.domain.CaptureState
-import java.util.UUID
+import app.chalna.capture.domain.CaptureTrigger
 import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInteractionSession(appContext) {
@@ -43,64 +48,111 @@ class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInte
     private var dispatchedSession: String? = null
     private var pulseView: ChalnaInvocationGlowView? = null
     private var pendingPulse: InvocationPulseKind? = null
-    private var lastAnonymousShowAtMillis = Long.MIN_VALUE
+    private var activeInvocation: AssistantInvocation? = null
+    private var failsafeJob: Job? = null
+    private var stateJob: Job? = null
 
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
-        val platformSessionId = if (Build.VERSION.SDK_INT >= 34) args?.getString(KEY_SHOW_SESSION_ID) else null
-        val now = SystemClock.elapsedRealtime()
-        if (platformSessionId == null && lastAnonymousShowAtMillis != Long.MIN_VALUE &&
-            now - lastAnonymousShowAtMillis < ANONYMOUS_DUPLICATE_WINDOW_MILLIS
-        ) return
-        if (platformSessionId == null) lastAnonymousShowAtMillis = now
-        val id = platformSessionId ?: "session-${UUID.randomUUID()}"
-        if (dispatchedSession == id) return
-        dispatchedSession = id
-
-        val requestedPulse = when (CaptureRuntime.state.value) {
-            is CaptureState.Recording, is CaptureState.Starting,
-            is CaptureState.Stopping, is CaptureState.Saving -> InvocationPulseKind.STOP
-            else -> InvocationPulseKind.START
+        val sessionKey = AssistantInvocationRegistry.sessionKey(args)
+        if (sessionKey != null && dispatchedSession == sessionKey) return
+        val prepared = sessionKey?.let(AssistantInvocationRegistry::take)
+        val invocation = prepared ?: run {
+            val id = AssistantInvocationRegistry.invocationId(args)
+            CaptureTelemetryRegistry.mark(id, "invocation_received")
+            val result = (appContext.applicationContext as ChalnaApplication).graph.captureCommands.dispatch(
+                id,
+                CaptureCommand.TOGGLE,
+                CaptureTrigger.ASSISTANT,
+            )
+            AssistantInvocation(id, result)
         }
-        CaptureTelemetryRegistry.mark("assistant_callback")
-        val accepted = CaptureService.dispatch(appContext, id)
-        pendingPulse = if (accepted) requestedPulse else InvocationPulseKind.ERROR
+        dispatchedSession = sessionKey ?: invocation.id
+        activeInvocation = invocation
+        pendingPulse = invocation.result.toPulseKind()
         pulseView?.activate(requireNotNull(pendingPulse))
+        observeResolution(invocation)
+        failsafeJob?.cancel()
+        failsafeJob = sessionScope.launch {
+            delay(SESSION_FAILSAFE_MILLIS)
+            pulseView?.release()
+            finish()
+        }
     }
 
     override fun onCreateContentView(): View = ChalnaInvocationGlowView(appContext) { finish() }.also { view ->
         pulseView = view
         pendingPulse?.let(view::activate)
-        sessionScope.launch {
+    }
+
+    private fun observeResolution(invocation: AssistantInvocation) {
+        stateJob?.cancel()
+        stateJob = sessionScope.launch {
             CaptureRuntime.state.collectLatest { state ->
-                when (state) {
-                    is CaptureState.Recording -> view.resolve(InvocationPulseKind.START)
-                    is CaptureState.Failed -> view.resolve(InvocationPulseKind.ERROR)
-                    is CaptureState.Saving, is CaptureState.Saved -> view.resolve(InvocationPulseKind.STOP)
-                    else -> Unit
+                val kind = invocation.result.toPulseKind()
+                val resolved = when (kind) {
+                    InvocationPulseKind.START -> state is CaptureState.Recording || state is CaptureState.Failed
+                    InvocationPulseKind.STOP -> state is CaptureState.Finalizing || state is CaptureState.Persisting ||
+                        state is CaptureState.Saved || state is CaptureState.Failed
+                    InvocationPulseKind.CANCEL -> state is CaptureState.Idle || state is CaptureState.Finalizing ||
+                        state is CaptureState.Failed
+                    InvocationPulseKind.BUSY -> true
+                    InvocationPulseKind.ERROR -> true
+                }
+                if (resolved) {
+                    viewOrPendingResolve(if (state is CaptureState.Failed) InvocationPulseKind.ERROR else kind)
+                    return@collectLatest
                 }
             }
         }
+    }
+
+    private fun viewOrPendingResolve(kind: InvocationPulseKind) {
+        pendingPulse = kind
+        pulseView?.resolve(kind)
     }
 
     override fun onHandleAssist(data: Bundle?, structure: AssistStructure?, content: AssistContent?) {
         // Assist structure, screen content, and foreground-app context are deliberately ignored.
     }
 
+    override fun onHandleScreenshot(screenshot: Bitmap?) = Unit
+
+    override fun onHide() {
+        failsafeJob?.cancel()
+        stateJob?.cancel()
+        pulseView?.release()
+        activeInvocation = null
+        pendingPulse = null
+        super.onHide()
+    }
+
     override fun onDestroy() {
         pulseView?.release()
         pulseView = null
+        failsafeJob?.cancel()
+        stateJob?.cancel()
         sessionScope.cancel()
         super.onDestroy()
     }
 
     private companion object {
-        const val ANONYMOUS_DUPLICATE_WINDOW_MILLIS = 320L
+        const val SESSION_FAILSAFE_MILLIS = 1_200L
     }
 
 }
 
-internal enum class InvocationPulseKind { START, STOP, ERROR }
+internal enum class InvocationPulseKind { START, STOP, CANCEL, BUSY, ERROR }
+
+private fun CaptureCommandResult.toPulseKind(): InvocationPulseKind = when (this) {
+    is CaptureCommandResult.AcceptedStart -> InvocationPulseKind.START
+    is CaptureCommandResult.AcceptedStop -> InvocationPulseKind.STOP
+    is CaptureCommandResult.AcceptedCancelStart -> InvocationPulseKind.CANCEL
+    is CaptureCommandResult.AlreadyStopping, is CaptureCommandResult.BusySaving,
+    is CaptureCommandResult.NoActiveCapture -> InvocationPulseKind.BUSY
+    is CaptureCommandResult.Duplicate -> original?.toPulseKind() ?: InvocationPulseKind.BUSY
+    is CaptureCommandResult.Rejected, is CaptureCommandResult.FailedToDispatch -> InvocationPulseKind.ERROR
+}
 
 /**
  * Transient three-layer perimeter illumination. Geometry, shaders, matrices, and hotspot buffers
@@ -156,6 +208,8 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
                 duration = when (requestedKind) {
                     InvocationPulseKind.START -> 650L
                     InvocationPulseKind.STOP -> 570L
+                    InvocationPulseKind.CANCEL -> 430L
+                    InvocationPulseKind.BUSY -> 420L
                     InvocationPulseKind.ERROR -> 460L
                 }
                 interpolator = PathInterpolator(0.18f, 0.78f, 0.22f, 1f)
@@ -243,7 +297,7 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             val envelope = activation * decay
             val asymmetry = 0.78f + 0.22f * activation
             val boost = 1f + resolveBoost * 0.28f
-            val contraction = if (kind == InvocationPulseKind.STOP) 1f - progress * 0.18f else 1f
+            val contraction = if (kind == InvocationPulseKind.STOP || kind == InvocationPulseKind.CANCEL) 1f - progress * 0.18f else 1f
 
             rotateShaders(progress)
             atmospherePaint.alpha = (34f * envelope * asymmetry).toInt().coerceIn(0, 255)
@@ -253,7 +307,7 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             drawOpticalLayer(canvas, bloomNode, bloomPaint)
             canvas.drawPath(edgePath, corePaint)
 
-            val direction = if (kind == InvocationPulseKind.STOP) -1f else 1f
+            val direction = if (kind == InvocationPulseKind.STOP || kind == InvocationPulseKind.CANCEL) -1f else 1f
             drawHotspot(canvas, (1.08f + direction * progress * 0.93f) % 1f, envelope, 1f)
             drawHotspot(canvas, (1.43f + direction * progress * 0.57f) % 1f, envelope, 0.72f)
             if (progress < 0.34f) drawHotspot(canvas, (1.74f + direction * progress * 0.38f) % 1f, envelope, 0.52f)
@@ -261,7 +315,6 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
 
         private fun drawHotspot(canvas: Canvas, fraction: Float, envelope: Float, energy: Float) {
             if (!pathMeasure.getPosTan(measuredLength * fraction, hotspotPosition, hotspotTangent)) return
-            val palette = palette(kind)
             hotspotShaderMatrix.setTranslate(hotspotPosition[0], hotspotPosition[1])
             hotspotShader?.setLocalMatrix(hotspotShaderMatrix)
             hotspotBloomPaint.alpha = (185f * envelope * energy).toInt().coerceIn(0, 255)
@@ -366,6 +419,20 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
                     atmosphere = intArrayOf(0x00896EFF, 0x40896EFF, 0x30D965F5, 0x00FF76AF, 0x48FF76AF, 0x20896EFF, 0x00896EFF),
                     bloom = intArrayOf(0x70896EFF, 0xB0896EFF.toInt(), 0xB0D965F5.toInt(), 0x70FF76AF, 0xC0FF76AF.toInt(), 0x90896EFF.toInt(), 0x70896EFF),
                     core = intArrayOf(0xFFF4EEFF.toInt(), 0xFFBFB0FF.toInt(), 0xFFFFEFFF.toInt(), 0xFFFF87BC.toInt(), 0xFFFFF2F8.toInt(), 0xFFB6A8FF.toInt(), 0xFFF4EEFF.toInt()),
+                    positions = positions,
+                )
+                InvocationPulseKind.CANCEL -> PulsePalette(
+                    hot = 0xFFD6D4E0.toInt(),
+                    atmosphere = intArrayOf(0x00A9A8B6, 0x34A9A8B6, 0x246D7C92, 0x00A9A8B6, 0x306D7C92, 0x18A9A8B6, 0x00A9A8B6),
+                    bloom = intArrayOf(0x50A9A8B6, 0x88C7C5D1.toInt(), 0x706D7C92, 0x40A9A8B6, 0x806D7C92.toInt(), 0x68A9A8B6, 0x50A9A8B6),
+                    core = intArrayOf(0xFFF5F4F8.toInt(), 0xFFD6D4E0.toInt(), 0xFFF0F4FA.toInt(), 0xFFAEBBCB.toInt(), 0xFFF5F4F8.toInt(), 0xFFD6D4E0.toInt(), 0xFFF5F4F8.toInt()),
+                    positions = positions,
+                )
+                InvocationPulseKind.BUSY -> PulsePalette(
+                    hot = 0xFFFFC36B.toInt(),
+                    atmosphere = intArrayOf(0x00FFC36B, 0x38FFC36B, 0x287C6D93, 0x00FFC36B, 0x347C6D93, 0x18FFC36B, 0x00FFC36B),
+                    bloom = intArrayOf(0x50FFC36B, 0x90FFC36B.toInt(), 0x787C6D93, 0x40FFC36B, 0x887C6D93.toInt(), 0x68FFC36B, 0x50FFC36B),
+                    core = intArrayOf(0xFFFFF7EA.toInt(), 0xFFFFD59A.toInt(), 0xFFF4F0FF.toInt(), 0xFFC7B9E8.toInt(), 0xFFFFF7EA.toInt(), 0xFFFFD59A.toInt(), 0xFFFFF7EA.toInt()),
                     positions = positions,
                 )
                 InvocationPulseKind.ERROR -> PulsePalette(

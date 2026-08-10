@@ -1,4 +1,57 @@
-# Chalna v1.1.1 Assistant eligibility hotfix
+# Chalna v1.2.0 production hardening
+
+## Current audit — 2026-08-10
+
+- Repository: `sampple-korea/chalna-android`; `origin` points to the private GitHub repository and `main` is the default branch.
+- Baseline: immutable `v1.1.1`, commit `98557c2a77fb7cfed5709bfa23a43fce57639ec5`, package `app.chalna.capture`, version code `3`.
+- Signing continuity anchor: SHA-256 `E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9`; the protected signing secrets are present and the existing release APK is the comparison artifact.
+- Next release: version name `1.2.0`, version code `4`, tag `v1.2.0`. Version metadata moves to one checked source.
+- Android build, lint, tests, emulator work, benchmark/profile generation, APK/AAB packaging, and dependency resolution remain GitHub Actions-only.
+
+## Confirmed architecture risks
+
+1. Voice interaction, session, and recognition components run in three private processes while reading a default-process `CaptureRuntime`; state is therefore not shared and invocation Glow/action can be wrong.
+2. Service intents launch independent coroutines; a mutex serializes only after launch and cannot cancel a start while `CameraXCaptureEngine.start()` is suspended.
+3. The current state model uses wall-clock time for recording duration and post-finalize guarding and catches cancellation as capture failure.
+4. The active attempt journal lacks an exact MediaStore identity and deletes stale output without first attempting to salvage a playable recording.
+5. The AtomicFile capture index rewrites the whole list, discovers files by path/name, and eagerly validates/extracts metadata on Gallery refresh.
+6. `ProductionUiDependencies` eagerly creates ExoPlayer, performs app-wide one-second ticks, owns unrelated screens, and makes lifecycle/security behavior difficult to test.
+7. The player uses TextureView, incomplete seeking/lifecycle state, and global inset ownership; the Gallery lacks paging, sort, favorites, trash, and durable batch results.
+8. The invocation Glow allocates a palette in the draw path, ignores tangent orientation, and reduces per-corner display geometry to one radius.
+
+## Decisions
+
+- Remove the unnecessary component process attributes and keep the default application process. Keep `Application` initialization lightweight and lazy.
+- Replace mutable runtime guesses with an authoritative `CaptureStateRepository`, typed `CaptureCommandDispatcher`, and single-consumer actor.
+- Use epoch time only for filenames/user dates and monotonic time for duration, ordering, latency, timers, and guards.
+- Use Room 2.8.4 with Paging 3.5.0, exported schemas, non-destructive migrations, an idempotent importer for `capture-index-v1`, and exact capture identities only.
+- Treat media bytes as the source of truth. Finalize validates output before READY; metadata persistence failure creates a reconciliation operation and never deletes a valid video.
+- Lazily construct Gallery reconciliation, thumbnail decoding, and Media3 playback only when their screens need them.
+- Add a locked-device-safe Quick Settings Tile that uses the same dispatcher and never bypasses keyguard.
+- Keep Material UI/icons, network permission, broad media reads, pre-capture, warm camera, and persistent binding prohibited.
+- Publish APK, AAB, checksums, build info, and SBOM only after clean/update/16KB, signer-continuity, and remote-asset verification.
+
+## Implementation and verification stages
+
+1. Process unification, invocation-token registry, typed dispatch results, actor/state machine, cancellation and service lifecycle.
+2. CameraX output identity, monotonic stats, storage/thermal stop, finalize validation, attempt salvage and reconciliation.
+3. Room database, legacy import, paging/sort/filter/favorites/trash/export relationships and playback-position persistence.
+4. Lazy Player controller, SurfaceView, recording conflict, seeking/speed/fullscreen/error state, safe intent routing.
+5. Screen-owned state/controllers, no global tick, refined Home/Setup/Settings/Gallery, Quick Tile, edge-to-edge/back/accessibility.
+6. Allocation-free invocation Glow hot path, tangent streaks, per-corner geometry and deterministic Visual Lab frames.
+7. Unit, migration, concurrency, instrumentation, screenshot, security, benchmark, baseline-profile, upgrade and release verification.
+8. GitHub Actions failure loop, image/trace inspection, deliberate refinement, source audit, immutable v1.2.0 publication and remote re-verification.
+
+## Completion evidence ledger
+
+- Pending: implementation commits and source audit.
+- Pending: Android CI, UI QA, benchmark, security, update-install, 16KB and release run IDs.
+- Pending: inspected screenshots, perceptual diffs, traces, benchmark JSON and APK size comparison.
+- Pending: v1.2.0 APK/AAB metadata, checksums, signer match, immutable release and re-downloaded asset verification.
+
+---
+
+# Archived v1.1.1 Assistant eligibility hotfix
 
 ## Goal
 

@@ -1,86 +1,39 @@
 package app.chalna.capture.domain
 
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
+
+data class EngineStartRequest(
+    val invocationId: String,
+    val settings: CaptureSessionSettings,
+    val createdAtEpochMillis: Long,
+)
 
 interface CaptureEngine {
-    suspend fun start(invocationId: String): Long
-    suspend fun stop(): LastCapture?
+    suspend fun start(
+        request: EngineStartRequest,
+        onStage: (CaptureState) -> Unit,
+        onProgress: (CaptureProgress) -> Unit,
+    ): CaptureStart
+
+    suspend fun stop(): LastCapture
+    suspend fun cancelStart(): LastCapture?
+    suspend fun release()
 }
 
-class CaptureCoordinator(
-    private val engine: CaptureEngine,
-    private val clockMillis: () -> Long = System::currentTimeMillis,
-    private val dedupeCapacity: Int = 64,
-    private val onStateChanged: (CaptureState) -> Unit = {},
-) {
-    private val mutex = Mutex()
-    private val handled = LinkedHashSet<String>()
-    private var lastFinalizedAtMillis = Long.MIN_VALUE
-    @Volatile var state: CaptureState = CaptureState.Idle
-        private set
-    @Volatile var lastCapture: LastCapture? = null
-        private set
+fun interface CapturePreflight {
+    suspend fun check(settings: CaptureSessionSettings): CaptureFailure?
+}
 
-    suspend fun dispatch(request: CaptureRequest): CaptureState = mutex.withLock {
-        if (!remember(request.invocationId)) return state
-        when (request.command) {
-            CaptureCommand.TOGGLE -> when (state) {
-                CaptureState.Idle, is CaptureState.Failed -> start(request.invocationId)
-                is CaptureState.Saved -> if (clockMillis() - lastFinalizedAtMillis >= POST_FINALIZE_GUARD_MILLIS) {
-                    start(request.invocationId)
-                } else {
-                    state
-                }
-                is CaptureState.Recording -> stop(request.invocationId)
-                is CaptureState.Starting, is CaptureState.Stopping, is CaptureState.Saving -> state
-            }
-            CaptureCommand.STOP -> when (state) {
-                is CaptureState.Recording -> stop(request.invocationId)
-                else -> state
-            }
-        }
+fun Throwable.toCaptureFailure(defaultCode: CaptureFailureCode): CaptureFailure {
+    if (this is CancellationException) throw this
+    val diagnosticName = javaClass.simpleName.take(80)
+    val code = when {
+        diagnosticName.contains("CameraAccess", true) || message?.contains("busy", true) == true ->
+            CaptureFailureCode.CAMERA_BUSY
+        message?.contains("permission", true) == true -> CaptureFailureCode.CAMERA_PERMISSION
+        message?.contains("space", true) == true || message?.contains("storage", true) == true ->
+            CaptureFailureCode.LOW_STORAGE
+        else -> defaultCode
     }
-
-    private suspend fun start(id: String): CaptureState {
-        update(CaptureState.Starting(id))
-        update(try {
-            val start = engine.start(id).takeIf { it > 0 } ?: clockMillis()
-            CaptureState.Recording(id, start)
-        } catch (t: Throwable) {
-            CaptureState.Failed(t.message ?: t.javaClass.simpleName)
-        })
-        return state
-    }
-
-    private suspend fun stop(id: String): CaptureState {
-        update(CaptureState.Stopping(id))
-        update(CaptureState.Saving(id))
-        update(try {
-            val saved = engine.stop()?.takeIf(LastCapture::isUsable)
-                ?: error("Recording could not be finalized")
-            lastCapture = saved
-            lastFinalizedAtMillis = clockMillis()
-            CaptureState.Saved(saved)
-        } catch (t: Throwable) {
-            CaptureState.Failed(t.message ?: t.javaClass.simpleName)
-        })
-        return state
-    }
-
-    private fun update(value: CaptureState) {
-        state = value
-        onStateChanged(value)
-    }
-
-    private fun remember(id: String): Boolean {
-        if (id.isBlank() || handled.contains(id)) return false
-        handled += id
-        while (handled.size > dedupeCapacity) handled.remove(handled.first())
-        return true
-    }
-
-    private companion object {
-        const val POST_FINALIZE_GUARD_MILLIS = 750L
-    }
+    return CaptureFailure(code, code !in setOf(CaptureFailureCode.OUTPUT_INVALID, CaptureFailureCode.INTERNAL), diagnosticName)
 }
