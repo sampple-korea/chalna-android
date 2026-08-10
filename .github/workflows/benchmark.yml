@@ -51,10 +51,8 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
-            ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest \
-              -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
-            ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest \
-              -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.StartupBenchmark
+            ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
+            ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.StartupBenchmark
       - name: Verify outputs
         shell: bash
         run: |

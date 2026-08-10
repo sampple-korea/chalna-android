@@ -55,6 +55,8 @@ jobs:
             echo "Resolved dependency graph contains a forbidden Material dependency." >&2
             exit 1
           fi
+      - name: Formatting and Detekt
+        run: ./gradlew --no-daemon --stacktrace :app:ktlintCheck :app:detekt
       - name: Android lint, unit tests, and debug APK
         run: ./gradlew --no-daemon --stacktrace :app:lintRelease :app:testDebugUnitTest :app:assembleDebug
       - name: Verify unit-test result artifacts

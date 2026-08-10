@@ -27,6 +27,12 @@ android {
     experimentalProperties["android.experimental.self-instrumenting"] = true
 }
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 dependencies {
     implementation(libs.androidx.test.runner)
     implementation(libs.androidx.test.junit)
