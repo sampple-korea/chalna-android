@@ -7,6 +7,7 @@ This file records repository changes, not unverified release claims. Dates use I
 ### Fixed
 
 - Preserved the v1.1.1 Assistant-role eligibility fix and extended role qualification checks across API 29, 33, 34, 35, and 36.
+- Corrected Android 14+ invocation identity parsing to read `KEY_SHOW_SESSION_ID` as the platform-defined integer, restoring the early `onPrepareToShowSession` dispatch and exact prepare/show deduplication path.
 - Removed the process-local state split between Voice Interaction/session/recognition and CaptureService/UI.
 - Serialized capture commands, preserved coroutine cancellation, handled Starting cancellation and Saving busy state, and moved duration/latency/guards to a monotonic clock.
 - Validated CameraX finalize output, retained usable media when metadata persistence fails, consumed durable reconciliation operations, and salvaged valid journaled output after process death.

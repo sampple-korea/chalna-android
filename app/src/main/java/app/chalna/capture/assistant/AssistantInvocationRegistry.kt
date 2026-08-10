@@ -38,7 +38,10 @@ object AssistantInvocationRegistry {
     fun sessionKey(args: Bundle?): String? =
         when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
-                args?.getString(VoiceInteractionSession.KEY_SHOW_SESSION_ID)
+                args
+                    ?.getInt(VoiceInteractionSession.KEY_SHOW_SESSION_ID, MISSING_SESSION_ID)
+                    ?.takeIf { it != MISSING_SESSION_ID }
+                    ?.let { "show-$it" }
             else ->
                 args
                     ?.getLong(EXTRA_INVOCATION_TIME, Long.MIN_VALUE)
@@ -52,5 +55,6 @@ object AssistantInvocationRegistry {
     }
 
     private const val MAX_ENTRIES = 32
+    private const val MISSING_SESSION_ID = Int.MIN_VALUE
     private const val EXTRA_INVOCATION_TIME = "android.intent.extra.TIME"
 }

@@ -3,6 +3,7 @@
 ## Critical fixes
 
 - Preserved the v1.1.1 Assistant-role qualification fix—recognition service, default category, and voice-interaction metadata—and added multi-API role verification so this release cannot regress it.
+- Corrected Android 14+ session-ID parsing so the early Assistant callback and the visible session share one platform invocation identity instead of falling back to an anonymous token.
 - Unified Voice Interaction, session, recognition, capture, and UI state in the default application process; Assistant feedback no longer reads a process-local stale singleton.
 - Serialized capture commands through a single actor with invocation IDs, typed outcomes, Starting cancellation, idempotent stopping, and monotonic timing.
 - Hardened CameraX cancellation, finalize validation, output identity, recovery journal, storage checks, and resource release without adding pre-capture or camera warm-up.

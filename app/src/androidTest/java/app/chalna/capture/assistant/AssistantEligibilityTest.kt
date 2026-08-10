@@ -4,7 +4,10 @@ import android.Manifest
 import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
 import android.service.voice.VoiceInteractionService
+import android.service.voice.VoiceInteractionSession
 import android.speech.RecognitionService
 import androidx.test.platform.app.InstrumentationRegistry
 import app.chalna.capture.MainActivity
@@ -88,6 +91,15 @@ class AssistantEligibilityTest {
 
         assertEquals(AssistFallbackActivity::class.java.name, activity.name)
         assertEquals(Manifest.permission.BIND_VOICE_INTERACTION, activity.permission)
+    }
+
+    @Test
+    fun android14SessionIdUsesThePlatformIntegerContract() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val args = Bundle().apply { putInt(VoiceInteractionSession.KEY_SHOW_SESSION_ID, 42) }
+
+        assertEquals("show-42", AssistantInvocationRegistry.sessionKey(args))
+        assertEquals("assistant-show-42", AssistantInvocationRegistry.invocationId(args))
     }
 
     private fun XmlPullParser.attribute(name: String): String = getAttributeValue(ANDROID_NAMESPACE, name).orEmpty()
