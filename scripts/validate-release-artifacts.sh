@@ -38,6 +38,14 @@ test -x "$build_tools/apksigner"
 test -x "$build_tools/zipalign"
 test -x "$build_tools/aapt2"
 test -s "$BUNDLETOOL_JAR"
+test -s app/src/main/baseline-prof.txt
+test -s app/src/main/startup-prof.txt
+test "$(wc -l < app/src/main/baseline-prof.txt)" -ge 20
+test "$(wc -l < app/src/main/startup-prof.txt)" -ge 20
+if grep -v 'Lapp/chalna/capture/' app/src/main/baseline-prof.txt | grep -q '[^[:space:]]'; then
+  echo 'Baseline profile contains a rule outside the Chalna package.' >&2
+  exit 1
+fi
 
 "$build_tools/zipalign" -c -P 16 -v 4 "$apk"
 certificate_output="$("$build_tools/apksigner" verify --verbose --print-certs "$apk")"
@@ -134,6 +142,9 @@ grep -q 'package="app.chalna.capture"' release-aab-manifest.xml
 grep -q "android:versionCode=\"${VERSION_CODE}\"" release-aab-manifest.xml
 grep -q "android:versionName=\"${VERSION}\"" release-aab-manifest.xml
 grep -q 'PAGE_ALIGNMENT_16K' release-aab-config.txt
+zipinfo -1 "$apk" | grep -qx 'assets/dexopt/baseline.prof'
+zipinfo -1 "$apk" | grep -qx 'assets/dexopt/baseline.profm'
+zipinfo -1 "$aab" | grep -qx 'BUNDLE-METADATA/com.android.tools.build.profiles/baseline.prof'
 
 jarsigner -verify "$aab" | tee release-aab-signature.txt
 grep -qi 'jar verified' release-aab-signature.txt
