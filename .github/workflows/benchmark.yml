@@ -52,8 +52,7 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
-            PROFILE="$(find benchmark/build/outputs/connected_android_test_additional_output \
-              -type f -name '*-startup-prof.txt' -size +0c | head -1)"
+            PROFILE="$(find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c | head -1)"
             test -n "$PROFILE"
             cp "$PROFILE" generated-baseline-prof.txt
             test "$(wc -l < generated-baseline-prof.txt)" -ge 20
@@ -65,7 +64,9 @@ jobs:
           find app benchmark -type f \( -name '*-startup-prof*.txt' -o -name '*benchmarkData.json' -o -name '*.trace' \) -print | tee benchmark-files.txt
           test -s generated-baseline-prof.txt
           test "$(wc -l < generated-baseline-prof.txt)" -ge 20
-          grep -q 'benchmarkData.json' benchmark-files.txt
+          RESULT="$(find benchmark/build/outputs -type f -name '*benchmarkData.json' -size +0c | head -1)"
+          test -n "$RESULT"
+          python3 scripts/verify-benchmark-results.py benchmark/performance-baseline.json "$RESULT"
       - name: Upload profiles and traces
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -78,4 +79,5 @@ jobs:
             app/build/outputs/
             benchmark/build/outputs/
             benchmark-files.txt
+            benchmark-gate.json
             generated-baseline-prof.txt

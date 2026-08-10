@@ -29,7 +29,6 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -116,7 +115,7 @@ class ChalnaScreenshotTest {
     @Test fun playerDeleteConfirmationNight() =
         captureApp("player-delete-confirmation-night", ChalnaScreenshotStates.player) {
             onNodeWithContentDescription("더보기").performClick()
-            onNodeWithText("삭제").performClick()
+            onNodeWithText("최근 삭제됨으로 이동").performClick()
         }
 
     @Test fun playerVaultNight() =
@@ -127,7 +126,7 @@ class ChalnaScreenshotTest {
     @Test fun settingsCameraDeniedNight() =
         captureApp("settings-camera-denied-night", ChalnaScreenshotStates.settingsCameraDenied) {
             onNodeWithContentDescription("설정").performClick()
-            onAllNodesWithText("시스템")[1].performScrollTo()
+            onNodeWithText("시스템").performScrollTo()
         }
 
     @Test fun settingsAudioOffNight() =
@@ -138,13 +137,13 @@ class ChalnaScreenshotTest {
     @Test fun settingsAssistantMissingNight() =
         captureApp("settings-assistant-missing-night", ChalnaScreenshotStates.settingsAssistantMissing) {
             onNodeWithContentDescription("설정").performClick()
-            onAllNodesWithText("시스템")[1].performScrollTo()
+            onNodeWithText("시스템").performScrollTo()
         }
 
     @Test fun settingsNotificationOptionalNight() =
         captureApp("settings-notification-optional-night", ChalnaScreenshotStates.settingsNotificationOptional) {
             onNodeWithContentDescription("설정").performClick()
-            onAllNodesWithText("시스템")[1].performScrollTo()
+            onNodeWithText("시스템").performScrollTo()
         }
 
     @Test fun settingsVaultMist() =

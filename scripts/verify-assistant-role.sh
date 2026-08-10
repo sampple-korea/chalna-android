@@ -10,7 +10,20 @@ recognizer_full="$package_name/app.chalna.capture.assistant.ChalnaRecognitionSer
 fallback_short="$package_name/.assistant.AssistFallbackActivity"
 fallback_full="$package_name/app.chalna.capture.assistant.AssistFallbackActivity"
 
-adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name"
+if ! role_output="$(adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name" 2>&1)"; then
+  printf '%s\n' "$role_output" >&2
+  printf '%s\n' 'Assistant-role diagnostics:' >&2
+  printf 'sdk=%s low_ram=%s\n' \
+    "$(adb shell getprop ro.build.version.sdk | tr -d '\r')" \
+    "$(adb shell getprop ro.config.low_ram | tr -d '\r')" >&2
+  adb shell cmd package query-activities --brief -a android.intent.action.ASSIST \
+    -c android.intent.category.DEFAULT "$package_name" 2>&1 | tr -d '\r' >&2 || true
+  adb shell dumpsys package "$package_name" 2>&1 | tr -d '\r' | \
+    grep -E -A8 -B3 'android.intent.action.ASSIST|VoiceInteractionService|AssistFallbackActivity|ChalnaRecognitionService' >&2 || true
+  adb shell logcat -d -v brief 2>&1 | tr -d '\r' | \
+    grep -E 'AssistantRoleBehavior|RoleController|RoleManager|VoiceInteraction|PermissionController' | tail -160 >&2 || true
+  exit 1
+fi
 adb shell cmd role get-role-holders --user 0 "$role_name" | tr -d '\r' | grep -Fx "$package_name"
 
 for _ in $(seq 1 20); do

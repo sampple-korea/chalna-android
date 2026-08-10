@@ -1,0 +1,18 @@
+{
+  "sourceRunId": 31355718126,
+  "device": "API 35 Android ATD x86_64",
+  "benchmarks": {
+    "coldStartup": {
+      "metric": "timeToInitialDisplayMs",
+      "median": 402.003945,
+      "maxRegressionPercent": 40,
+      "noiseAllowanceMs": 50
+    },
+    "warmStartup": {
+      "metric": "timeToInitialDisplayMs",
+      "median": 98.392303,
+      "maxRegressionPercent": 60,
+      "noiseAllowanceMs": 40
+    }
+  }
+}
