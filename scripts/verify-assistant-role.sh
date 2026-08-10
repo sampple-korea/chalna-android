@@ -11,10 +11,22 @@ fallback_short="$package_name/.assistant.AssistFallbackActivity"
 fallback_full="$package_name/app.chalna.capture.assistant.AssistFallbackActivity"
 
 adb shell logcat -c >/dev/null 2>&1 || true
-set +e
-role_output="$(adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name" 2>&1)"
-role_status=$?
-set -e
+role_output_file="$(mktemp)"
+trap 'rm -f "$role_output_file"' EXIT
+role_status=1
+for attempt in $(seq 1 10); do
+  set +e
+  adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name" >"$role_output_file" 2>&1
+  role_status=$?
+  set -e
+  if (( role_status == 0 )); then
+    break
+  fi
+  if (( attempt < 10 )); then
+    sleep 2
+  fi
+done
+role_output="$(tr -d '\r' < "$role_output_file")"
 if (( role_status != 0 )); then
   printf 'add-role-holder exited %s\n' "$role_status" >&2
   printf '%s\n' "$role_output" >&2
