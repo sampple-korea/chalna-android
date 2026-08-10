@@ -23,6 +23,7 @@ class CaptureCoordinatorTest {
         assertEquals(1, engine.starts)
         assertEquals(1, engine.stops)
         assertEquals(1, fixture.persisted.size)
+        fixture.actor.destroy()
     }
 
     @Test fun secondInvocationDuringStartingCancelsAndReleasesCamera() = runTest {
@@ -35,6 +36,7 @@ class CaptureCoordinatorTest {
         assertEquals(CaptureState.Idle, fixture.states.state.value)
         assertEquals(1, engine.cancels)
         assertEquals(0, engine.stops)
+        fixture.actor.destroy()
     }
 
     @Test fun cancellationExceptionIsNotConvertedToFailure() = runTest {
@@ -45,6 +47,7 @@ class CaptureCoordinatorTest {
         fixture.actor.submit(request("22222222-2222-2222-2222-222222222222", CaptureCommand.CANCEL_START))
         advanceUntilIdle()
         assertTrue(fixture.states.state.value !is CaptureState.Failed)
+        fixture.actor.destroy()
     }
 
     private fun kotlinx.coroutines.test.TestScope.actor(engine: FakeEngine): Fixture {

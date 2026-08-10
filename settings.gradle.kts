@@ -16,4 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Chalna"
 include(":app")
-
+include(":benchmark")

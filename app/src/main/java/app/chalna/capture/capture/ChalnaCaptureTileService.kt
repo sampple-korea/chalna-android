@@ -81,9 +81,11 @@ class ChalnaCaptureTileService : TileService() {
     }
 
     companion object {
+        private const val UNSUPPORTED_RESULT = -1
+
         fun requestAdd(context: android.content.Context, callback: (Int) -> Unit) {
             if (Build.VERSION.SDK_INT < 33) {
-                callback(StatusBarManager.TILE_ADD_REQUEST_ERROR_NOT_CURRENT_USER)
+                callback(UNSUPPORTED_RESULT)
                 return
             }
             context.getSystemService(StatusBarManager::class.java).requestAddTileService(

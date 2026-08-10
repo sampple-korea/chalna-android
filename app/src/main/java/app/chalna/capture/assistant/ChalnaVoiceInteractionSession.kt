@@ -34,6 +34,7 @@ import app.chalna.capture.domain.CaptureCommandResult
 import app.chalna.capture.domain.CaptureState
 import app.chalna.capture.domain.CaptureTrigger
 import kotlin.math.max
+import kotlin.math.atan2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -169,11 +170,19 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         private val hotspotShaderMatrix = Matrix()
         private val hotspotPosition = FloatArray(2)
         private val hotspotTangent = FloatArray(2)
+        private val cornerRadii = FloatArray(8)
         private val atmospherePaint = strokePaint(22f, 22)
         private val bloomPaint = strokePaint(10f, 72)
         private val corePaint = strokePaint(1.35f, 235)
         private val hotspotBloomPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val hotspotCorePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val hotspotTailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+        private val hotspotCorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
         private val atmosphereNode = RenderNode("chalna-atmosphere")
         private val bloomNode = RenderNode("chalna-bloom")
         private var animator: ValueAnimator? = null
@@ -256,6 +265,7 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             bloomPaint.shader = null
             corePaint.shader = null
             hotspotBloomPaint.shader = null
+            hotspotTailPaint.shader = null
             hotspotShader = null
             atmosphereNode.discardDisplayList()
             bloomNode.discardDisplayList()
@@ -264,20 +274,30 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
         override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
             val opticalInset = max(1f, density * 0.8f)
             edgeBounds.set(opticalInset, opticalInset, width - opticalInset, height - opticalInset)
-            val platformCorner = if (Build.VERSION.SDK_INT >= 31) {
-                listOf(
-                    RoundedCorner.POSITION_TOP_LEFT,
-                    RoundedCorner.POSITION_TOP_RIGHT,
-                    RoundedCorner.POSITION_BOTTOM_RIGHT,
-                    RoundedCorner.POSITION_BOTTOM_LEFT,
-                ).maxOfOrNull { rootWindowInsets?.getRoundedCorner(it)?.radius ?: 0 }?.toFloat() ?: 0f
-            } else {
-                0f
-            }
-            val corner = maxOf(resources.displayMetrics.density * 31f, platformCorner)
-                .coerceAtMost(edgeBounds.shortSide() * 0.18f)
+            val fallbackCorner = resources.displayMetrics.density * 31f
+            val maximumCorner = edgeBounds.shortSide() * 0.18f
+            fun corner(position: Int): Float = max(
+                fallbackCorner,
+                if (Build.VERSION.SDK_INT >= 31) {
+                    rootWindowInsets?.getRoundedCorner(position)?.radius?.toFloat() ?: 0f
+                } else {
+                    0f
+                },
+            ).coerceAtMost(maximumCorner)
+            val topLeft = corner(RoundedCorner.POSITION_TOP_LEFT)
+            val topRight = corner(RoundedCorner.POSITION_TOP_RIGHT)
+            val bottomRight = corner(RoundedCorner.POSITION_BOTTOM_RIGHT)
+            val bottomLeft = corner(RoundedCorner.POSITION_BOTTOM_LEFT)
+            cornerRadii[0] = topLeft
+            cornerRadii[1] = topLeft
+            cornerRadii[2] = topRight
+            cornerRadii[3] = topRight
+            cornerRadii[4] = bottomRight
+            cornerRadii[5] = bottomRight
+            cornerRadii[6] = bottomLeft
+            cornerRadii[7] = bottomLeft
             edgePath.reset()
-            edgePath.addRoundRect(edgeBounds, corner, corner, Path.Direction.CW)
+            edgePath.addRoundRect(edgeBounds, cornerRadii, Path.Direction.CW)
             pathMeasure.setPath(edgePath, true)
             measuredLength = pathMeasure.length
             atmosphereNode.setPosition(0, 0, width, height)
@@ -318,10 +338,42 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             hotspotShaderMatrix.setTranslate(hotspotPosition[0], hotspotPosition[1])
             hotspotShader?.setLocalMatrix(hotspotShaderMatrix)
             hotspotBloomPaint.alpha = (185f * envelope * energy).toInt().coerceIn(0, 255)
+            hotspotTailPaint.alpha = (138f * envelope * energy).toInt().coerceIn(0, 255)
+            hotspotTailPaint.strokeWidth = density * (4.2f + resolveBoost)
             hotspotCorePaint.color = Color.WHITE
             hotspotCorePaint.alpha = (230f * envelope * energy).toInt().coerceIn(0, 255)
-            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * (14f + 3f * resolveBoost), hotspotBloomPaint)
-            canvas.drawCircle(hotspotPosition[0], hotspotPosition[1], density * 1.25f, hotspotCorePaint)
+            hotspotCorePaint.strokeWidth = density * 1.35f
+            val tangentLength = kotlin.math.sqrt(
+                hotspotTangent[0] * hotspotTangent[0] + hotspotTangent[1] * hotspotTangent[1],
+            ).coerceAtLeast(0.001f)
+            val tangentX = hotspotTangent[0] / tangentLength
+            val tangentY = hotspotTangent[1] / tangentLength
+            val centerX = hotspotPosition[0]
+            val centerY = hotspotPosition[1]
+            val bloomRadius = density * (10f + 2f * resolveBoost)
+            val checkpoint = canvas.save()
+            canvas.rotate(
+                Math.toDegrees(atan2(tangentY, tangentX).toDouble()).toFloat(),
+                centerX,
+                centerY,
+            )
+            canvas.scale(2.15f, 0.78f, centerX, centerY)
+            canvas.drawCircle(centerX, centerY, bloomRadius, hotspotBloomPaint)
+            canvas.restoreToCount(checkpoint)
+            canvas.drawLine(
+                centerX - tangentX * density * 19f,
+                centerY - tangentY * density * 19f,
+                centerX + tangentX * density * 3f,
+                centerY + tangentY * density * 3f,
+                hotspotTailPaint,
+            )
+            canvas.drawLine(
+                centerX - tangentX * density * 2.2f,
+                centerY - tangentY * density * 2.2f,
+                centerX + tangentX * density * 3.8f,
+                centerY + tangentY * density * 3.8f,
+                hotspotCorePaint,
+            )
         }
 
         private fun drawOpticalLayer(canvas: Canvas, node: RenderNode, paint: Paint) {
@@ -369,6 +421,7 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             bloomPaint.shader = bloomShader
             corePaint.shader = coreShader
             hotspotBloomPaint.shader = hotspotShader
+            hotspotTailPaint.shader = hotspotShader
         }
 
         private fun rotateShaders(phase: Float) {

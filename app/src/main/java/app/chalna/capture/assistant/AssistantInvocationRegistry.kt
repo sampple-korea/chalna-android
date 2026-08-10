@@ -1,6 +1,5 @@
 package app.chalna.capture.assistant
 
-import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
@@ -32,7 +31,7 @@ object AssistantInvocationRegistry {
 
     fun sessionKey(args: Bundle?): String? = when {
         Build.VERSION.SDK_INT >= 34 -> args?.getString(VoiceInteractionSession.KEY_SHOW_SESSION_ID)
-        else -> args?.getLong(Intent.EXTRA_TIME, Long.MIN_VALUE)
+        else -> args?.getLong(EXTRA_INVOCATION_TIME, Long.MIN_VALUE)
             ?.takeIf { it != Long.MIN_VALUE }
             ?.let { "time-$it" }
     }
@@ -43,4 +42,5 @@ object AssistantInvocationRegistry {
     }
 
     private const val MAX_ENTRIES = 32
+    private const val EXTRA_INVOCATION_TIME = "android.intent.extra.TIME"
 }

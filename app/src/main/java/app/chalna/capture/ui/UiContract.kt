@@ -66,6 +66,7 @@ data class ChalnaUiState(
     val setupComplete: Boolean = false,
     val phase: CapturePhase = CapturePhase.SETUP_REQUIRED,
     val durationSeconds: Long = 0,
+    val recordingStartedElapsedNanos: Long = 0,
     val lastCapture: MediaItemUi? = null,
     val errorCode: String? = null,
     val operationEvent: UiOperationEvent? = null,

@@ -221,7 +221,6 @@ class CaptureCommandActor(
 
     private suspend fun handleProgress(message: Message.Progress) {
         val current = states.state.value as? CaptureState.Recording ?: return
-        transition(current.copy(recordedDurationNanos = message.durationNanos, bytesRecorded = message.bytes))
         if (message.storageCritical && !storageStopIssued) {
             storageStopIssued = true
             launchStop(

@@ -2,8 +2,8 @@ package app.chalna.capture.capture
 
 import android.content.ContentValues
 import android.content.Context
-import android.net.Uri
 import android.provider.MediaStore
+import androidx.core.net.toUri
 import app.chalna.capture.domain.CaptureItem
 import app.chalna.capture.domain.CaptureRecordState
 import app.chalna.capture.domain.StorageDestination
@@ -79,7 +79,7 @@ class CaptureRecoveryManager(
     }
 
     private fun publishPending(raw: String): Boolean {
-        val uri = runCatching { Uri.parse(raw) }.getOrNull() ?: return false
+        val uri = runCatching { raw.toUri() }.getOrNull() ?: return false
         if (uri.scheme != "content" || uri.authority != MediaStore.AUTHORITY) return false
         return context.contentResolver.update(
             uri,

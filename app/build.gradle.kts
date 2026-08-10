@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.room)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.baselineprofile)
 }
 
 val chalnaVersion = Properties().apply {
@@ -62,6 +63,12 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (signingConfigs.names.contains("release")) signingConfig = signingConfigs.getByName("release")
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
         }
     }
 
@@ -146,6 +153,8 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.profileinstaller)
     implementation(libs.coroutines.android)
+
+    baselineProfile(project(":benchmark"))
 
     ksp(libs.room.compiler)
 

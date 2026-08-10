@@ -3,6 +3,7 @@ package app.chalna.capture.ui
 import android.app.Activity
 import android.graphics.Bitmap
 import android.os.CancellationSignal
+import android.os.SystemClock
 import android.text.format.Formatter
 import android.view.SurfaceView
 import android.view.accessibility.AccessibilityManager
@@ -172,6 +173,19 @@ private fun SetupRow(
 
 @Composable
 internal fun HomeScreen(state: ChalnaUiState, dependencies: UiDependencies, navigate: (ChalnaRoute) -> Unit) = ScreenColumn {
+    val elapsedSeconds by produceState(
+        initialValue = state.durationSeconds,
+        key1 = state.phase,
+        key2 = state.recordingStartedElapsedNanos,
+    ) {
+        if (state.phase == CapturePhase.RECORDING && state.recordingStartedElapsedNanos > 0) {
+            while (true) {
+                value = ((SystemClock.elapsedRealtimeNanos() - state.recordingStartedElapsedNanos)
+                    .coerceAtLeast(0) / 1_000_000_000L)
+                kotlinx.coroutines.delay(1_000L)
+            }
+        }
+    }
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
         ChalnaIconCanvas(ChalnaIcon.MARK, Modifier.size(30.dp), ChalnaTheme.colors.accent)
         Spacer(Modifier.width(9.dp))
@@ -199,7 +213,7 @@ internal fun HomeScreen(state: ChalnaUiState, dependencies: UiDependencies, navi
     )
     if (state.phase == CapturePhase.RECORDING || state.phase == CapturePhase.STOPPING) {
         ChalnaText(
-            formatDuration(state.durationSeconds * 1_000L),
+            formatDuration(elapsedSeconds * 1_000L),
             Modifier.fillMaxWidth(),
             19,
             ChalnaTheme.colors.muted,

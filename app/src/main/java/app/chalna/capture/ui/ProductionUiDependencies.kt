@@ -68,14 +68,12 @@ class ProductionUiDependencies(
     private val galleryRepository: GalleryRepository get() = graph.galleryRepository
     private val mutableState = MutableStateFlow(ChalnaUiState())
     override val state: StateFlow<ChalnaUiState> = mutableState
-    private val elapsedSeconds = MutableStateFlow(0L)
     private val systemSnapshot = MutableStateFlow(readSystemSnapshot())
     private val overlay = MutableStateFlow(UiOverlay())
     private val playerSnapshot = MutableStateFlow<PlayerSnapshot?>(null)
     private val galleryMutex = Mutex()
     private var galleryInitialized = false
     private var galleryJob: Job? = null
-    private var elapsedJob: Job? = null
     private var operationDismissJob: Job? = null
     private var playerController: PlayerController? = null
     private var pendingOpenId: String? = null
@@ -143,19 +141,6 @@ class ProductionUiDependencies(
         )
         activity.lifecycleScope.launch {
             captureStates.state.collectLatest { capture ->
-                elapsedJob?.cancel()
-                if (capture is CaptureState.Recording) {
-                    elapsedJob = launch {
-                        while (true) {
-                            val elapsed = ((SystemClock.elapsedRealtimeNanos() - capture.startedAtElapsedNanos)
-                                .coerceAtLeast(capture.recordedDurationNanos) / 1_000_000_000L)
-                            elapsedSeconds.value = elapsed
-                            delay(1_000L)
-                        }
-                    }
-                } else {
-                    elapsedSeconds.value = 0
-                }
                 if (capture is CaptureState.Saved) {
                     overlay.value = overlay.value.copy(savedVisible = true)
                     delay(SAVED_DISPLAY_MILLIS)
@@ -168,7 +153,6 @@ class ProductionUiDependencies(
                 settingsStore.settings,
                 settingsStore.lastCapture,
                 captureStates.state,
-                elapsedSeconds,
                 systemSnapshot,
                 overlay,
                 playerSnapshot,
@@ -176,10 +160,9 @@ class ProductionUiDependencies(
                 val settings = values[0] as CaptureSettings
                 val lastCapture = values[1] as app.chalna.capture.domain.LastCapture?
                 val capture = values[2] as CaptureState
-                val elapsed = values[3] as Long
-                val system = values[4] as SystemSnapshot
-                val ui = values[5] as UiOverlay
-                val player = values[6] as PlayerSnapshot?
+                val system = values[3] as SystemSnapshot
+                val ui = values[4] as UiOverlay
+                val player = values[5] as PlayerSnapshot?
                 val ready = system.cameraGranted && system.assistantSelected &&
                     (!settings.audioEnabled || system.microphoneGranted)
                 val phase = when {
@@ -199,7 +182,10 @@ class ProductionUiDependencies(
                 ChalnaUiState(
                     setupComplete = settings.onboardingSeen,
                     phase = phase,
-                    durationSeconds = elapsed,
+                    durationSeconds = (capture as? CaptureState.Recording)
+                        ?.recordedDurationNanos?.div(1_000_000_000L) ?: 0,
+                    recordingStartedElapsedNanos = (capture as? CaptureState.Recording)
+                        ?.startedAtElapsedNanos ?: 0,
                     lastCapture = fresh ?: persisted,
                     errorCode = (capture as? CaptureState.Failed)?.failure?.code?.name,
                     operationEvent = ui.operation,

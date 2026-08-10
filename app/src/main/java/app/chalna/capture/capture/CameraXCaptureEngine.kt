@@ -163,7 +163,13 @@ class CameraXCaptureEngine(
             attemptStore.updateStage(CaptureAttemptStage.RECORDER_START_REQUESTED)
             CaptureTelemetryRegistry.mark(request.invocationId, "recorder_start_requested")
             var pending = prepare(recorder, output)
-            if (request.settings.audioEnabled) pending = pending.withAudioEnabled()
+            if (request.settings.audioEnabled) {
+                check(
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                        PackageManager.PERMISSION_GRANTED,
+                ) { "Microphone permission was revoked before recorder start" }
+                pending = pending.withAudioEnabled()
+            }
             val active = pending.start(ContextCompat.getMainExecutor(context)) { event ->
                 handleEvent(
                     request = request,
@@ -278,8 +284,13 @@ class CameraXCaptureEngine(
                 audioKnown = request.settings.audioEnabled,
                 state = CaptureRecordState.METADATA_PENDING,
             )
-            val validated = runCatching { galleryMedia.validate(app.chalna.capture.domain.CaptureItem.from(candidate)) }
-                .getOrNull()
+            val validated = try {
+                galleryMedia.validate(app.chalna.capture.domain.CaptureItem.from(candidate))
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                null
+            }
             if (validated == null) {
                 destinationFactory.discard(output)
                 attemptStore.clear()
@@ -289,7 +300,14 @@ class CameraXCaptureEngine(
                 resetAttemptState()
                 return@launch
             }
-            val published = runCatching { destinationFactory.publish(output) }.isSuccess
+            val published = try {
+                destinationFactory.publish(output)
+                true
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                false
+            }
             val capture = validated.copy(
                 state = if (published) CaptureRecordState.READY else CaptureRecordState.METADATA_PENDING,
             ).toLastCapture()
@@ -317,12 +335,19 @@ class CameraXCaptureEngine(
 
     private suspend fun cleanupFailedStart(output: PreparedCaptureOutput) {
         val active = recording
+        var preserved: LastCapture? = null
         if (active != null) {
             runCatching { active.stop() }
-            withTimeoutOrNull(CANCEL_FINALIZE_TIMEOUT_MILLIS) { finalized?.await() }
+            preserved = try {
+                withTimeoutOrNull(CANCEL_FINALIZE_TIMEOUT_MILLIS) { finalized?.await() }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                null
+            }
             runCatching { active.close() }
         }
-        if (finalized?.isCompleted != true) {
+        if (preserved == null) {
             destinationFactory.discard(output)
             attemptStore.clear()
         }
