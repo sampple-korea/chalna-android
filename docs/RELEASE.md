@@ -28,6 +28,7 @@ Before dispatch, the exact main commit must have green Android CI, UI QA, Benchm
 - application ID, version name/code, min/target SDK, non-debuggable state;
 - APK zipalign with 16 KB page alignment and APK Signature Scheme verification;
 - AAB bundletool validation, JAR signature, package/version, and `PAGE_ALIGNMENT_16K` config;
+- generated package-only startup/baseline profile sources and compiled Baseline Profile entries in both APK and AAB;
 - every native ELF LOAD segment alignment;
 - exact signer continuity with v1.1.1;
 - no Internet, media-read, broad storage, overlay, Accessibility Service, debug Activity, Visual Lab, production Diagnostics, or unexpected exported component;

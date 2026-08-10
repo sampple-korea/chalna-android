@@ -2,6 +2,18 @@
 
 Report date: 2026-08-10. Android compilation and tests ran only on GitHub-hosted runners, per repository policy.
 
+## v1.2.0 production-hardening candidate
+
+The v1.2 candidate preserves the Assistant-role eligibility repair delivered in v1.1.1. It does not claim that the recognition-service fix is new: the non-empty recognition service, default recognition-service category, `supportsAssist` metadata, application ID, and signing-continuity anchor are retained. The process model is intentionally changed so voice interaction, session, recognition, capture, and UI share the default application process and one authoritative capture state.
+
+At commit `09ab820da03d5bcd8a26c2702f1e987db84013df`, Android CI [31364048916](https://github.com/sampple-korea/chalna-android/actions/runs/31364048916) passed policy, formatting, Detekt, Android Lint, JVM tests, dependency inspection, and debug assembly. UI QA [31364048942](https://github.com/sampple-korea/chalna-android/actions/runs/31364048942) passed API 34 instrumentation, accessibility smoke, all 39 deterministic screenshot comparisons, and independent Assistant-role qualification on API 29, 33, 35, and 36. The API 29/33 verifier uses `dumpsys role` because those platform images do not expose the newer `cmd role get-role-holders` command; it still verifies the system role holder and both secure-service mappings rather than bypassing eligibility.
+
+Benchmark [31364048906](https://github.com/sampple-korea/chalna-android/actions/runs/31364048906) produced 464 unobfuscated, application-only startup/baseline rules and ten Perfetto traces. Both committed profile files have SHA-256 `3F2B2E2AEC3EA1986DA9F01DEE6DDB832B15E254503490C43F77F0F71E91668A`. Cold initial-display median was 334.505 ms against a 612.806 ms gate; warm median was 55.482 ms against a 197.428 ms gate. These are emulator software-path results, not physical camera latency.
+
+The UI artifact contains 39 PNGs with zero exact and perceptual differences from committed goldens. The downloaded Home, recording, Gallery, selection, Player, Settings, large-font, Glow activation/peak/stop, tall/colorful/cutout, and circle/squircle/teardrop icon-mask images were opened and inspected. State hierarchy, custom icon optical weight, Korean wrapping, absence of a persistent recording border, Gallery density, Player hierarchy, Mist/Night contrast, Glow bloom/decay, cutout clearance, and adaptive-icon safe margins were accepted after the deliberate refinement pass.
+
+Durable reconciliation tests cover deferred metadata indexing and Vault-export relationship recovery without deleting valid media. Legacy-import fixtures cover empty, 250-row, mixed-destination, malformed/truncated, unknown-quality, duplicate, idempotent rerun, and backup-retention cases. Release publication evidence is intentionally not claimed here until the signed v1.2.0 workflow completes and its downloaded assets are independently verified.
+
 ## v1.1.1 Assistant-role hotfix
 
 Android RoleController excludes a voice-interaction package when its metadata omits `recognitionService`. v1.1.0 removed that required attribute, so Android correctly treated Chalna as an unqualified Assistant candidate. v1.1.1 restores non-empty session, recognition, and `supportsAssist` metadata; declares a system-bound recognizer that rejects requests without opening audio; and restores the session service's dedicated process.

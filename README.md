@@ -8,7 +8,7 @@ The source version is 1.2.0 (`versionCode` 4). Signed distribution status is rec
 
 ## Product contract
 
-- Capture begins only after an Assistant invocation or recording-notification action. Test-only harnesses must never ship in production.
+- Capture begins only after an Assistant invocation or an explicit Quick Settings Tile action. The recording notification can stop an active capture but never starts one. Test-only harnesses never ship in production.
 - Every Assistant callback is deduplicated by invocation identity and serialized through one command actor. Starting can be cancelled; Saving never queues a surprise recording.
 - Each recording uses the selected local destination: Device Gallery writes through Android MediaStore under `Movies/Chalna`; Chalna Vault uses app-specific local storage. Vault does not claim encryption. Audio is optional and requires microphone permission.
 - The Chalna library indexes only recordings created by Chalna. It does not scan the device gallery and does not request `READ_MEDIA_VIDEO`.
@@ -21,7 +21,7 @@ The source version is 1.2.0 (`versionCode` 4). Signed distribution status is rec
 ## Setup
 
 1. Install a verified APK on Android 10 (API 29) or newer.
-2. Open Chalna and grant Camera permission. Grant Microphone only if audio is enabled; grant Notifications where Android requests it.
+2. Open Chalna and grant Camera permission. Grant Microphone only if audio is enabled. Notification permission is optional; Android still receives the required foreground-service notification call.
 3. Use Chalna's Assistant action to open the system role picker and select Chalna as the default digital assistant app.
 4. Choose Device Gallery or Chalna Vault for future recordings.
 5. Invoke the configured Assistant gesture to start recording. Confirm the visible recording state/notification.

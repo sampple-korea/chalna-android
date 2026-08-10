@@ -13,6 +13,6 @@ v1.2.0 preserves package `app.chalna.capture`, the v1.1.1 signing certificate, D
 7. Rename the legacy file to a read-only backup; retain it for a recovery window before cleanup.
 8. Verify actual files later in small background batches. No path/prefix-wide MediaStore import occurs.
 
-A crash before the completion marker safely repeats the transaction because IDs are stable and inserts are conflict-safe. Room schema migrations are explicit and `fallbackToDestructiveMigration` is forbidden. Instrumentation fixtures cover empty, mixed-destination, malformed, truncated, duplicate, missing-file, repeat-run, and rollback cases.
+A crash before the completion marker safely repeats the transaction because IDs are stable and inserts are conflict-safe. Room schema migrations are explicit and `fallbackToDestructiveMigration` is forbidden. Instrumentation fixtures cover an empty index, 250 rows, mixed destinations, malformed/truncated rows, unknown quality, duplicates, repeat-run idempotency, backup retention, and deferred metadata/export reconciliation. Missing files are handled by bounded Gallery reconciliation rather than by the importer.
 
 Release verification installs the immutable v1.1.1 APK and then installs v1.2.0 with `adb install -r`, without uninstalling. Signer equality is checked before installation. Database fixture migration remains a dedicated Room instrumentation test because a production release APK cannot expose a data-seeding endpoint.

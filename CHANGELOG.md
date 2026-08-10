@@ -6,10 +6,10 @@ This file records repository changes, not unverified release claims. Dates use I
 
 ### Fixed
 
-- Restored actual Assistant-role picker eligibility by adding the required default recognition-service category and selectable metadata contract.
+- Preserved the v1.1.1 Assistant-role eligibility fix and extended role qualification checks across API 29, 33, 34, 35, and 36.
 - Removed the process-local state split between Voice Interaction/session/recognition and CaptureService/UI.
 - Serialized capture commands, preserved coroutine cancellation, handled Starting cancellation and Saving busy state, and moved duration/latency/guards to a monotonic clock.
-- Validated CameraX finalize output, retained usable media when metadata persistence fails, and salvaged valid journaled output after process death.
+- Validated CameraX finalize output, retained usable media when metadata persistence fails, consumed durable reconciliation operations, and salvaged valid journaled output after process death.
 - Removed eager ExoPlayer construction, app-wide one-second ticking, whole-index Gallery refreshes, and per-frame Glow palette/path allocations.
 
 ### Added
@@ -18,7 +18,7 @@ This file records repository changes, not unverified release claims. Dates use I
 - Recently Deleted, restore/permanent purge, deterministic sorting/filtering, typed batch outcomes, and idempotent Vault-to-MediaStore export.
 - Screen-scoped SurfaceView Media3 player lifecycle, recording-conflict pause, buffered seek, speed, resume position, missing/error state, and fullscreen ownership.
 - Official Quick Settings capture Tile using the same authoritative command pipeline.
-- StrictMode debug checks, baseline-profile/macrobenchmark module, CodeQL/security/SBOM workflow, 16 KB release validation, AAB distribution, update-install verification, and remote APK/AAB integrity checks.
+- StrictMode debug checks, a remotely generated and package-filtered Baseline Profile, macrobenchmark traces, CodeQL/security/SBOM workflow, 16 KB release validation, AAB distribution, update-install verification, and remote APK/AAB integrity checks.
 - Process, state-machine, data, migration, storage, Gallery, Player, performance, accessibility, threat-model, and ADR documentation.
 
 ### Changed
