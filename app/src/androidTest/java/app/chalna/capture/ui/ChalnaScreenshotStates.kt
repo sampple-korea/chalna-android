@@ -77,7 +77,7 @@ object ChalnaScreenshotStates {
             player = PlayerUiState(vaultVideo, positionMillis = 4_000, durationMillis = 18_000, phase = PlayerPhase.READY),
         )
     val settingsCameraDenied = homeReadyNight.copy(ready = false, cameraGranted = false, cameraPermanentlyDenied = true)
-    val settingsAudioOff = homeReadyNight.copy(sound = false, microphoneGranted = false)
+    val settingsAudioOff = homeReadyNight.copy(audioEnabled = false, microphoneGranted = false)
     val settingsAssistantMissing = homeReadyNight.copy(ready = false, assistantSelected = false)
     val settingsNotificationOptional = homeReadyNight.copy(notificationsGranted = false, ready = true)
     val settingsVaultMist = homeReady.copy(storageDestination = StorageDestinationUi.CHALNA_VAULT)

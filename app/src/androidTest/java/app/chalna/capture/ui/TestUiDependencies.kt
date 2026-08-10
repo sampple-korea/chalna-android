@@ -53,7 +53,7 @@ internal open class TestUiDependencies(
 
     open override fun setHaptics(value: Boolean) = Unit
 
-    open override fun setSound(value: Boolean) = Unit
+    open override fun setAudioEnabled(value: Boolean) = Unit
 
     open override fun setAutoStop(seconds: Int) = Unit
 

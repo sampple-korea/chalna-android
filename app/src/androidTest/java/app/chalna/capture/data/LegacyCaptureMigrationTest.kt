@@ -60,8 +60,9 @@ class LegacyCaptureMigrationTest {
         runBlocking {
             val row = row("33333333-3333-3333-3333-333333333333", "DEVICE_GALLERY", "content://media/external/video/media/3", "")
             legacy.writeText("CHALNA_INDEX_1\t1\n$row$row", StandardCharsets.UTF_8)
-            LegacyCaptureIndexImporter(context, database).import(null)
+            val result = LegacyCaptureIndexImporter(context, database).import(null)
             assertEquals(1, database.captureDao().countAll())
+            assertEquals(1, result.importedRows)
         }
 
     @Test fun backupSurvivesMigrationLaunchAndIsRemovedOnlyAfterStabilityWindow() =

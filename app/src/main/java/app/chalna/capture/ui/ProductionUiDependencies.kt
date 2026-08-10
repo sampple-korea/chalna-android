@@ -12,6 +12,7 @@ import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.PowerManager
+import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Size
@@ -246,7 +247,7 @@ class ProductionUiDependencies(
                     quality = settings.preferredQuality.toUi(),
                     appearance = settings.theme.toUi(),
                     haptics = settings.hapticsEnabled,
-                    sound = settings.audioEnabled,
+                    audioEnabled = settings.audioEnabled,
                     autoStopSeconds = settings.autoStopSeconds,
                     reducedMotion = settings.motion == MotionPreference.REDUCED || !ValueAnimator.areAnimatorsEnabled(),
                     motion = settings.motion.toUi(),
@@ -298,11 +299,17 @@ class ProductionUiDependencies(
     override fun openAssistantSettings() {
         val manager = activity.getSystemService(RoleManager::class.java)
         if (manager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)) {
-            assistantRole.launch(manager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
+            runCatching {
+                assistantRole.launch(manager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
+            }.onFailure { openVoiceInputSettings() }
         } else {
-            runCatching { activity.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)) }
-                .onFailure { openAppSettings() }
+            openVoiceInputSettings()
         }
+    }
+
+    private fun openVoiceInputSettings() {
+        runCatching { activity.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)) }
+            .onFailure { openAppSettings() }
     }
 
     override fun openAppSettings() {
@@ -331,7 +338,7 @@ class ProductionUiDependencies(
 
     override fun setHaptics(value: Boolean) = updateSettings { copy(hapticsEnabled = value) }
 
-    override fun setSound(value: Boolean) {
+    override fun setAudioEnabled(value: Boolean) {
         if (value && !granted(Manifest.permission.RECORD_AUDIO)) {
             if (systemSnapshot.value.microphonePermanentlyDenied) openAppSettings() else requestMicrophone()
         } else {
@@ -760,7 +767,15 @@ class ProductionUiDependencies(
         requestedThisSession: Boolean,
     ): Boolean {
         if (granted(permission)) return false
-        return requestedThisSession && !activity.shouldShowRequestPermissionRationale(permission)
+        val userFixed =
+            runCatching {
+                activity.packageManager.getPermissionFlags(
+                    permission,
+                    activity.packageName,
+                    Process.myUserHandle(),
+                ) and PackageManager.FLAG_PERMISSION_USER_FIXED != 0
+            }.getOrDefault(false)
+        return userFixed || requestedThisSession && !activity.shouldShowRequestPermissionRationale(permission)
     }
 
     private fun updateSettings(transform: CaptureSettings.() -> CaptureSettings) {

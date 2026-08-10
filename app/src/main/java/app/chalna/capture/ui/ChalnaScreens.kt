@@ -125,13 +125,13 @@ internal fun SetupScreen(
     Hairline()
     SetupRow(
         title = stringResource(R.string.audio),
-        detail = stringResource(if (state.sound) R.string.audio_setup_on else R.string.audio_setup_off),
+        detail = stringResource(if (state.audioEnabled) R.string.audio_setup_on else R.string.audio_setup_off),
         icon = ChalnaIcon.MIC,
-        complete = !state.sound || state.microphoneGranted,
+        complete = !state.audioEnabled || state.microphoneGranted,
         action =
             when {
-                !state.sound -> ({ dependencies.setSound(true) })
-                state.microphoneGranted -> ({ dependencies.setSound(false) })
+                !state.audioEnabled -> ({ dependencies.setAudioEnabled(true) })
+                state.microphoneGranted -> ({ dependencies.setAudioEnabled(false) })
                 state.microphonePermanentlyDenied -> dependencies::openAppSettings
                 else -> dependencies::requestMicrophone
             },
@@ -154,7 +154,7 @@ internal fun SetupScreen(
         action = if (state.notificationsGranted) null else dependencies::requestNotifications,
     )
     Spacer(Modifier.height(26.dp))
-    val essentialReady = state.cameraGranted && state.assistantSelected && (!state.sound || state.microphoneGranted)
+    val essentialReady = state.cameraGranted && state.assistantSelected && (!state.audioEnabled || state.microphoneGranted)
     PrimaryButton(stringResource(R.string.finish_setup), essentialReady, dependencies::finishSetup)
 }
 
@@ -330,7 +330,7 @@ internal fun SettingsScreen(
         ),
     )
     ChalnaText(stringResource(R.string.existing_videos_not_moved), 12, ChalnaTheme.colors.muted)
-    ToggleRow(stringResource(R.string.include_audio), state.sound, dependencies::setSound)
+    ToggleRow(stringResource(R.string.include_audio), state.audioEnabled, dependencies::setAudioEnabled)
     SelectionSettingRow(
         stringResource(R.string.video_quality),
         qualityLabel(state.quality),
@@ -395,7 +395,7 @@ internal fun SettingsScreen(
     SettingRow(
         stringResource(R.string.microphone),
         stringResource(
-            if (!state.sound) {
+            if (!state.audioEnabled) {
                 R.string.audio_off
             } else if (state.microphoneGranted) {
                 R.string.allowed
@@ -404,7 +404,7 @@ internal fun SettingsScreen(
             },
         ),
         ChalnaIcon.MIC,
-        !state.sound || state.microphoneGranted,
+        !state.audioEnabled || state.microphoneGranted,
     ) { if (state.microphonePermanentlyDenied) dependencies.openAppSettings() else dependencies.requestMicrophone() }
     SettingRow(
         stringResource(R.string.notifications_optional),

@@ -112,7 +112,7 @@ data class ChalnaUiState(
     val quality: VideoQuality = VideoQuality.AUTO,
     val appearance: AppearanceMode = AppearanceMode.SYSTEM,
     val haptics: Boolean = true,
-    val sound: Boolean = true,
+    val audioEnabled: Boolean = true,
     val autoStopSeconds: Int = 0,
     val reducedMotion: Boolean = false,
     val motion: MotionMode = MotionMode.SYSTEM,
@@ -164,7 +164,7 @@ interface UiDependencies {
 
     fun setHaptics(value: Boolean)
 
-    fun setSound(value: Boolean)
+    fun setAudioEnabled(value: Boolean)
 
     fun setAutoStop(seconds: Int)
 

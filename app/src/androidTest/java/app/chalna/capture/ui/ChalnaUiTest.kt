@@ -84,7 +84,7 @@ class ChalnaUiTest {
         val fake =
             FakeUiDependencies(
                 ChalnaUiState(
-                    sound = false,
+                    audioEnabled = false,
                     cameraGranted = true,
                     assistantSelected = true,
                     reducedMotion = true,
@@ -133,8 +133,8 @@ internal class FakeUiDependencies(
         state.value = state.value.copy(haptics = value)
     }
 
-    override fun setSound(value: Boolean) {
-        state.value = state.value.copy(sound = value)
+    override fun setAudioEnabled(value: Boolean) {
+        state.value = state.value.copy(audioEnabled = value)
     }
 
     override fun setAutoStop(seconds: Int) {

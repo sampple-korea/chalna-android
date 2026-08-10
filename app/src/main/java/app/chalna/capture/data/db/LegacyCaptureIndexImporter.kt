@@ -45,13 +45,20 @@ class LegacyCaptureIndexImporter(
                     addAll(decoded.items)
                     lastCapture?.takeIf(LastCapture::isUsable)?.let { add(CaptureItem.from(it)) }
                 }.distinctBy { "${it.storageDestination}:${it.privateRef ?: it.contentUri}" }
-            database.withTransaction {
-                database.captureDao().insertAllIgnoringDuplicates(candidates.map { it.toEntity(CURRENT_DATA_VERSION) })
-                database.migrationMarkerDao().insert(
-                    MigrationMarkerEntity(MARKER, nowEpochMillis(), candidates.size, decoded.malformedRows),
-                )
-            }
+            val importedRows =
+                database.withTransaction {
+                    val insertedRows =
+                        database
+                            .captureDao()
+                            .insertAllIgnoringDuplicates(candidates.map { it.toEntity(CURRENT_DATA_VERSION) })
+                            .count { it != INSERT_IGNORED }
+                    database.migrationMarkerDao().insert(
+                        MigrationMarkerEntity(MARKER, nowEpochMillis(), insertedRows, decoded.malformedRows),
+                    )
+                    insertedRows
+                }
             val marker = requireNotNull(database.migrationMarkerDao().byName(MARKER))
+            check(marker.importedRows == importedRows)
             if (legacy.isFile && !backup.exists()) check(legacy.renameTo(backup))
             LegacyImportResult(marker.importedRows, marker.malformedRows, false)
         }
@@ -73,5 +80,6 @@ class LegacyCaptureIndexImporter(
         private const val BACKUP_NAME = "capture-index-v1.imported.bak"
         private const val MARKER = "legacy_capture_index_v1"
         private const val BACKUP_STABILITY_WINDOW_MILLIS = 24L * 60L * 60L * 1_000L
+        private const val INSERT_IGNORED = -1L
     }
 }
