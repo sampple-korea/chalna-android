@@ -10,7 +10,13 @@ recognizer_full="$package_name/app.chalna.capture.assistant.ChalnaRecognitionSer
 fallback_short="$package_name/.assistant.AssistFallbackActivity"
 fallback_full="$package_name/app.chalna.capture.assistant.AssistFallbackActivity"
 
-if ! role_output="$(adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name" 2>&1)"; then
+adb shell logcat -c >/dev/null 2>&1 || true
+set +e
+role_output="$(adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name" 2>&1)"
+role_status=$?
+set -e
+if (( role_status != 0 )); then
+  printf 'add-role-holder exited %s\n' "$role_status" >&2
   printf '%s\n' "$role_output" >&2
   printf '%s\n' 'Assistant-role diagnostics:' >&2
   printf 'sdk=%s low_ram=%s\n' \
@@ -18,6 +24,8 @@ if ! role_output="$(adb shell cmd role add-role-holder --user 0 "$role_name" "$p
     "$(adb shell getprop ro.config.low_ram | tr -d '\r')" >&2
   adb shell cmd package query-activities --brief -a android.intent.action.ASSIST \
     -c android.intent.category.DEFAULT "$package_name" 2>&1 | tr -d '\r' >&2 || true
+  adb shell cmd role get-role-holders --user 0 "$role_name" 2>&1 | tr -d '\r' >&2 || true
+  adb shell dumpsys role 2>&1 | tr -d '\r' | tail -200 >&2 || true
   adb shell dumpsys package "$package_name" 2>&1 | tr -d '\r' | \
     grep -E -A8 -B3 'android.intent.action.ASSIST|VoiceInteractionService|AssistFallbackActivity|ChalnaRecognitionService' >&2 || true
   adb shell logcat -d -v brief 2>&1 | tr -d '\r' | \

@@ -52,9 +52,8 @@ jobs:
           disable-animations: true
           script: |
             ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
-            PROFILE="$(find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c | head -1)"
-            test -n "$PROFILE"
-            cp "$PROFILE" generated-baseline-prof.txt
+            find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c -exec cp '{}' generated-baseline-prof.txt ';' -quit
+            test -s generated-baseline-prof.txt
             test "$(wc -l < generated-baseline-prof.txt)" -ge 20
             ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.StartupBenchmark
       - name: Verify outputs
