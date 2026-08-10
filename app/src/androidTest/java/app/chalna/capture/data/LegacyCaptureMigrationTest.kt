@@ -65,6 +65,56 @@ class LegacyCaptureMigrationTest {
             assertEquals(1, result.importedRows)
         }
 
+    @Test fun emptyIndexCompletesWithoutInventingRows() =
+        runBlocking {
+            legacy.writeText("CHALNA_INDEX_1\t1\n", StandardCharsets.UTF_8)
+            val result = LegacyCaptureIndexImporter(context, database).import(null)
+            assertEquals(0, result.importedRows)
+            assertEquals(0, result.malformedRows)
+            assertEquals(0, database.captureDao().countAll())
+        }
+
+    @Test fun hundredsOfRowsImportInOneIdempotentTransaction() =
+        runBlocking {
+            legacy.writeText(
+                buildString {
+                    append("CHALNA_INDEX_1\t1\n")
+                    repeat(250) { index ->
+                        val id = "%08x-0000-0000-0000-%012x".format(index, index)
+                        append(row(id, "DEVICE_GALLERY", "content://media/external/video/media/${index + 1}", ""))
+                    }
+                },
+                StandardCharsets.UTF_8,
+            )
+            val importer = LegacyCaptureIndexImporter(context, database)
+            val first = importer.import(null)
+            val second = importer.import(null)
+            assertEquals(250, first.importedRows)
+            assertTrue(second.alreadyComplete)
+            assertEquals(250, database.captureDao().countAll())
+        }
+
+    @Test fun truncatedTailAndUnknownQualityDoNotDiscardValidRows() =
+        runBlocking {
+            val validId = "55555555-5555-5555-5555-555555555555"
+            legacy.writeText(
+                "CHALNA_INDEX_1\t1\n" +
+                    row(
+                        validId,
+                        "DEVICE_GALLERY",
+                        "content://media/external/video/media/5",
+                        "",
+                        quality = "FUTURE_QUALITY",
+                    ) +
+                    "dHJ1bmNhdGVk\n",
+                StandardCharsets.UTF_8,
+            )
+            val result = LegacyCaptureIndexImporter(context, database).import(null)
+            assertEquals(1, result.importedRows)
+            assertEquals(1, result.malformedRows)
+            assertEquals("UNKNOWN", database.captureDao().byId(validId)?.quality)
+        }
+
     @Test fun backupSurvivesMigrationLaunchAndIsRemovedOnlyAfterStabilityWindow() =
         runBlocking {
             var now = 1_700_000_000_000L
@@ -88,6 +138,7 @@ class LegacyCaptureMigrationTest {
         destination: String,
         uri: String,
         privateRef: String,
+        quality: String = "FHD",
     ): String =
         listOf(
             id,
@@ -97,7 +148,7 @@ class LegacyCaptureMigrationTest {
             "$id.mp4",
             "1700000000000",
             "1200",
-            "FHD",
+            quality,
             "1",
             "1024",
             "1920",

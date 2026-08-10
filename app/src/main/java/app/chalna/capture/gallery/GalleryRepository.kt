@@ -96,7 +96,7 @@ class GalleryRepository(
 
     suspend fun initialize(): Int {
         importer.import(settings.lastCapture.value)
-        processPendingOperations()
+        reconcilePendingOperations()
         reconcile(limit = RECONCILE_OPEN_BATCH)
         purgeExpiredTrash()
         importer.cleanupVerifiedBackup()
@@ -413,7 +413,7 @@ class GalleryRepository(
             trashBytes = captureDao.trashBytes(),
         )
 
-    private suspend fun processPendingOperations(limit: Int = PENDING_OPERATION_BATCH) {
+    internal suspend fun reconcilePendingOperations(limit: Int = PENDING_OPERATION_BATCH) {
         val operations = database.pendingOperationDao().due(nowEpochMillis(), limit)
         operations.forEach { operation ->
             val completed =
