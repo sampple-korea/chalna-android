@@ -51,10 +51,15 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
-            ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
-            find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c -exec cp '{}' generated-baseline-prof.txt ';' -quit
+            ./gradlew --no-daemon --stacktrace :benchmark:connectedProfileAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.BaselineProfileGenerator
+            find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-baseline-prof.txt' -size +0c -exec cp '{}' generated-baseline-prof.txt ';' -quit
+            find benchmark/build/outputs/connected_android_test_additional_output -type f -name '*-startup-prof.txt' -size +0c -exec cp '{}' generated-startup-prof.txt ';' -quit
             test -s generated-baseline-prof.txt
+            test -s generated-startup-prof.txt
             test "$(wc -l < generated-baseline-prof.txt)" -ge 20
+            test "$(wc -l < generated-startup-prof.txt)" -ge 20
+            grep -q 'Lapp/chalna/capture/' generated-baseline-prof.txt
+            grep -q 'Lapp/chalna/capture/' generated-startup-prof.txt
             ./gradlew --no-daemon --stacktrace :benchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.chalna.capture.benchmark.StartupBenchmark
       - name: Verify outputs
         shell: bash
@@ -62,7 +67,9 @@ jobs:
           set -euo pipefail
           find app benchmark -type f \( -name '*-startup-prof*.txt' -o -name '*benchmarkData.json' -o -name '*.trace' \) -print | tee benchmark-files.txt
           test -s generated-baseline-prof.txt
+          test -s generated-startup-prof.txt
           test "$(wc -l < generated-baseline-prof.txt)" -ge 20
+          test "$(wc -l < generated-startup-prof.txt)" -ge 20
           RESULT="$(find benchmark/build/outputs -type f -name '*benchmarkData.json' -size +0c | head -1)"
           test -n "$RESULT"
           python3 scripts/verify-benchmark-results.py benchmark/performance-baseline.json "$RESULT"
@@ -80,3 +87,4 @@ jobs:
             benchmark-files.txt
             benchmark-gate.json
             generated-baseline-prof.txt
+            generated-startup-prof.txt
