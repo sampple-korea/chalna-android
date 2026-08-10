@@ -24,7 +24,20 @@ if ! role_output="$(adb shell cmd role add-role-holder --user 0 "$role_name" "$p
     grep -E 'AssistantRoleBehavior|RoleController|RoleManager|VoiceInteraction|PermissionController' | tail -160 >&2 || true
   exit 1
 fi
-adb shell cmd role get-role-holders --user 0 "$role_name" | tr -d '\r' | grep -Fx "$package_name"
+
+holder_seen=false
+for _ in $(seq 1 20); do
+  holders="$(adb shell cmd role get-role-holders --user 0 "$role_name" | tr -d '\r')"
+  if grep -Fxq "$package_name" <<< "$holders"; then
+    holder_seen=true
+    break
+  fi
+  sleep 1
+done
+if test "$holder_seen" != true; then
+  printf 'Assistant role transaction completed without retaining %s. holders=%s\n' "$package_name" "$holders" >&2
+  exit 1
+fi
 
 for _ in $(seq 1 20); do
   interactor="$(adb shell settings get secure voice_interaction_service | tr -d '\r')"

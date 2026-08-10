@@ -28,7 +28,6 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ github.event.inputs.version }}
-      VERSION_CODE: "4"
       CHALNA_KEYSTORE_PATH: ${{ github.workspace }}/.release/chalna-release.p12
       EXPECTED_RELEASE_CERT_SHA256: E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9
       BUNDLETOOL_JAR: ${{ github.workspace }}/.release/bundletool.jar
@@ -44,8 +43,8 @@ jobs:
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           source version.properties
           test "$VERSION_NAME" = "$VERSION"
-          test "$VERSION_CODE" = '4'
-          test "$VERSION" = '1.2.0'
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]*$ ]]
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           gh release verify --help >/dev/null
           gh release verify-asset --help >/dev/null
           if gh release view "v$VERSION" >/dev/null 2>&1; then
@@ -272,8 +271,8 @@ jobs:
           java -jar "$BUNDLETOOL_JAR" validate --bundle "chalna-v${VERSION}-release.aab"
           aab_certificate_sha="$(keytool -printcert -jarfile "chalna-v${VERSION}-release.aab" | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           test "$aab_certificate_sha" = "$EXPECTED_RELEASE_CERT_SHA256"
-          jq -e --arg sha "$GITHUB_SHA" --arg version "$VERSION" \
-            '.gitCommit == $sha and .versionName == $version and .versionCode == 4' \
+          jq -e --arg sha "$GITHUB_SHA" --arg version "$VERSION" --argjson code "$VERSION_CODE" \
+            '.gitCommit == $sha and .versionName == $version and .versionCode == $code' \
             "chalna-v${VERSION}-build-info.json"
           jq -e '.bomFormat == "CycloneDX" and (.components | length > 0)' "chalna-v${VERSION}-sbom.json"
       - name: Remove failed draft release

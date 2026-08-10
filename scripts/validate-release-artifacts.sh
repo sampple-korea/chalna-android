@@ -57,6 +57,16 @@ previous_certificate_sha="$(sed -n 's/^.*certificate SHA-256 digest: //p' <<< "$
 test "$previous_certificate_sha" = "$EXPECTED_RELEASE_CERT_SHA256"
 test "$previous_certificate_sha" = "$certificate_sha"
 
+previous_app_id="$("$apkanalyzer" manifest application-id "$previous_apk")"
+previous_version_code="$("$apkanalyzer" manifest version-code "$previous_apk")"
+test "$previous_app_id" = 'app.chalna.capture'
+[[ "$previous_version_code" =~ ^[0-9]+$ ]]
+[[ "$VERSION_CODE" =~ ^[0-9]+$ ]]
+if (( VERSION_CODE <= previous_version_code )); then
+  echo "Version code $VERSION_CODE must be greater than previous release code $previous_version_code." >&2
+  exit 1
+fi
+
 app_id="$("$apkanalyzer" manifest application-id "$apk")"
 version_name="$("$apkanalyzer" manifest version-name "$apk")"
 actual_version_code="$("$apkanalyzer" manifest version-code "$apk")"
@@ -178,6 +188,7 @@ jq -n \
   --arg aabSha256 "$aab_sha" \
   --arg signingCertificateSha256 "$certificate_sha" \
   --arg previousCertificateSha256 "$previous_certificate_sha" \
+  --argjson previousVersionCode "$previous_version_code" \
   --arg androidGradlePlugin '9.3.1' \
   --arg kotlin '2.3.21' \
   --arg cameraX '1.6.1' \
@@ -185,7 +196,7 @@ jq -n \
   --arg room '2.8.4' \
   --arg workflowRunId "$GITHUB_RUN_ID" \
   --arg buildTimestamp "$build_timestamp" \
-  '{applicationId:$applicationId,versionName:$versionName,versionCode:$versionCode,gitCommit:$gitCommit,tag:$tag,minSdk:$minSdk,targetSdk:$targetSdk,compileSdk:$compileSdk,apk:{filename:$apkFilename,byteSize:$apkByteSize,sha256:$apkSha256},aab:{filename:$aabFilename,byteSize:$aabByteSize,sha256:$aabSha256},signingCertificateSha256:$signingCertificateSha256,previousCertificateSha256:$previousCertificateSha256,toolchain:{androidGradlePlugin:$androidGradlePlugin,kotlin:$kotlin,cameraX:$cameraX,media3:$media3,room:$room},buildWorkflowRunId:$workflowRunId,buildTimestamp:$buildTimestamp}' \
+  '{applicationId:$applicationId,versionName:$versionName,versionCode:$versionCode,previousVersionCode:$previousVersionCode,gitCommit:$gitCommit,tag:$tag,minSdk:$minSdk,targetSdk:$targetSdk,compileSdk:$compileSdk,apk:{filename:$apkFilename,byteSize:$apkByteSize,sha256:$apkSha256},aab:{filename:$aabFilename,byteSize:$aabByteSize,sha256:$aabSha256},signingCertificateSha256:$signingCertificateSha256,previousCertificateSha256:$previousCertificateSha256,toolchain:{androidGradlePlugin:$androidGradlePlugin,kotlin:$kotlin,cameraX:$cameraX,media3:$media3,room:$room},buildWorkflowRunId:$workflowRunId,buildTimestamp:$buildTimestamp}' \
   > "$build_info"
 
 if test -n "${GITHUB_OUTPUT:-}"; then
