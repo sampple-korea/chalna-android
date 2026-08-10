@@ -1,14 +1,18 @@
 package app.chalna.capture.ui
 
 import android.content.res.Configuration
+import android.graphics.AdaptiveIconDrawable
 import android.graphics.Bitmap
-import androidx.compose.foundation.Image
+import android.graphics.Canvas
+import android.graphics.Path
+import android.graphics.RectF
+import android.os.Build
+import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -17,12 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.ComposeTestRule
@@ -37,6 +39,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import app.chalna.capture.assistant.ChalnaInvocationGlowView
 import app.chalna.capture.assistant.InvocationPulseKind
@@ -45,6 +48,7 @@ import org.junit.Test
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import android.graphics.Color as AndroidColor
 
 class ChalnaScreenshotTest {
     @get:Rule val compose = createComposeRule()
@@ -194,13 +198,15 @@ class ChalnaScreenshotTest {
 
     @Test fun glowWideCutoutMist() = perimeterGlow("glow-stop-wide-cutout-mist", InvocationPulseKind.STOP, .5f, 380, 230, true)
 
-    @Test fun iconMaskCircle() = icon("icon-mask-circle", CircleShape)
+    @Test fun iconMaskCircle() = icon("icon-mask-circle", AdaptiveMask.CIRCLE)
 
-    @Test fun iconMaskSquircle() = icon("icon-mask-squircle", RoundedCornerShape(24.dp))
+    @Test fun iconMaskSquircle() = icon("icon-mask-squircle", AdaptiveMask.SQUIRCLE)
 
-    @Test fun iconMaskSquare() = icon("icon-mask-square", RoundedCornerShape(8.dp))
+    @Test fun iconMaskSquare() = icon("icon-mask-square", AdaptiveMask.ROUNDED_SQUARE)
 
-    @Test fun iconMaskMonochrome() = icon("icon-mask-monochrome", RoundedCornerShape(24.dp), monochrome = true)
+    @Test fun iconMaskTeardrop() = icon("icon-mask-teardrop", AdaptiveMask.TEARDROP)
+
+    @Test fun iconMaskMonochrome() = icon("icon-mask-monochrome", AdaptiveMask.SQUIRCLE, monochrome = true)
 
     private fun glow(
         name: String,
@@ -265,25 +271,15 @@ class ChalnaScreenshotTest {
 
     private fun icon(
         name: String,
-        shape: androidx.compose.ui.graphics.Shape,
+        mask: AdaptiveMask,
         monochrome: Boolean = false,
     ) = captureContent(name, {
         CompositionLocalProvider(LocalChalnaColors provides NightColors) {
             Box(Modifier.fillMaxSize().background(NightColors.background), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(220.dp).clip(shape).background(NightColors.surfaceHigh), contentAlignment = Alignment.Center) {
-                    Image(
-                        painterResource(
-                            if (monochrome) {
-                                app.chalna.capture.R.drawable.ic_chalna_monochrome
-                            } else {
-                                app.chalna.capture.R.drawable.ic_chalna_mark
-                            },
-                        ),
-                        null,
-                        Modifier.fillMaxSize(),
-                        colorFilter = if (monochrome) ColorFilter.tint(Color.White) else null,
-                    )
-                }
+                AndroidView(
+                    factory = { context -> AdaptiveIconMaskView(context, mask, monochrome) },
+                    modifier = Modifier.size(220.dp),
+                )
             }
         }
     })
@@ -346,6 +342,64 @@ class ChalnaScreenshotTest {
 
     private companion object {
         const val SCREENSHOT_CAPTURE_ATTEMPTS = 3
+    }
+}
+
+private enum class AdaptiveMask { CIRCLE, SQUIRCLE, ROUNDED_SQUARE, TEARDROP }
+
+private class AdaptiveIconMaskView(
+    context: android.content.Context,
+    private val mask: AdaptiveMask,
+    private val monochrome: Boolean,
+) : View(context) {
+    private val icon = requireNotNull(context.getDrawable(app.chalna.capture.R.mipmap.ic_launcher) as? AdaptiveIconDrawable)
+    private val clipPath = Path()
+    private val bounds = RectF()
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val side = minOf(width, height).toFloat()
+        val left = (width - side) / 2f
+        val top = (height - side) / 2f
+        bounds.set(left, top, left + side, top + side)
+        buildMask(clipPath, bounds, mask)
+        val checkpoint = canvas.save()
+        canvas.clipPath(clipPath)
+        icon.background.setBounds(left.toInt(), top.toInt(), (left + side).toInt(), (top + side).toInt())
+        icon.background.draw(canvas)
+        val layer =
+            if (monochrome && Build.VERSION.SDK_INT >= 33) {
+                icon.monochrome?.mutate()?.also { DrawableCompat.setTint(it, AndroidColor.WHITE) }
+            } else {
+                icon.foreground
+            }
+        layer?.setBounds(left.toInt(), top.toInt(), (left + side).toInt(), (top + side).toInt())
+        layer?.draw(canvas)
+        canvas.restoreToCount(checkpoint)
+    }
+
+    private fun buildMask(
+        target: Path,
+        box: RectF,
+        kind: AdaptiveMask,
+    ) {
+        target.rewind()
+        when (kind) {
+            AdaptiveMask.CIRCLE -> target.addOval(box, Path.Direction.CW)
+            AdaptiveMask.ROUNDED_SQUARE -> target.addRoundRect(box, box.width() * .12f, box.height() * .12f, Path.Direction.CW)
+            AdaptiveMask.SQUIRCLE -> {
+                val radius = box.width() * .27f
+                target.addRoundRect(box, radius, radius, Path.Direction.CW)
+            }
+            AdaptiveMask.TEARDROP -> {
+                val radius = box.width() * .34f
+                target.addRoundRect(
+                    box,
+                    floatArrayOf(radius, radius, radius, radius, radius, radius, box.width() * .08f, box.height() * .08f),
+                    Path.Direction.CW,
+                )
+            }
+        }
     }
 }
 

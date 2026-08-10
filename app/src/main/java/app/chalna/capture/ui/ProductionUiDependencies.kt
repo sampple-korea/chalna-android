@@ -12,7 +12,6 @@ import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.PowerManager
-import android.os.Process
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Size
@@ -767,15 +766,10 @@ class ProductionUiDependencies(
         requestedThisSession: Boolean,
     ): Boolean {
         if (granted(permission)) return false
-        val userFixed =
-            runCatching {
-                activity.packageManager.getPermissionFlags(
-                    permission,
-                    activity.packageName,
-                    Process.myUserHandle(),
-                ) and PackageManager.FLAG_PERMISSION_USER_FIXED != 0
-            }.getOrDefault(false)
-        return userFixed || requestedThisSession && !activity.shouldShowRequestPermissionRationale(permission)
+        // Android does not expose the package-manager user-fixed flag to third-party apps.
+        // Keep this decision tied to a request made by this live Activity and current system
+        // rationale state so permission auto-reset or a Settings change cannot become stale.
+        return requestedThisSession && !activity.shouldShowRequestPermissionRationale(permission)
     }
 
     private fun updateSettings(transform: CaptureSettings.() -> CaptureSettings) {
