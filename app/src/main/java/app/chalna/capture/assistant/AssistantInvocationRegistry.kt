@@ -34,7 +34,8 @@ object AssistantInvocationRegistry {
 
     fun sessionKey(args: Bundle?): String? =
         when {
-            Build.VERSION.SDK_INT >= 34 -> args?.getString(VoiceInteractionSession.KEY_SHOW_SESSION_ID)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
+                args?.getString(VoiceInteractionSession.KEY_SHOW_SESSION_ID)
             else ->
                 args
                     ?.getLong(EXTRA_INVOCATION_TIME, Long.MIN_VALUE)

@@ -104,14 +104,19 @@ object StableCaptureId {
                 .getInstance("SHA-256")
                 .digest("${destination.name}:$reference".toByteArray(StandardCharsets.UTF_8))
         val digits = "0123456789abcdef"
-        return buildString(32) {
-            bytes.take(16).forEach { byte ->
+        return buildString(CAPTURE_ID_LENGTH) {
+            bytes.take(CAPTURE_ID_BYTE_COUNT).forEach { byte ->
                 val value = byte.toInt() and 0xff
-                append(digits[value ushr 4])
-                append(digits[value and 0x0f])
+                append(digits[value ushr NIBBLE_BITS])
+                append(digits[value and NIBBLE_MASK])
             }
         }
     }
+
+    private const val CAPTURE_ID_LENGTH = 32
+    private const val CAPTURE_ID_BYTE_COUNT = 16
+    private const val NIBBLE_BITS = 4
+    private const val NIBBLE_MASK = 0x0f
 }
 
 enum class GallerySort { NEWEST_FIRST, OLDEST_FIRST, LONGEST_FIRST, LARGEST_FIRST }

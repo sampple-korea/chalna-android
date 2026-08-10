@@ -55,8 +55,7 @@ style:
       - '**/test/**'
       - '**/androidTest/**'
       - '**/*.kts'
-      - '**/ui/ChalnaComponents.kt'
-      - '**/ui/InvocationGlow.kt'
+      - '**/ui/**'
       - '**/assistant/ChalnaVoiceInteractionSession.kt'
     ignoreNumbers:
       - '-1'

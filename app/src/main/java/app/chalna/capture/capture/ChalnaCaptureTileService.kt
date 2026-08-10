@@ -88,7 +88,7 @@ class ChalnaCaptureTileService : TileService() {
             context: android.content.Context,
             callback: (Int) -> Unit,
         ) {
-            if (Build.VERSION.SDK_INT < 33) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 callback(UNSUPPORTED_RESULT)
                 return
             }

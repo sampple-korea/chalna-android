@@ -27,8 +27,8 @@ object CaptureTelemetryRegistry {
         try {
             sink.mark(
                 CaptureTelemetryEvent(
-                    invocationId = invocationId.take(160),
-                    name = name.take(64),
+                    invocationId = invocationId.take(MAX_INVOCATION_ID_LENGTH),
+                    name = name.take(MAX_EVENT_NAME_LENGTH),
                     elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos(),
                 ),
             )
@@ -36,4 +36,7 @@ object CaptureTelemetryRegistry {
             // Developer telemetry cannot affect capture dispatch or finalization.
         }
     }
+
+    private const val MAX_INVOCATION_ID_LENGTH = 160
+    private const val MAX_EVENT_NAME_LENGTH = 64
 }

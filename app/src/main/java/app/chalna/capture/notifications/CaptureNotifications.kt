@@ -173,7 +173,7 @@ object CaptureNotifications {
                 .setContentIntent(open)
                 .setOnlyAlertOnce(true)
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
-        if (Build.VERSION.SDK_INT >= 31) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
         }
         if (includeStop) {

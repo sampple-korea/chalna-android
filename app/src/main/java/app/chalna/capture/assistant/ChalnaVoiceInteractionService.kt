@@ -18,7 +18,7 @@ class ChalnaVoiceInteractionService : VoiceInteractionService() {
         setDisabledShowContext(
             VoiceInteractionSession.SHOW_WITH_ASSIST or VoiceInteractionSession.SHOW_WITH_SCREENSHOT,
         )
-        if (Build.VERSION.SDK_INT >= 36 &&
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
             Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1
         ) {
             disableSystemInvocationEffect()
@@ -30,7 +30,7 @@ class ChalnaVoiceInteractionService : VoiceInteractionService() {
         flags: Int,
     ) {
         super.onPrepareToShowSession(args, flags)
-        if (Build.VERSION.SDK_INT < 34) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
         val sessionKey = AssistantInvocationRegistry.sessionKey(args) ?: return
         val invocationId = AssistantInvocationRegistry.invocationId(args)
         CaptureTelemetryRegistry.mark(invocationId, "invocation_received")

@@ -284,7 +284,7 @@ class CaptureService :
 
     private fun beginForeground(includeMicrophone: Boolean) {
         val notification = CaptureNotifications.starting(this)
-        if (Build.VERSION.SDK_INT >= 30) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val type =
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
                     if (includeMicrophone) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
@@ -308,7 +308,7 @@ class CaptureService :
         if (seconds <= 0) return
         autoStopJob =
             scope.launch {
-                delay(seconds * 1_000L)
+                delay(seconds * MILLIS_PER_SECOND)
                 actor.submit(
                     CaptureRequest(
                         invocationId = "auto-${state.invocationId}",
@@ -373,18 +373,18 @@ class CaptureService :
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun successStartHaptic() = vibrate(VibrationEffect.createOneShot(48, VibrationEffect.DEFAULT_AMPLITUDE))
+    private fun successStartHaptic() = vibrate(VibrationEffect.createOneShot(START_HAPTIC_MILLIS, VibrationEffect.DEFAULT_AMPLITUDE))
 
-    private fun savedHaptic() = vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 64, 34), -1))
+    private fun savedHaptic() = vibrate(VibrationEffect.createWaveform(SAVED_HAPTIC_TIMINGS, -1))
 
-    private fun cancelHaptic() = vibrate(VibrationEffect.createOneShot(24, 96))
+    private fun cancelHaptic() = vibrate(VibrationEffect.createOneShot(CANCEL_HAPTIC_MILLIS, CANCEL_HAPTIC_AMPLITUDE))
 
-    private fun errorHaptic() = vibrate(VibrationEffect.createWaveform(longArrayOf(0, 52, 42, 20), -1))
+    private fun errorHaptic() = vibrate(VibrationEffect.createWaveform(ERROR_HAPTIC_TIMINGS, -1))
 
     private fun vibrate(effect: VibrationEffect) {
         if (!::settings.isInitialized || !settings.settings.value.hapticsEnabled || !systemHapticsEnabled()) return
         val vibrator =
-            if (Build.VERSION.SDK_INT >= 31) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 getSystemService(VibratorManager::class.java).defaultVibrator
             } else {
                 @Suppress("DEPRECATION")
@@ -402,7 +402,8 @@ class CaptureService :
 
     private fun hasPermission(permission: String): Boolean = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun hasNotificationPermission(): Boolean = Build.VERSION.SDK_INT < 33 || hasPermission(Manifest.permission.POST_NOTIFICATIONS)
+    private fun hasNotificationPermission(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || hasPermission(Manifest.permission.POST_NOTIFICATIONS)
 
     private fun activeInvocationId(): String =
         when (val state = states.state.value) {
@@ -446,6 +447,12 @@ class CaptureService :
         private const val EXTRA_COMMAND = "capture_command"
         private const val EXTRA_TRIGGER = "capture_trigger"
         private const val EXTRA_RECEIVED_ELAPSED_NANOS = "received_elapsed_nanos"
+        private const val MILLIS_PER_SECOND = 1_000L
+        private const val START_HAPTIC_MILLIS = 48L
+        private const val CANCEL_HAPTIC_MILLIS = 24L
+        private const val CANCEL_HAPTIC_AMPLITUDE = 96
+        private val SAVED_HAPTIC_TIMINGS = longArrayOf(0, 30, 64, 34)
+        private val ERROR_HAPTIC_TIMINGS = longArrayOf(0, 52, 42, 20)
 
         fun intent(
             context: Context,

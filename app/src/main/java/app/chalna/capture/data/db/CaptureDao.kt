@@ -84,7 +84,8 @@ interface CaptureDao {
     suspend fun deleteByIds(ids: Set<String>): Int
 
     @Query(
-        "SELECT * FROM captures WHERE lastVerifiedEpochMillis IS NULL OR lastVerifiedEpochMillis < :before ORDER BY createdAtEpochMillis DESC LIMIT :limit",
+        "SELECT * FROM captures WHERE lastVerifiedEpochMillis IS NULL OR lastVerifiedEpochMillis < :before " +
+            "ORDER BY createdAtEpochMillis DESC LIMIT :limit",
     )
     suspend fun reconciliationBatch(
         before: Long,

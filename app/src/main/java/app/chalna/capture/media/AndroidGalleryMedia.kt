@@ -84,7 +84,9 @@ class AndroidGalleryMedia(
             when (item.storageDestination) {
                 StorageDestination.CHALNA_VAULT -> moveVaultToTrash(item)
                 StorageDestination.DEVICE_GALLERY -> {
-                    if (Build.VERSION.SDK_INT < 30) return@withContext TrashMediaResult.PermanentDeleteRequired
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                        return@withContext TrashMediaResult.PermanentDeleteRequired
+                    }
                     val uri = validMediaStoreUri(item.contentUri) ?: return@withContext TrashMediaResult.Failed
                     val values =
                         ContentValues().apply {
@@ -105,7 +107,7 @@ class AndroidGalleryMedia(
             when (item.storageDestination) {
                 StorageDestination.CHALNA_VAULT -> restoreVault(item)
                 StorageDestination.DEVICE_GALLERY -> {
-                    if (Build.VERSION.SDK_INT < 30) return@withContext null
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return@withContext null
                     val uri = validMediaStoreUri(item.contentUri) ?: return@withContext null
                     val values =
                         ContentValues().apply {
