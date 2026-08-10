@@ -30,4 +30,4 @@
 
 ## Installation
 
-Download the signed APK from this private Release and use Android's normal package installer. Existing v1.1.1 installations update in place because package name and signing identity are unchanged. After installation, open Chalna and choose it from the system Assistant role picker.
+Download the signed APK from this published Release and use Android's normal package installer. Existing v1.1.1 installations update in place because package name and signing identity are unchanged. After installation, open Chalna and choose it from the system Assistant role picker.

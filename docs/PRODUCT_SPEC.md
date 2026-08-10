@@ -2,7 +2,7 @@
 
 ## Definition
 
-Chalna 1.2.0 is a private Android 10+ capture utility. When Chalna is the user-selected system Assistant, an Assistant invocation is an explicit command to toggle a visible, local video recording. The official Quick Settings Tile is an opt-in OEM fallback. Chalna is not a voice assistant, cloud camera, hidden recorder, device-wide gallery scanner, or pre-capture system.
+Chalna 1.2.0 is a local-only Android 10+ capture utility. When Chalna is the user-selected system Assistant, an Assistant invocation is an explicit command to toggle a visible, local video recording. The official Quick Settings Tile is an opt-in OEM fallback. Chalna is not a voice assistant, cloud camera, hidden recorder, device-wide gallery scanner, or pre-capture system.
 
 ## Goals and success criteria
 
@@ -45,4 +45,4 @@ Live preview, streaming, upload, remote control, scheduled/background capture, h
 
 ## Acceptance evidence
 
-CI logs, policy scans, unit/instrumentation results, deterministic gallery/glow/icon screenshots, Assistant role-assignment smoke, device matrix results, APK metadata/signature/permissions, checksums, and the re-downloaded private release asset are the acceptance evidence.
+CI logs, policy scans, unit/instrumentation results, deterministic gallery/glow/icon screenshots, Assistant role-assignment smoke, device matrix results, APK metadata/signature/permissions, checksums, and the re-downloaded published release asset are the acceptance evidence.

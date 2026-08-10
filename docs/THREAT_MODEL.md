@@ -37,7 +37,7 @@ Open questions that could change residual rankings:
 - CameraX → MediaStore or Chalna Vault: encoded MP4 bytes and metadata cross Android storage APIs. The attempt journal records exact output identity first; final output is validated before READY indexing; valid media is preserved if metadata persistence fails.
 - Room capture ID → Gallery/Player: only records created or migrated by Chalna produce local content references. IDs use an opaque accepted format; repository lookup and storage validation precede playback, share, export, restore, or deletion.
 - Chalna Vault → external recipient: a user-initiated chooser receives exact `content://` URIs in `ClipData` with temporary read grants. FileProvider is non-exported and exposes only the Vault subtree.
-- GitHub Secrets → Actions runner → signed APK/AAB → private immutable Release: step-scoped secrets reconstruct the keystore temporarily. The workflow pins the previous signer, verifies package/version/permissions/signature/alignment, publishes complete assets once, downloads them again, and compares digests.
+- GitHub Secrets → Actions runner → signed APK/AAB → public immutable Release: step-scoped secrets reconstruct the keystore temporarily. The workflow pins the previous signer, verifies package/version/permissions/signature/alignment, publishes complete assets once, downloads them again, and compares digests. Public source and artifacts contain no signing secret.
 
 #### Diagram
 
@@ -57,7 +57,7 @@ flowchart LR
     Database --> Gallery["Gallery and Player"]
     Gallery --> Share["Android share recipient"]
     Secrets["GitHub signing secrets"] --> CI["GitHub Actions"]
-    CI --> Release["Private immutable Release"]
+    CI --> Release["Public immutable Release"]
 ```
 
 ## Assets and security objectives
@@ -171,5 +171,5 @@ Ratings assume a normal non-rooted consumer Android device, no runtime network p
 - Covered launcher, Assistant, recognition, fallback, keyguard, Quick Tile, notification, capture service, storage, Room migration, Gallery, Player, FileProvider/share, and release entry points.
 - Represented every runtime and supply-chain trust boundary in at least one threat.
 - Separated production runtime from debug Visual Lab, CI/build tooling, and tests.
-- Used the directive's explicit local-only, single-user, no-network, private-repository, same-signer context rather than inventing server or account threats.
+- Used the explicit local-only, single-user, no-network, public-source, same-signer context rather than inventing server or account threats.
 - Marked physical OEM behavior, rooted devices, and possible future network/storage changes as residual assumptions rather than verified controls.

@@ -52,6 +52,6 @@ Asset names/count/sizes and target commit are checked before publication. A fail
 
 After publish, all assets are downloaded again. The job checks both hashes, `gh release verify`, `gh release verify-asset` for APK and AAB, immutable state, APK/AAB signer, package/version, bundle validity, build-info commit, and SBOM. The build-info records package/version/SDK/toolchain, exact commit/tag/run, sizes/hashes, previous/current signer, and reproducible commit timestamp without secrets.
 
-GitHub immutable-release attestation is mandatory for this repository. Additional Actions provenance attestation is recorded only if the private repository plan supports it; lack of optional plan support does not weaken checksum, platform signature, or immutable-release verification.
+GitHub immutable-release attestation is mandatory for this repository. Additional Actions provenance attestation is recorded when the repository/account supports it; lack of optional provenance does not weaken checksum, platform signature, or immutable-release verification.
 
 No release claim is valid until the workflow logs, API release metadata, downloaded artifacts, signatures, checksums, package metadata, and clean/update install evidence are inspected.

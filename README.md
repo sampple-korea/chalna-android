@@ -1,10 +1,10 @@
 # Chalna
 
-Chalna is a private Android 10+ application that turns an invocation of the user-selected system Assistant into an explicit toggle for local CameraX video recording. The first invocation starts capture; a later invocation, notification action, or Quick Settings Tile stops it. Chalna never pre-captures, pre-buffers, warms the camera, binds it persistently, or activates camera/microphone before a user trigger. Version 1.2.0 hardens Assistant qualification, process/state coherence, CameraX recovery, Room-backed Gallery, and local playback.
+Chalna is a local-only Android 10+ application that turns an invocation of the user-selected system Assistant into an explicit toggle for local CameraX video recording. The first invocation starts capture; a later invocation, notification action, or Quick Settings Tile stops it. Chalna never pre-captures, pre-buffers, warms the camera, binds it persistently, or activates camera/microphone before a user trigger. Version 1.2.0 hardens Assistant qualification, process/state coherence, CameraX recovery, Room-backed Gallery, and local playback.
 
 ## Status
 
-The source version is 1.2.0 (`versionCode` 4). Signed distribution status is recorded by the private immutable GitHub Release and its machine-readable build-info asset. GitHub Actions is the build source of truth; physical Assistant-button, locked-screen OEM, camera-hardware latency, thermal, and high-refresh-rate results remain device-only checks documented in the [QA report](docs/QA_REPORT.md).
+The source version is 1.2.0 (`versionCode` 4). Signed distribution status is recorded by the published immutable GitHub Release and its machine-readable build-info asset. GitHub Actions is the build source of truth; physical Assistant-button, locked-screen OEM, camera-hardware latency, thermal, and high-refresh-rate results remain device-only checks documented in the [QA report](docs/QA_REPORT.md).
 
 ## Product contract
 

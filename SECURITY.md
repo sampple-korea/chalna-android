@@ -10,7 +10,7 @@ Report suspected vulnerabilities privately to the repository owner through GitHu
 
 ## Security model
 
-- The repository and release workflow are private; release artifacts are not public by default.
+- The repository and immutable release artifacts are public. Signing credentials remain protected GitHub secrets and are never stored in source or public artifacts.
 - The app declares no `INTERNET` permission and disables cleartext traffic. Lack of `INTERNET` materially limits app-initiated network access but does not replace dependency and artifact review.
 - Camera and microphone are accessed only after an explicit supported trigger. Boot capture, warm-up, persistent binding, pre-buffering, and background surveillance are prohibited.
 - The capture service is non-exported. System-bound voice services require `android.permission.BIND_VOICE_INTERACTION`.

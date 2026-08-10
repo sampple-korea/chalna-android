@@ -2,7 +2,7 @@
 
 ## Current audit — 2026-08-10
 
-- Repository: `sampple-korea/chalna-android`; `origin` points to the private GitHub repository and `main` is the default branch.
+- Repository: `sampple-korea/chalna-android`; `origin` points to the public GitHub repository and `main` is the default branch. Visibility was changed to public on 2026-08-10 by explicit owner instruction so GitHub-hosted validation could continue.
 - Baseline: immutable `v1.1.1`, commit `98557c2a77fb7cfed5709bfa23a43fce57639ec5`, package `app.chalna.capture`, version code `3`.
 - Signing continuity anchor: SHA-256 `E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9`; the protected signing secrets are present and the existing release APK is the comparison artifact.
 - Next release: version name `1.2.0`, version code `4`, tag `v1.2.0`. Version metadata moves to one checked source.
@@ -51,15 +51,14 @@
 - UI QA [31364048942](https://github.com/sampple-korea/chalna-android/actions/runs/31364048942) passed API 34 instrumentation, 39 deterministic screenshot goldens, accessibility smoke, and API 29/33/35/36 Assistant-role qualification for the same commit.
 - Benchmark [31364048906](https://github.com/sampple-korea/chalna-android/actions/runs/31364048906) generated 464 app-only startup/baseline rules with SHA-256 `3F2B2E2AEC3EA1986DA9F01DEE6DDB832B15E254503490C43F77F0F71E91668A`; the package-filtered sources are committed. Cold initial-display median was 334.505 ms and warm median was 55.482 ms, both within their accepted regression thresholds, and ten Perfetto traces were archived.
 - Inspected: 39 API 34 Korean screenshots across Home, Setup, Gallery, Player, Settings, Glow keyframes, large font, Night/Mist, tall/cutout simulation, and adaptive icon masks. The artifact from run 31364048942 compares all 39 goldens with zero pixel/perceptual difference and was opened for visual review.
-- Repository visibility was independently re-read through the GitHub API and corrected to `PRIVATE`; default branch is `main`, force-push and deletion are disabled, and immutable releases are enabled.
+- Repository visibility was independently re-read through the GitHub API as `PUBLIC`; default branch is `main`, force-push and deletion are disabled, and immutable releases are enabled.
 - Pending: v1.2.0 APK/AAB metadata, checksums, signer match, immutable release and re-downloaded asset verification.
 
-## Active external blocker — 2026-08-10
+## Resolved external blocker — 2026-08-10
 
 - Final source commit `58a29fd40337e68f69c872138653c2c2979e3fc4` includes the Android 14+ integer session-ID correction and its API 34 instrumentation assertion.
-- GitHub accepted the push but refused to start every hosted job. Android CI `31366297566`, UI QA `31366297558`, Benchmark `31366297590`, and Security `31366297542` each contain the same GitHub-generated annotation: recent account payments failed or the Actions spending limit must be increased.
-- No workflow step ran, so these failures are account billing/Actions allocation failures rather than build or test results. Repository Actions remain enabled and workflow permissions remain read-only by default.
-- Required user action: restore GitHub Actions billing availability for the `sampple-korea` account in GitHub **Settings → Billing & plans**. After that single external action, rerun the four workflows on the exact final main commit, then run the signed v1.2.0 release workflow and remote verification.
+- GitHub initially refused to start every hosted job because private-repository billing was unavailable. Those runs contained no executed workflow steps and were not build/test failures.
+- The owner explicitly authorized public visibility. The repository was changed to public, GitHub API visibility and Actions enablement were re-verified, and the immutable v1.1.1 release attestation still verified. Final workflows must run on the post-visibility documentation commit before release.
 
 ---
 
