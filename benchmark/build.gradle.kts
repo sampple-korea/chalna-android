@@ -34,6 +34,10 @@ kotlin {
     }
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 dependencies {
     implementation(libs.androidx.test.runner)
     implementation(libs.androidx.test.junit)

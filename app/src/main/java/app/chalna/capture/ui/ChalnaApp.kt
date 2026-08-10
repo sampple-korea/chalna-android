@@ -82,16 +82,18 @@ private fun MainShell(
     dependencies: UiDependencies,
 ) {
     var route by rememberSaveable { mutableStateOf(if (state.player == null) ChalnaRoute.HOME else ChalnaRoute.PLAYER) }
+    var playerOrigin by rememberSaveable { mutableStateOf(ChalnaRoute.HOME) }
     LaunchedEffect(state.player?.item?.id) {
         if (state.player != null) {
+            if (route != ChalnaRoute.PLAYER) playerOrigin = route
             route = ChalnaRoute.PLAYER
         } else if (route == ChalnaRoute.PLAYER) {
-            route = ChalnaRoute.GALLERY
+            route = playerOrigin
         }
     }
     BackHandler(enabled = route != ChalnaRoute.HOME) {
         if (route == ChalnaRoute.PLAYER) dependencies.closePlayer()
-        route = if (route == ChalnaRoute.PLAYER) ChalnaRoute.GALLERY else ChalnaRoute.HOME
+        route = if (route == ChalnaRoute.PLAYER) playerOrigin else ChalnaRoute.HOME
     }
     AnimatedContent(
         targetState = route,
@@ -111,6 +113,7 @@ private fun MainShell(
             ChalnaRoute.HOME -> HomeScreen(state, dependencies) { route = it }
             ChalnaRoute.GALLERY ->
                 GalleryScreen(state, dependencies, { route = ChalnaRoute.HOME }) { id ->
+                    playerOrigin = ChalnaRoute.GALLERY
                     dependencies.openPlayer(id)
                     route = ChalnaRoute.PLAYER
                 }
@@ -121,7 +124,7 @@ private fun MainShell(
                 state.player?.let {
                     PlayerScreen(it, dependencies) {
                         dependencies.closePlayer()
-                        route = ChalnaRoute.GALLERY
+                        route = playerOrigin
                     }
                 } ?: GalleryScreen(state, dependencies, { route = ChalnaRoute.HOME }) { id -> dependencies.openPlayer(id) }
         }

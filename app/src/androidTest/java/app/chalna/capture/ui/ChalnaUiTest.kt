@@ -38,6 +38,13 @@ class ChalnaUiTest {
         check(fake.toggleCount == 1)
     }
 
+    @Test fun externallyOpenedPlayerBackReturnsHomeInsteadOfInventingGalleryHistory() {
+        val fake = FakeUiDependencies(ChalnaScreenshotStates.player)
+        compose.setContent { ChalnaApp(fake) }
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Ready").assertIsDisplayed()
+    }
+
     @Test fun consolidatedSettingsIsReachable() {
         val fake = FakeUiDependencies(ChalnaUiState(setupComplete = true, ready = true, reducedMotion = true))
         compose.setContent { ChalnaApp(fake) }
@@ -51,7 +58,7 @@ class ChalnaUiTest {
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithContentDescription("Gallery").performClick()
         compose.onNodeWithContentDescription("Share").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Delete").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Move to trash").assertIsDisplayed()
     }
 
     @Test fun productionHomeHasNoDiagnosticsAndNotificationDenialDoesNotBlockReady() {
@@ -59,6 +66,7 @@ class ChalnaUiTest {
             FakeUiDependencies(
                 ChalnaUiState(
                     setupComplete = true,
+                    phase = CapturePhase.READY,
                     ready = true,
                     cameraGranted = true,
                     microphoneGranted = true,
