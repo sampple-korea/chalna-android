@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.room)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
-    alias(libs.plugins.baselineprofile)
 }
 
 val chalnaVersion = Properties().apply {
@@ -154,7 +153,6 @@ dependencies {
     implementation(libs.profileinstaller)
     implementation(libs.coroutines.android)
 
-    baselineProfile(project(":benchmark"))
 
     ksp(libs.room.compiler)
 

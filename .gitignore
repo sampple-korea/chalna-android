@@ -5,6 +5,7 @@ local.properties
 build/
 **/build/
 captures/
+.ci-artifacts/
 *.apk
 *.aab
 *.jks
@@ -16,4 +17,3 @@ signing.properties
 *.hprof
 .DS_Store
 Thumbs.db
-

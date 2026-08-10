@@ -1,12 +1,12 @@
 <resources>
-    <string name="visual_lab">Chalna Visual Lab</string>
-    <string name="visual_lab_subtitle">Deterministic renderer and accessibility QA</string>
-    <string name="lab_state_frames">State frames</string>
-    <string name="lab_glow_timing">Invocation glow timing</string>
-    <string name="lab_icon_masks">Icon masks</string>
-    <string name="lab_theme_contrast">Night / Mist contrast</string>
-    <string name="lab_large_font">Large font</string>
+    <string name="visual_lab">Chalna Lab</string>
+    <string name="visual_lab_subtitle">Debug-only state, glow, layout, and icon checks</string>
+    <string name="lab_state_frames">UI states</string>
+    <string name="lab_glow_timing">Invocation glow frames</string>
+    <string name="lab_icon_masks">Adaptive icon masks</string>
+    <string name="lab_theme_contrast">Theme and contrast</string>
+    <string name="lab_large_font">Large text</string>
     <string name="lab_capture_timing">Capture timing</string>
-    <string name="lab_no_capture_timing">Invoke capture in this debug build to collect timing markers.</string>
     <string name="lab_clear_timing">Clear timing</string>
+    <string name="lab_no_capture_timing">No capture timing data</string>
 </resources>
