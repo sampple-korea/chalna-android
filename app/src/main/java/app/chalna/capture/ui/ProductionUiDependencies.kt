@@ -188,7 +188,7 @@ class ProductionUiDependencies(
                 }
 
                 override fun onDestroy(owner: LifecycleOwner) {
-                    activity.lifecycleScope.launch { playerController?.close() }
+                    playerController?.releaseNow()
                 }
             },
         )

@@ -80,6 +80,7 @@ class AndroidCaptureCommandDispatcher(
                 appContext.startForegroundService(CaptureService.intent(appContext, request))
                 resolved
             } catch (failure: RuntimeException) {
+                projection = null
                 val rejected =
                     CaptureCommandResult.FailedToDispatch(
                         normalizedId,

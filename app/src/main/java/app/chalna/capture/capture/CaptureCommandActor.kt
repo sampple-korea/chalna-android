@@ -118,7 +118,12 @@ class CaptureCommandActor(
     private suspend fun handle(message: Message) {
         when (message) {
             is Message.Command -> handleCommand(message.request)
-            is Message.Stage -> if (states.state.value !is CaptureState.CancelRequested) transition(message.state)
+            is Message.Stage -> {
+                val stageInvocationId = message.state.invocationIdOrNull()
+                if (stageInvocationId == activeRequest?.invocationId && states.state.value !is CaptureState.CancelRequested) {
+                    transition(message.state)
+                }
+            }
             is Message.Started -> handleStarted(message)
             is Message.StartFailed -> fail(message.failure)
             is Message.StartCancelled -> handleCancelled(message)
@@ -369,4 +374,19 @@ class CaptureCommandActor(
             this is CaptureState.Recording || this is CaptureState.CancelRequested ||
             this is CaptureState.StopRequested || this is CaptureState.StoppingRecorder ||
             this is CaptureState.Finalizing || this is CaptureState.Persisting || this is CaptureState.Recovering
+
+    private fun CaptureState.invocationIdOrNull(): String? =
+        when (this) {
+            is CaptureState.StartRequested -> invocationId
+            is CaptureState.StartingForeground -> invocationId
+            is CaptureState.OpeningCamera -> invocationId
+            is CaptureState.StartingRecorder -> invocationId
+            is CaptureState.Recording -> invocationId
+            is CaptureState.CancelRequested -> invocationId
+            is CaptureState.StopRequested -> invocationId
+            is CaptureState.StoppingRecorder -> invocationId
+            is CaptureState.Finalizing -> invocationId
+            is CaptureState.Recovering -> invocationId
+            CaptureState.Idle, is CaptureState.Persisting, is CaptureState.Saved, is CaptureState.Failed -> null
+        }
 }

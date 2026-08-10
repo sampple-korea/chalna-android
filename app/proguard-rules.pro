@@ -1,4 +1,8 @@
--keep class app.chalna.capture.assistant.** { *; }
--keep class app.chalna.capture.capture.CaptureService { *; }
+-keep,allowoptimization class app.chalna.capture.assistant.ChalnaVoiceInteractionService
+-keep,allowoptimization class app.chalna.capture.assistant.ChalnaVoiceInteractionSessionService
+-keep,allowoptimization class app.chalna.capture.assistant.ChalnaRecognitionService
+-keep,allowoptimization class app.chalna.capture.assistant.AssistFallbackActivity
+-keep,allowoptimization class app.chalna.capture.assistant.KeyguardCaptureActivity
+-keep,allowoptimization class app.chalna.capture.capture.CaptureService
+-keep,allowoptimization class app.chalna.capture.capture.ChalnaCaptureTileService
 -keepattributes *Annotation*
-

@@ -175,6 +175,16 @@ class PlayerController(
         val current = player
         val closingState = mutableState.value
         val closingPosition = (current?.currentPosition ?: closingState?.positionMillis ?: 0).coerceAtLeast(0)
+        releasePlayer(current)
+        if (closingState != null) persistPositionNow(closingState, closingPosition)
+    }
+
+    /** Main-thread lifecycle fallback when the Activity scope is already being cancelled. */
+    fun releaseNow() {
+        releasePlayer(player)
+    }
+
+    private fun releasePlayer(current: ExoPlayer?) {
         ticker?.cancel()
         ticker = null
         surfaceView?.keepScreenOn = false
@@ -184,7 +194,6 @@ class PlayerController(
         player = null
         mutableState.value = null
         unregisterNoisyReceiver()
-        if (closingState != null) persistPositionNow(closingState, closingPosition)
     }
 
     fun bookmark(): Pair<String, Long>? =
