@@ -60,6 +60,23 @@ class LegacyCaptureMigrationTest {
         assertEquals(1, database.captureDao().countAll())
     }
 
+    @Test fun backupSurvivesMigrationLaunchAndIsRemovedOnlyAfterStabilityWindow() = runBlocking {
+        var now = 1_700_000_000_000L
+        legacy.writeText(
+            "CHALNA_INDEX_1\t1\n" +
+                row("44444444-4444-4444-4444-444444444444", "DEVICE_GALLERY", "content://media/external/video/media/4", ""),
+            StandardCharsets.UTF_8,
+        )
+        val importer = LegacyCaptureIndexImporter(context, database) { now }
+        importer.import(null)
+        backup.setLastModified(now)
+        importer.cleanupVerifiedBackup()
+        assertTrue(backup.isFile)
+        now += 24L * 60L * 60L * 1_000L + 1L
+        importer.cleanupVerifiedBackup()
+        assertTrue(!backup.exists())
+    }
+
     private fun row(id: String, destination: String, uri: String, privateRef: String): String = listOf(
         id,
         destination,

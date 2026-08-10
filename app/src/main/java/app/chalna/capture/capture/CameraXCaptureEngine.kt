@@ -23,6 +23,7 @@ import app.chalna.capture.domain.CaptureEngine
 import app.chalna.capture.domain.CaptureFailure
 import app.chalna.capture.domain.CaptureFailureCode
 import app.chalna.capture.domain.CaptureFileNames
+import app.chalna.capture.domain.CaptureOperationException
 import app.chalna.capture.domain.CapturePreflight
 import app.chalna.capture.domain.CaptureProgress
 import app.chalna.capture.domain.CaptureQuality
@@ -127,7 +128,11 @@ class CameraXCaptureEngine(
         val cameraProvider = awaitProvider()
         CaptureTelemetryRegistry.mark(request.invocationId, "camera_provider_ready")
         val selector = CameraSelector.DEFAULT_BACK_CAMERA
-        check(cameraProvider.hasCamera(selector)) { "Rear camera unavailable" }
+        if (!cameraProvider.hasCamera(selector)) {
+            throw CaptureOperationException(
+                CaptureFailure(CaptureFailureCode.CAMERA_UNAVAILABLE, false, "rear_camera_unavailable"),
+            )
+        }
         val effectiveQuality = selectQuality(cameraProvider, selector, request.settings.preferredQuality)
         val recorder = Recorder.Builder()
             .setQualitySelector(QualitySelector.from(effectiveQuality))
@@ -294,7 +299,9 @@ class CameraXCaptureEngine(
             if (validated == null) {
                 destinationFactory.discard(output)
                 attemptStore.clear()
-                val failure = IllegalStateException("Recorded output failed validation: ${event.error}")
+                val failure = CaptureOperationException(
+                    CaptureFailure(CaptureFailureCode.OUTPUT_INVALID, false, "recorded_output_invalid"),
+                )
                 if (!started.isCompleted) started.completeExceptionally(failure)
                 finalized?.completeExceptionally(failure)
                 resetAttemptState()
@@ -313,7 +320,20 @@ class CameraXCaptureEngine(
             ).toLastCapture()
             runCatching { attemptStore.updateStage(CaptureAttemptStage.MEDIA_SAVED) }
             CaptureTelemetryRegistry.mark(request.invocationId, "output_validated")
-            finalized?.complete(capture)
+            if (event.hasError()) {
+                val code = if (event.error == VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE) {
+                    CaptureFailureCode.LOW_STORAGE
+                } else {
+                    CaptureFailureCode.FINALIZE
+                }
+                finalized?.completeExceptionally(
+                    CaptureOperationException(
+                        CaptureFailure(code, true, "camerax_finalize_${event.error}"),
+                    ),
+                )
+            } else {
+                finalized?.complete(capture)
+            }
             resetAttemptState(keepFinalized = true)
         }
     }
@@ -374,7 +394,9 @@ class CameraXCaptureEngine(
             CaptureQuality.UNKNOWN -> listOf(Quality.FHD, Quality.HD, Quality.SD)
         }
         return order.firstOrNull(supported::contains) ?: supported.firstOrNull()
-            ?: throw IllegalStateException("No stable video quality is available")
+            ?: throw CaptureOperationException(
+                CaptureFailure(CaptureFailureCode.CAMERA_UNAVAILABLE, false, "no_supported_video_quality"),
+            )
     }
 
     private fun Quality.toCaptureQuality(): CaptureQuality = when (this) {

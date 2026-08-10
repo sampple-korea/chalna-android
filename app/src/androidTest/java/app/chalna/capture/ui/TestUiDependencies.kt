@@ -3,10 +3,27 @@ package app.chalna.capture.ui
 import android.graphics.Bitmap
 import android.os.CancellationSignal
 import android.view.SurfaceView
+import androidx.paging.PagingData
+import java.time.Instant
+import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 internal open class TestUiDependencies(initial: ChalnaUiState) : UiDependencies {
     override val state = MutableStateFlow(initial)
+    override val galleryPaging: Flow<PagingData<GalleryPagingItem>> = state.map { snapshot ->
+        val entries = buildList {
+            var day: java.time.LocalDate? = null
+            snapshot.gallery.forEach { item ->
+                val itemDay = Instant.ofEpochMilli(item.capturedAtMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+                if (itemDay != day) add(GalleryPagingItem.Day(itemDay))
+                add(GalleryPagingItem.Media(item))
+                day = itemDay
+            }
+        }
+        PagingData.from(entries)
+    }
     open override fun toggleCapture() = Unit
     open override fun requestCamera() = Unit
     open override fun requestMicrophone() = Unit

@@ -79,11 +79,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
 import app.chalna.capture.BuildConfig
 import app.chalna.capture.R
 import app.chalna.capture.domain.CaptureFailureCode
 import java.text.DateFormat
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Date
@@ -441,6 +443,7 @@ private fun StorageSummary(state: ChalnaUiState, dependencies: UiDependencies) {
 @Composable
 internal fun GalleryScreen(state: ChalnaUiState, dependencies: UiDependencies, back: () -> Unit, open: (String) -> Unit) {
     val selected = state.selectedMediaIds
+    val gallery = dependencies.galleryPaging.collectAsLazyPagingItems()
     var controlsVisible by rememberSaveable { mutableStateOf(false) }
     var confirmPermanent by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = selected.isNotEmpty() || controlsVisible || confirmPermanent) {
@@ -465,7 +468,7 @@ internal fun GalleryScreen(state: ChalnaUiState, dependencies: UiDependencies, b
                 } else {
                     IconButton(ChalnaIcon.FAVORITE, stringResource(R.string.favorite)) { dependencies.favoriteSelectedMedia(true) }
                     IconButton(ChalnaIcon.SHARE, stringResource(R.string.share), onClick = dependencies::shareSelectedMedia)
-                    if (state.gallery.any { it.id in selected && it.destination == StorageDestinationUi.CHALNA_VAULT }) {
+                    if (state.galleryFilter == GalleryFilter.CHALNA_VAULT) {
                         IconButton(ChalnaIcon.EXPORT, stringResource(R.string.export)) { dependencies.exportSelectedMedia() }
                     }
                     IconButton(ChalnaIcon.DELETE, stringResource(R.string.move_to_trash), onClick = dependencies::trashSelectedMedia)
@@ -482,10 +485,11 @@ internal fun GalleryScreen(state: ChalnaUiState, dependencies: UiDependencies, b
         }
         state.operationEvent?.let { OperationBanner(it) }
         when {
-            state.galleryLoading && state.gallery.isEmpty() -> GalleryMessage(R.string.loading, null)
-            state.galleryError && state.gallery.isEmpty() -> GalleryMessage(R.string.gallery_error, R.string.retry) { dependencies.refreshGallery() }
-            state.gallery.isEmpty() -> GalleryMessage(R.string.gallery_empty_title, R.string.gallery_empty_body)
-            else -> GalleryGrid(state.gallery, selected, dependencies, open)
+            gallery.loadState.refresh is LoadState.Loading && gallery.itemCount == 0 -> GalleryMessage(R.string.loading, null)
+            gallery.loadState.refresh is LoadState.Error && gallery.itemCount == 0 ->
+                GalleryMessage(R.string.gallery_error, R.string.retry, gallery::retry)
+            gallery.itemCount == 0 -> GalleryMessage(R.string.gallery_empty_title, R.string.gallery_empty_body)
+            else -> GalleryGrid(gallery, selected, dependencies, open)
         }
     }
 }
@@ -546,31 +550,47 @@ private fun GalleryMessage(title: Int, body: Int?, action: (() -> Unit)? = null)
 
 @Composable
 private fun GalleryGrid(
-    items: List<MediaItemUi>,
+    items: LazyPagingItems<GalleryPagingItem>,
     selected: Set<String>,
     dependencies: UiDependencies,
     open: (String) -> Unit,
 ) {
-    val grouped = items.groupBy { dayKey(it.capturedAtMillis) }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(148.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        grouped.forEach { (day, media) ->
-            item(span = { GridItemSpan(maxLineSpan) }, key = "day-$day") {
-                ChalnaText(dayLabel(day), Modifier.padding(top = 14.dp, bottom = 4.dp), 14, ChalnaTheme.colors.muted, FontWeight.SemiBold)
-            }
-            items(media, key = MediaItemUi::id) { item ->
-                MediaGridItem(
-                    item,
-                    dependencies,
-                    item.id in selected,
-                    selected.isNotEmpty(),
-                    { dependencies.toggleMediaSelection(item.id) },
-                    { open(item.id) },
+        items(
+            count = items.itemCount,
+            key = { index ->
+                when (val entry = items.peek(index)) {
+                    is GalleryPagingItem.Day -> "day-${entry.date}"
+                    is GalleryPagingItem.Media -> entry.item.id
+                    null -> "loading-$index"
+                }
+            },
+            span = { index ->
+                if (items.peek(index) is GalleryPagingItem.Day) GridItemSpan(maxLineSpan) else GridItemSpan(1)
+            },
+        ) { index ->
+            when (val entry = items[index]) {
+                is GalleryPagingItem.Day -> ChalnaText(
+                    dayLabel(entry.date),
+                    Modifier.padding(top = 14.dp, bottom = 4.dp),
+                    14,
+                    ChalnaTheme.colors.muted,
+                    FontWeight.SemiBold,
                 )
+                is GalleryPagingItem.Media -> MediaGridItem(
+                    entry.item,
+                    dependencies,
+                    entry.item.id in selected,
+                    selected.isNotEmpty(),
+                    { dependencies.toggleMediaSelection(entry.item.id) },
+                    { open(entry.item.id) },
+                )
+                null -> Box(Modifier.fillMaxWidth().aspectRatio(1f).background(ChalnaTheme.colors.surfaceHigh))
             }
         }
     }
@@ -971,8 +991,6 @@ private fun formatMediaDate(millis: Long): String {
     val locale = LocalConfiguration.current.locales[0]
     return remember(millis, locale) { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale).format(Date(millis)) }
 }
-
-private fun dayKey(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
 
 @Composable
 private fun dayLabel(day: LocalDate): String {

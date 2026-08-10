@@ -24,8 +24,13 @@ fun interface CapturePreflight {
     suspend fun check(settings: CaptureSessionSettings): CaptureFailure?
 }
 
+class CaptureOperationException(
+    val failure: CaptureFailure,
+) : Exception(failure.diagnostic)
+
 fun Throwable.toCaptureFailure(defaultCode: CaptureFailureCode): CaptureFailure {
     if (this is CancellationException) throw this
+    if (this is CaptureOperationException) return failure
     val diagnosticName = javaClass.simpleName.take(80)
     val code = when {
         diagnosticName.contains("CameraAccess", true) || message?.contains("busy", true) == true ->

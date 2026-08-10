@@ -51,7 +51,12 @@ class LegacyCaptureIndexImporter(
 
     suspend fun cleanupVerifiedBackup() = withContext(Dispatchers.IO) {
         val marker = database.migrationMarkerDao().byName(MARKER) ?: return@withContext
-        if (marker.importedRows <= database.captureDao().countAll() && backup.isFile) backup.delete()
+        val backupAge = nowEpochMillis() - backup.lastModified()
+        if (marker.importedRows <= database.captureDao().countAll() && backup.isFile &&
+            backupAge >= BACKUP_STABILITY_WINDOW_MILLIS
+        ) {
+            backup.delete()
+        }
     }
 
     companion object {
@@ -59,5 +64,6 @@ class LegacyCaptureIndexImporter(
         private const val LEGACY_NAME = "capture-index-v1"
         private const val BACKUP_NAME = "capture-index-v1.imported.bak"
         private const val MARKER = "legacy_capture_index_v1"
+        private const val BACKUP_STABILITY_WINDOW_MILLIS = 24L * 60L * 60L * 1_000L
     }
 }

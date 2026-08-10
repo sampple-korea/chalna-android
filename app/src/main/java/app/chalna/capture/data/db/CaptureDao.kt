@@ -40,6 +40,9 @@ interface CaptureDao {
     @RawQuery(observedEntities = [CaptureEntity::class])
     fun pagingSource(query: SupportSQLiteQuery): PagingSource<Int, CaptureEntity>
 
+    @RawQuery(observedEntities = [CaptureEntity::class])
+    suspend fun idList(query: SupportSQLiteQuery): List<String>
+
     @Query("UPDATE captures SET favorite = :favorite, updatedVersion = :version WHERE id IN (:ids)")
     suspend fun setFavorite(ids: Set<String>, favorite: Boolean, version: Int): Int
 

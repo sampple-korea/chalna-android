@@ -3,6 +3,9 @@ package app.chalna.capture.ui
 import android.graphics.Bitmap
 import android.os.CancellationSignal
 import android.view.SurfaceView
+import androidx.paging.PagingData
+import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 enum class CapturePhase { SETUP_REQUIRED, READY, STARTING, RECORDING, STOPPING, SAVED, ERROR }
@@ -40,6 +43,11 @@ data class MediaItemUi(
     val favorite: Boolean = false,
     val trashed: Boolean = false,
 )
+
+sealed interface GalleryPagingItem {
+    data class Day(val date: LocalDate) : GalleryPagingItem
+    data class Media(val item: MediaItemUi) : GalleryPagingItem
+}
 
 data class PlayerUiState(
     val item: MediaItemUi,
@@ -99,6 +107,7 @@ data class ChalnaUiState(
 
 interface UiDependencies {
     val state: StateFlow<ChalnaUiState>
+    val galleryPaging: Flow<PagingData<GalleryPagingItem>>
     fun toggleCapture()
     fun requestCamera()
     fun requestMicrophone()

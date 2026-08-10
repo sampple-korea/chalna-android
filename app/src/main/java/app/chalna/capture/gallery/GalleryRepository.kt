@@ -96,6 +96,8 @@ class GalleryRepository(
         pagingSourceFactory = { captureDao.pagingSource(buildPagingQuery(query)) },
     ).flow.map { data -> data.map { entity -> requireNotNull(entity.toDomain()) } }
 
+    suspend fun ids(query: GalleryQuery): Set<String> = captureDao.idList(buildPagingQuery(query, "id")).toSet()
+
     suspend fun items(query: GalleryQuery = GalleryQuery(), limit: Int = LEGACY_UI_LIMIT): List<CaptureItem> {
         val page = captureDao.activePage(limit).mapNotNull(CaptureEntity::toDomain)
         return GalleryFilter.apply(page, query)
@@ -338,7 +340,7 @@ class GalleryRepository(
         if (!exists) settings.saveLastCapture(captureDao.latestActive()?.toDomain()?.toLastCapture())
     }
 
-    private fun buildPagingQuery(query: GalleryQuery): SimpleSQLiteQuery {
+    private fun buildPagingQuery(query: GalleryQuery, projection: String = "*"): SimpleSQLiteQuery {
         val where = mutableListOf<String>()
         val args = mutableListOf<Any>()
         when (query.scope) {
@@ -359,7 +361,10 @@ class GalleryRepository(
             GallerySort.LONGEST_FIRST -> "durationMillis DESC, createdAtEpochMillis DESC"
             GallerySort.LARGEST_FIRST -> "COALESCE(sizeBytes, -1) DESC, createdAtEpochMillis DESC"
         }
-        return SimpleSQLiteQuery("SELECT * FROM captures WHERE ${where.joinToString(" AND ")} ORDER BY $order", args.toTypedArray())
+        return SimpleSQLiteQuery(
+            "SELECT $projection FROM captures WHERE ${where.joinToString(" AND ")} ORDER BY $order",
+            args.toTypedArray(),
+        )
     }
 
     private fun String.isOpaqueCaptureId(): Boolean = matches(Regex("[0-9a-fA-F-]{32,36}"))

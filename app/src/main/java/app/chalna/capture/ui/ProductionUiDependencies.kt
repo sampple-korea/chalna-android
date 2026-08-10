@@ -23,6 +23,10 @@ import androidx.core.net.toUri
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.insertSeparators
+import androidx.paging.map
 import app.chalna.capture.ChalnaApplication
 import app.chalna.capture.R
 import app.chalna.capture.capture.ChalnaCaptureTileService
@@ -45,15 +49,22 @@ import app.chalna.capture.domain.ThemePreference
 import app.chalna.capture.gallery.BatchOperationResult
 import app.chalna.capture.gallery.GalleryRepository
 import java.util.UUID
+import java.time.Instant
+import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -71,6 +82,8 @@ class ProductionUiDependencies(
     private val systemSnapshot = MutableStateFlow(readSystemSnapshot())
     private val overlay = MutableStateFlow(UiOverlay())
     private val playerSnapshot = MutableStateFlow<PlayerSnapshot?>(null)
+    private data class GalleryRequest(val query: GalleryQuery, val generation: Long)
+    private val galleryRequest = MutableStateFlow(GalleryRequest(GalleryQuery(), 0))
     private val galleryMutex = Mutex()
     private var galleryInitialized = false
     private var galleryJob: Job? = null
@@ -80,6 +93,29 @@ class ProductionUiDependencies(
     private var pendingOpenPosition = 0L
     private var cameraRequestedThisSession = false
     private var microphoneRequestedThisSession = false
+
+    override val galleryPaging: Flow<PagingData<GalleryPagingItem>> = galleryRequest
+        .flatMapLatest { request ->
+            flow {
+                galleryMutex.withLock {
+                    if (!galleryInitialized) {
+                        galleryRepository.initialize()
+                        galleryInitialized = true
+                    }
+                }
+                emitAll(
+                    galleryRepository.paging(request.query).map { page ->
+                        page.map { GalleryPagingItem.Media(it.toUi()) as GalleryPagingItem }
+                            .insertSeparators { before, after ->
+                                val next = (after as? GalleryPagingItem.Media)?.item ?: return@insertSeparators null
+                                val previousDay = (before as? GalleryPagingItem.Media)?.item?.capturedAtMillis?.toLocalDay()
+                                val nextDay = next.capturedAtMillis.toLocalDay()
+                                if (previousDay != nextDay) GalleryPagingItem.Day(nextDay) else null
+                            }
+                    },
+                )
+            }
+        }.cachedIn(activity.lifecycleScope)
 
     private data class SystemSnapshot(
         val assistantAvailable: Boolean,
@@ -318,26 +354,22 @@ class ProductionUiDependencies(
             val current = overlay.value
             overlay.value = current.copy(galleryLoading = current.gallery.isEmpty(), galleryError = false)
             try {
-                val items = withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     galleryMutex.withLock {
                         if (!galleryInitialized) {
                             galleryRepository.initialize()
                             galleryInitialized = true
                         }
-                        galleryRepository.items(current.query())
                     }
-                }.map { it.toUi() }
-                val available = items.mapTo(mutableSetOf(), MediaItemUi::id)
-                overlay.value.gallery.filter { it.id !in available }.forEach { ThumbnailMemoryCache.remove(it.contentUri) }
+                }
                 overlay.value = overlay.value.copy(
-                    gallery = items,
                     galleryLoading = false,
                     galleryError = false,
-                    selected = overlay.value.selected intersect available,
                 )
+                galleryRequest.value = GalleryRequest(current.query(), galleryRequest.value.generation + 1)
                 refreshStorageSummary()
                 pendingOpenId?.let { id ->
-                    items.firstOrNull { it.id == id }?.let { openPlayerItem(it, pendingOpenPosition) }
+                    openCaptureWhenReady(id, pendingOpenPosition)
                     pendingOpenId = null
                     pendingOpenPosition = 0
                 }
@@ -389,7 +421,10 @@ class ProductionUiDependencies(
     }
 
     override fun selectAllMedia() {
-        overlay.value = overlay.value.copy(selected = overlay.value.gallery.mapTo(mutableSetOf(), MediaItemUi::id))
+        activity.lifecycleScope.launch {
+            val ids = withContext(Dispatchers.IO) { galleryRepository.ids(overlay.value.query()) }
+            overlay.value = overlay.value.copy(selected = ids)
+        }
     }
 
     override fun clearMediaSelection() {
@@ -416,8 +451,7 @@ class ProductionUiDependencies(
 
     override fun emptyTrash() {
         activity.lifecycleScope.launch(Dispatchers.IO) {
-            val ids = galleryRepository.items(GalleryQuery(scope = GalleryScope.TRASH), 500)
-                .mapTo(mutableSetOf(), CaptureItem::id)
+            val ids = galleryRepository.ids(GalleryQuery(scope = GalleryScope.TRASH))
             withContext(Dispatchers.Main.immediate) {
                 overlay.value = overlay.value.copy(selected = ids)
                 deleteSelectedMediaPermanently()
@@ -427,10 +461,7 @@ class ProductionUiDependencies(
 
     override fun exportAllVault() {
         activity.lifecycleScope.launch(Dispatchers.IO) {
-            val ids = galleryRepository.items(
-                GalleryQuery(destination = StorageDestination.CHALNA_VAULT),
-                10_000,
-            ).mapTo(mutableSetOf(), CaptureItem::id)
+            val ids = galleryRepository.ids(GalleryQuery(destination = StorageDestination.CHALNA_VAULT))
             val result = galleryRepository.exportVault(ids)
             withContext(Dispatchers.Main.immediate) { handleBatchResult("export", result) }
         }
@@ -760,6 +791,8 @@ class ProductionUiDependencies(
     }
 
     private fun String.isOpaqueCaptureId(): Boolean = matches(Regex("[0-9a-fA-F-]{32,36}"))
+
+    private fun Long.toLocalDay() = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
 
     private fun operationSuccessMessage(name: String): Int = when (name) {
         "trash" -> R.string.gallery_trash_succeeded
