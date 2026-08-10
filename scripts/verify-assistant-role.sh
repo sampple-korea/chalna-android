@@ -11,7 +11,7 @@ recognizer_full="$package_name/app.chalna.capture.assistant.ChalnaRecognitionSer
 adb shell cmd role add-role-holder --user 0 "$role_name" "$package_name"
 adb shell cmd role get-role-holders --user 0 "$role_name" | tr -d '\r' | grep -Fx "$package_name"
 
-for attempt in $(seq 1 20); do
+for _ in $(seq 1 20); do
   interactor="$(adb shell settings get secure voice_interaction_service | tr -d '\r')"
   recognizer="$(adb shell settings get secure voice_recognition_service | tr -d '\r')"
   if { test "$interactor" = "$interactor_short" || test "$interactor" = "$interactor_full"; } &&

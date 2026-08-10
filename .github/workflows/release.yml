@@ -6,7 +6,7 @@ on:
       version:
         description: SemVer without the v prefix
         required: true
-        default: 1.1.1
+        default: 1.2.0
         type: string
 
 permissions:
@@ -18,35 +18,44 @@ concurrency:
 
 jobs:
   release:
-    name: Build, verify, publish, re-download
+    name: Build, verify, publish, and re-download
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     permissions:
       attestations: read
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ github.event.inputs.version }}
+      VERSION_CODE: "4"
       CHALNA_KEYSTORE_PATH: ${{ github.workspace }}/.release/chalna-release.p12
       EXPECTED_RELEASE_CERT_SHA256: E1344975A288EC785AB12841CA8719B2115EADF41AE6F6E7AB8770979B7FA2B9
+      BUNDLETOOL_JAR: ${{ github.workspace }}/.release/bundletool.jar
     steps:
-      - name: Validate version and release tooling
+      - name: Checkout exact main commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - name: Validate version, tag, and release tooling
         shell: bash
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          test "$VERSION" = "1.1.1"
+          source version.properties
+          test "$VERSION_NAME" = "$VERSION"
+          test "$VERSION_CODE" = '4'
+          test "$VERSION" = '1.2.0'
           gh release verify --help >/dev/null
           gh release verify-asset --help >/dev/null
           if gh release view "v$VERSION" >/dev/null 2>&1; then
             echo "Release v$VERSION already exists; refusing to overwrite it." >&2
             exit 1
           fi
-      - name: Checkout exact main commit
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          fetch-depth: 0
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
       - name: Set up JDK 17
@@ -60,7 +69,7 @@ jobs:
         run: sdkmanager "platforms;android-37.1" "build-tools;36.0.0"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
-      - name: Restore signing key
+      - name: Restore and verify signing identity
         shell: bash
         env:
           KEYSTORE_B64: ${{ secrets.CHALNA_RELEASE_KEYSTORE_B64 }}
@@ -74,14 +83,26 @@ jobs:
           test -n "$CHALNA_RELEASE_STORE_PASSWORD"
           test -n "$CHALNA_RELEASE_KEY_ALIAS"
           test -n "$CHALNA_RELEASE_KEY_PASSWORD"
-          test -n "$CHALNA_RELEASE_CERT_SHA256"
           test "$CHALNA_RELEASE_CERT_SHA256" = "$EXPECTED_RELEASE_CERT_SHA256"
           install -d -m 700 .release
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$CHALNA_KEYSTORE_PATH"
           chmod 600 "$CHALNA_KEYSTORE_PATH"
           keytool -list -storetype PKCS12 -keystore "$CHALNA_KEYSTORE_PATH" \
             -storepass "$CHALNA_RELEASE_STORE_PASSWORD" -alias "$CHALNA_RELEASE_KEY_ALIAS" >/dev/null
-      - name: Policy, tests, and signed release build
+      - name: Download pinned bundletool and previous signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            --output "$BUNDLETOOL_JAR" \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
+          printf '%s  %s\n' \
+            'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29' \
+            "$BUNDLETOOL_JAR" | sha256sum --check
+          mkdir previous-release
+          gh release download v1.1.1 --pattern 'chalna-v1.1.1-release.apk' --dir previous-release
+          test -s previous-release/chalna-v1.1.1-release.apk
+      - name: Policy, formatting, static analysis, tests, and signed builds
         shell: bash
         env:
           CHALNA_RELEASE_STORE_PASSWORD: ${{ secrets.CHALNA_RELEASE_STORE_PASSWORD }}
@@ -90,102 +111,96 @@ jobs:
         run: |
           set -euo pipefail
           pwsh ./scripts/policy-check.ps1
-          export BUILD_DATE_UTC="$(git show -s --format=%cI "$GITHUB_SHA")"
+          BUILD_DATE_UTC="$(git show -s --format=%cI "$GITHUB_SHA")"
+          export BUILD_DATE_UTC
           ./gradlew --no-daemon --stacktrace :app:dependencies --configuration releaseRuntimeClasspath | tee dependency-report.txt
           if grep -Ei 'androidx\.compose\.material(3)?:|com\.google\.android\.material:|material-icons-(core|extended)|androidx\.media3:media3-ui-compose-material3' dependency-report.txt | grep -Ev '\(c\)$'; then
-            echo "Resolved dependency graph contains a forbidden Material dependency." >&2
+            echo 'Resolved dependency graph contains a forbidden Material dependency.' >&2
             exit 1
           fi
-          ./gradlew --no-daemon --stacktrace :app:lintRelease :app:testDebugUnitTest :app:assembleRelease
-      - name: Validate signed APK and create metadata
-        id: apk
+          ./gradlew --no-daemon --stacktrace \
+            :app:ktlintCheck \
+            :app:detekt \
+            :app:lintRelease \
+            :app:testDebugUnitTest \
+            :app:assembleRelease \
+            :app:bundleRelease \
+            cyclonedxBom
+      - name: Validate APK, AAB, signer continuity, 16 KB alignment, and SBOM
+        id: artifacts
         shell: bash
         env:
           CHALNA_RELEASE_CERT_SHA256: ${{ secrets.CHALNA_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
-          APK_IN="app/build/outputs/apk/release/app-release.apk"
-          APK="chalna-v${VERSION}-release.apk"
-          CHECKSUM="chalna-v${VERSION}-SHA256.txt"
-          INFO="chalna-v${VERSION}-build-info.json"
-          test -s "$APK_IN"
-          cp "$APK_IN" "$APK"
-          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          APKANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
-          test -x "$APKANALYZER"
-          "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$APK"
-          CERT_OUTPUT="$($BUILD_TOOLS/apksigner verify --verbose --print-certs "$APK")"
-          printf '%s\n' "$CERT_OUTPUT"
-          grep -q 'Verified using v2 scheme.*true' <<< "$CERT_OUTPUT"
-          CERT_SHA="$(sed -n 's/^.*certificate SHA-256 digest: //p' <<< "$CERT_OUTPUT" | head -1 | tr '[:lower:]' '[:upper:]')"
-          test -n "$CERT_SHA"
-          test "$CERT_SHA" = "$EXPECTED_RELEASE_CERT_SHA256"
-          test "$CERT_SHA" = "$CHALNA_RELEASE_CERT_SHA256"
-          ! grep -qi 'Android Debug' <<< "$CERT_OUTPUT"
-          APP_ID="$($APKANALYZER manifest application-id "$APK")"
-          VERSION_NAME="$($APKANALYZER manifest version-name "$APK")"
-          VERSION_CODE="$($APKANALYZER manifest version-code "$APK")"
-          MIN_SDK="$($APKANALYZER manifest min-sdk "$APK")"
-          TARGET_SDK="$($APKANALYZER manifest target-sdk "$APK")"
-          test "$APP_ID" = 'app.chalna.capture'
-          test "$VERSION_NAME" = "$VERSION"
-          test "$VERSION_CODE" = '3'
-          "$BUILD_TOOLS/aapt2" dump permissions "$APK" | tee permissions.txt
-          ! grep -q 'android.permission.INTERNET' permissions.txt
-          ! grep -q 'android.permission.READ_MEDIA_VIDEO' permissions.txt
-          "$APKANALYZER" manifest print "$APK" > manifest.txt
-          ! grep -Eqi 'VisualLab|Diagnostics' manifest.txt
-          "$APKANALYZER" dex packages "$APK" > dex-packages.txt
-          ! grep -Eqi 'VisualLab|Diagnostics' dex-packages.txt
-          if test -f app/build/outputs/mapping/release/mapping.txt; then
-            ! grep -Eqi 'VisualLab|Diagnostics' app/build/outputs/mapping/release/mapping.txt
-          fi
-          ! "$BUILD_TOOLS/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'android:debuggable.*0xffffffff'
-          SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
-          SIZE="$(stat -c%s "$APK")"
-          printf '%s  %s\n' "$SHA" "$APK" > "$CHECKSUM"
-          jq -n \
-            --arg applicationId "$APP_ID" --arg versionName "$VERSION_NAME" \
-            --argjson versionCode "$VERSION_CODE" --arg gitCommit "$GITHUB_SHA" \
-            --arg tag "v$VERSION" --arg apkFilename "$APK" --argjson apkByteSize "$SIZE" \
-            --arg sha256 "$SHA" --arg signingCertificateSha256 "$CERT_SHA" \
-            --argjson minSdk "$MIN_SDK" --argjson targetSdk "$TARGET_SDK" \
-            --arg workflowRunId "$GITHUB_RUN_ID" \
-            '{applicationId:$applicationId,versionName:$versionName,versionCode:$versionCode,gitCommit:$gitCommit,tag:$tag,apkFilename:$apkFilename,apkByteSize:$apkByteSize,sha256:$sha256,signingCertificateSha256:$signingCertificateSha256,minSdk:$minSdk,targetSdk:$targetSdk,buildWorkflowRunId:$workflowRunId}' > "$INFO"
-          echo "apk=$APK" >> "$GITHUB_OUTPUT"
-          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
-          echo "info=$INFO" >> "$GITHUB_OUTPUT"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "cert_sha=$CERT_SHA" >> "$GITHUB_OUTPUT"
-      - name: Reclaim runner space for release smoke test
+          sbom_source=''
+          sbom_source="$(find build/reports -type f -name 'bom.json' -size +0c | head -n 1)"
+          test -n "$sbom_source"
+          bash scripts/validate-release-artifacts.sh \
+            app/build/outputs/apk/release/app-release.apk \
+            app/build/outputs/bundle/release/app-release.aab \
+            previous-release/chalna-v1.1.1-release.apk \
+            "$sbom_source"
+      - name: Upload private release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-evidence-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            app/build/outputs/mapping/release/mapping.txt
+            app/build/reports/
+            dependency-report.txt
+            release-*.txt
+            release-*.xml
+      - name: Reclaim runner space for emulator verification
+        shell: bash
         run: |
           sudo rm -rf /usr/local/lib/android/sdk/ndk /usr/share/dotnet /opt/hostedtoolcache/CodeQL
           df -h /
-      - name: Enable KVM access for release smoke test
+      - name: Enable KVM access
+        shell: bash
         run: |
           if test -e /dev/kvm; then
-            sudo chmod a+rw /dev/kvm || true
-            if test -r /dev/kvm -a -w /dev/kvm; then
-              echo "KVM acceleration is available."
-            else
-              echo "KVM is not accessible; emulator runner will use its software fallback."
-            fi
-          else
-            echo "KVM is unavailable; using the emulator software fallback."
+            sudo chmod a+rw /dev/kvm
           fi
-      - name: Install and launch signed release APK
+      - name: Verify update install, clean install, and Assistant qualification
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 34
           arch: x86_64
           profile: pixel_2
           target: aosp_atd
-          disk-size: 2048M
+          disk-size: 3072M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
-            adb install -r "${{ steps.apk.outputs.apk }}"
+            adb install previous-release/chalna-v1.1.1-release.apk
+            adb shell am start -W -n app.chalna.capture/app.chalna.capture.MainActivity
+            adb install -r "${{ steps.artifacts.outputs.apk }}"
             bash scripts/verify-assistant-role.sh app.chalna.capture
+            adb shell am force-stop app.chalna.capture
+            adb shell am start -W -n app.chalna.capture/app.chalna.capture.MainActivity
+            test -n "$(adb shell pidof app.chalna.capture)"
+            adb uninstall app.chalna.capture
+            adb install "${{ steps.artifacts.outputs.apk }}"
+            bash scripts/verify-assistant-role.sh app.chalna.capture
+            adb shell am start -W -n app.chalna.capture/app.chalna.capture.MainActivity
+            test -n "$(adb shell pidof app.chalna.capture)"
+      - name: Verify release launch on a 16 KB page-size emulator
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          target: google_apis_ps16k
+          disk-size: 3072M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          script: |
+            page_size="$(adb shell getconf PAGE_SIZE | tr -d '\r')"
+            test "$page_size" = '16384'
+            adb install "${{ steps.artifacts.outputs.apk }}"
             adb shell am start -W -n app.chalna.capture/app.chalna.capture.MainActivity
             test -n "$(adb shell pidof app.chalna.capture)"
       - name: Create complete draft release
@@ -193,16 +208,25 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "v$VERSION" \
-            "${{ steps.apk.outputs.apk }}" \
-            "${{ steps.apk.outputs.checksum }}" \
-            "${{ steps.apk.outputs.info }}" \
-            --draft --target "$GITHUB_SHA" --title "Chalna v$VERSION" --notes-file docs/RELEASE_NOTES_v1.1.1.md
-          test "$(gh release view "v$VERSION" --json assets --jq '.assets | length')" = '3'
+            "${{ steps.artifacts.outputs.apk }}" \
+            "${{ steps.artifacts.outputs.aab }}" \
+            "${{ steps.artifacts.outputs.checksum }}" \
+            "${{ steps.artifacts.outputs.info }}" \
+            "${{ steps.artifacts.outputs.sbom }}" \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "Chalna v$VERSION" \
+            --notes-file docs/RELEASE_NOTES_v1.2.0.md
+          test "$(gh release view "v$VERSION" --json assets --jq '.assets | length')" = '5'
           test "$(gh release view "v$VERSION" --json targetCommitish --jq .targetCommitish)" = "$GITHUB_SHA"
-          test "$(gh release view "v$VERSION" --json assets --jq '[.assets[].name] | sort | join("\n")')" = "$(printf '%s\n' \
+          actual_assets="$(gh release view "v$VERSION" --json assets --jq '[.assets[].name] | sort | join("\n")')"
+          expected_assets="$(printf '%s\n' \
             "chalna-v${VERSION}-SHA256.txt" \
             "chalna-v${VERSION}-build-info.json" \
-            "chalna-v${VERSION}-release.apk")"
+            "chalna-v${VERSION}-release.aab" \
+            "chalna-v${VERSION}-release.apk" \
+            "chalna-v${VERSION}-sbom.json")"
+          test "$actual_assets" = "$expected_assets"
           test "$(gh release view "v$VERSION" --json assets --jq '[.assets[] | select(.size <= 0)] | length')" = '0'
       - name: Publish immutable release
         shell: bash
@@ -215,40 +239,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir remote
-          gh release download "v$VERSION" --dir remote
-          cd remote
+          mkdir remote-release
+          gh release download "v$VERSION" --dir remote-release
+          cd remote-release
           sha256sum -c "chalna-v${VERSION}-SHA256.txt"
-          test "$(sha256sum "chalna-v${VERSION}-release.apk" | cut -d' ' -f1)" = "${{ steps.apk.outputs.sha }}"
+          test "$(sha256sum "chalna-v${VERSION}-release.apk" | cut -d' ' -f1)" = "${{ steps.artifacts.outputs.apk_sha }}"
+          test "$(sha256sum "chalna-v${VERSION}-release.aab" | cut -d' ' -f1)" = "${{ steps.artifacts.outputs.aab_sha }}"
           verified=false
           for attempt in $(seq 1 12); do
             if gh release verify-asset "v$VERSION" "chalna-v${VERSION}-release.apk" --repo "$GITHUB_REPOSITORY" && \
-               gh release verify "v$VERSION" --repo "$GITHUB_REPOSITORY"; then
+              gh release verify-asset "v$VERSION" "chalna-v${VERSION}-release.aab" --repo "$GITHUB_REPOSITORY" && \
+              gh release verify "v$VERSION" --repo "$GITHUB_REPOSITORY"; then
               verified=true
               break
             fi
             if test "$attempt" -lt 12; then
-              echo "Immutable-release attestation not available yet (attempt $attempt/12); retrying in 10 seconds."
               sleep 10
             fi
           done
           test "$verified" = true
-          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          APKANALYZER="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
-          REMOTE_CERT="$($BUILD_TOOLS/apksigner verify --verbose --print-certs "chalna-v${VERSION}-release.apk")"
-          REMOTE_CERT_SHA="$(sed -n 's/^.*certificate SHA-256 digest: //p' <<< "$REMOTE_CERT" | head -1 | tr '[:lower:]' '[:upper:]')"
-          test "$REMOTE_CERT_SHA" = '${{ steps.apk.outputs.cert_sha }}'
-          test "$REMOTE_CERT_SHA" = "$EXPECTED_RELEASE_CERT_SHA256"
-          test "$($APKANALYZER manifest application-id "chalna-v${VERSION}-release.apk")" = 'app.chalna.capture'
-          test "$($APKANALYZER manifest version-name "chalna-v${VERSION}-release.apk")" = "$VERSION"
-          test "$($APKANALYZER manifest version-code "chalna-v${VERSION}-release.apk")" = '3'
-          "$BUILD_TOOLS/aapt2" dump permissions "chalna-v${VERSION}-release.apk" > remote-permissions.txt
-          ! grep -q 'android.permission.INTERNET' remote-permissions.txt
-          ! grep -q 'android.permission.READ_MEDIA_VIDEO' remote-permissions.txt
-          "$APKANALYZER" manifest print "chalna-v${VERSION}-release.apk" > remote-manifest.txt
-          ! grep -Eqi 'VisualLab|Diagnostics' remote-manifest.txt
-          "$APKANALYZER" dex packages "chalna-v${VERSION}-release.apk" > remote-dex-packages.txt
-          ! grep -Eqi 'VisualLab|Diagnostics' remote-dex-packages.txt
+          test "$(gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json isImmutable --jq .isImmutable)" = 'true'
+          build_tools_version="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)"
+          build_tools="$ANDROID_HOME/build-tools/$build_tools_version"
+          apkanalyzer="$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer"
+          remote_certificate_output="$("$build_tools/apksigner" verify --verbose --print-certs "chalna-v${VERSION}-release.apk")"
+          remote_certificate_sha="$(sed -n 's/^.*certificate SHA-256 digest: //p' <<< "$remote_certificate_output" | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          test "$remote_certificate_sha" = "${{ steps.artifacts.outputs.certificate_sha }}"
+          test "$remote_certificate_sha" = "$EXPECTED_RELEASE_CERT_SHA256"
+          test "$("$apkanalyzer" manifest application-id "chalna-v${VERSION}-release.apk")" = 'app.chalna.capture'
+          test "$("$apkanalyzer" manifest version-name "chalna-v${VERSION}-release.apk")" = "$VERSION"
+          test "$("$apkanalyzer" manifest version-code "chalna-v${VERSION}-release.apk")" = "$VERSION_CODE"
+          java -jar "$BUNDLETOOL_JAR" validate --bundle "chalna-v${VERSION}-release.aab"
+          aab_certificate_sha="$(keytool -printcert -jarfile "chalna-v${VERSION}-release.aab" | sed -n 's/^[[:space:]]*SHA256: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          test "$aab_certificate_sha" = "$EXPECTED_RELEASE_CERT_SHA256"
+          jq -e --arg sha "$GITHUB_SHA" --arg version "$VERSION" \
+            '.gitCommit == $sha and .versionName == $version and .versionCode == 4' \
+            "chalna-v${VERSION}-build-info.json"
+          jq -e '.bomFormat == "CycloneDX" and (.components | length > 0)' "chalna-v${VERSION}-sbom.json"
       - name: Remove failed draft release
         if: failure()
         shell: bash
