@@ -51,6 +51,7 @@ import app.chalna.capture.gallery.GalleryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -99,6 +100,7 @@ class ProductionUiDependencies(
     private var cameraRequestedThisSession = false
     private var microphoneRequestedThisSession = false
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override val galleryPaging: Flow<PagingData<GalleryPagingItem>> =
         galleryRequest
             .flatMapLatest { request ->

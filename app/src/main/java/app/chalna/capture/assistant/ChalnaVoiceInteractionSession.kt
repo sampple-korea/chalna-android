@@ -128,7 +128,7 @@ class ChalnaVoiceInteractionSession(
         pulseView?.resolve(kind)
     }
 
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onHandleAssist(
         data: Bundle?,
         structure: AssistStructure?,

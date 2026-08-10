@@ -10,16 +10,18 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-val chalnaVersion = Properties().apply {
-    rootProject.file("version.properties").inputStream().use(::load)
-}
+val chalnaVersion =
+    Properties().apply {
+        rootProject.file("version.properties").inputStream().use(::load)
+    }
 
 android {
     namespace = "app.chalna.capture"
     compileSdk {
-        version = release(37) {
-            minorApiLevel = 1
-        }
+        version =
+            release(37) {
+                minorApiLevel = 1
+            }
     }
 
     defaultConfig {
@@ -31,7 +33,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = false
         buildConfigField("String", "GIT_SHA", "\"${providers.environmentVariable("GITHUB_SHA").orElse("local").get().take(12)}\"")
-        buildConfigField("String", "BUILD_DATE_UTC", "\"${providers.environmentVariable("BUILD_DATE_UTC").orElse(Instant.EPOCH.toString()).get()}\"")
+        buildConfigField(
+            "String",
+            "BUILD_DATE_UTC",
+            "\"${providers.environmentVariable("BUILD_DATE_UTC").orElse(Instant.EPOCH.toString()).get()}\"",
+        )
     }
 
     val releaseStorePath = providers.environmentVariable("CHALNA_KEYSTORE_PATH")
@@ -116,6 +122,7 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
     parallel = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
 }
 
 ktlint {
@@ -158,7 +165,6 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.profileinstaller)
     implementation(libs.coroutines.android)
-
 
     ksp(libs.room.compiler)
 

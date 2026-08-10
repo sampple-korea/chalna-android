@@ -1,0 +1,89 @@
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+  warningsAsErrors: true
+
+complexity:
+  ComplexCondition:
+    threshold: 8
+  CyclomaticComplexMethod:
+    threshold: 50
+    ignoreSingleWhenExpression: true
+    ignoreSimpleWhenEntries: true
+  LargeClass:
+    threshold: 1200
+  LongMethod:
+    threshold: 500
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+  NestedBlockDepth:
+    threshold: 6
+  TooManyFunctions:
+    thresholdInFiles: 80
+    thresholdInClasses: 80
+    thresholdInInterfaces: 60
+    thresholdInObjects: 40
+    thresholdInEnums: 40
+    ignorePrivate: false
+    ignoreOverridden: true
+
+exceptions:
+  ExceptionRaisedInUnexpectedLocation:
+    methodNames:
+      - equals
+      - hashCode
+      - toString
+  TooGenericExceptionCaught:
+    allowedExceptionNameRegex: 'failure|expected|ignored|_'
+
+naming:
+  FunctionNaming:
+    functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
+  MatchingDeclarationName:
+    active: false
+
+style:
+  LoopWithTooManyJumpStatements:
+    maxJumpCount: 2
+  MagicNumber:
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/*.kts'
+      - '**/ui/ChalnaComponents.kt'
+      - '**/ui/InvocationGlow.kt'
+      - '**/assistant/ChalnaVoiceInteractionSession.kt'
+    ignoreNumbers:
+      - '-1'
+      - '0'
+      - '1'
+      - '2'
+    ignoreHashCodeFunction: true
+    ignorePropertyDeclaration: true
+    ignoreLocalVariableDeclaration: true
+    ignoreConstantDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreNamedArgument: true
+    ignoreEnums: true
+    ignoreRanges: true
+    ignoreExtensionFunctions: true
+  MaxLineLength:
+    maxLineLength: 140
+    excludePackageStatements: true
+    excludeImportStatements: true
+    excludeCommentStatements: false
+    excludeRawStrings: true
+  ReturnCount:
+    max: 6
+    excludeGuardClauses: true
+  ThrowsCount:
+    max: 6
+    excludeGuardClauses: true
+  UseCheckOrError:
+    active: false
