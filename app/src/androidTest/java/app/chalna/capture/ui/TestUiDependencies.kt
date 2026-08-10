@@ -71,7 +71,8 @@ internal open class TestUiDependencies(
 
     override fun loadThumbnail(
         uri: String,
-        sizePx: Int,
+        widthPx: Int,
+        heightPx: Int,
         cancellationSignal: CancellationSignal,
     ): Bitmap? = null
 

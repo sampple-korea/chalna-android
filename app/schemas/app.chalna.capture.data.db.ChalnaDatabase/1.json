@@ -1,0 +1,373 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "1f1222adcfd9c324c929b9e11d271d96",
+    "entities": [
+      {
+        "tableName": "captures",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `storageDestination` TEXT NOT NULL, `contentUri` TEXT NOT NULL, `privateRef` TEXT, `displayName` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `durationMillis` INTEGER NOT NULL, `sizeBytes` INTEGER, `width` INTEGER, `height` INTEGER, `rotationDegrees` INTEGER, `quality` TEXT NOT NULL, `codec` TEXT, `frameRate` REAL, `bitrate` INTEGER, `audioIncluded` INTEGER NOT NULL, `audioKnown` INTEGER NOT NULL, `mimeType` TEXT NOT NULL, `metadataKnown` INTEGER NOT NULL, `state` TEXT NOT NULL, `favorite` INTEGER NOT NULL, `trashedAtEpochMillis` INTEGER, `exportedFromId` TEXT, `exportedCopyId` TEXT, `lastVerifiedEpochMillis` INTEGER, `createdVersion` INTEGER NOT NULL, `updatedVersion` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "storageDestination",
+            "columnName": "storageDestination",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contentUri",
+            "columnName": "contentUri",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "privateRef",
+            "columnName": "privateRef",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMillis",
+            "columnName": "durationMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "sizeBytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "rotationDegrees",
+            "columnName": "rotationDegrees",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "quality",
+            "columnName": "quality",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "codec",
+            "columnName": "codec",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "frameRate",
+            "columnName": "frameRate",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bitrate",
+            "columnName": "bitrate",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "audioIncluded",
+            "columnName": "audioIncluded",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "audioKnown",
+            "columnName": "audioKnown",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mimeType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metadataKnown",
+            "columnName": "metadataKnown",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "favorite",
+            "columnName": "favorite",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trashedAtEpochMillis",
+            "columnName": "trashedAtEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "exportedFromId",
+            "columnName": "exportedFromId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exportedCopyId",
+            "columnName": "exportedCopyId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastVerifiedEpochMillis",
+            "columnName": "lastVerifiedEpochMillis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdVersion",
+            "columnName": "createdVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedVersion",
+            "columnName": "updatedVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_captures_contentUri",
+            "unique": true,
+            "columnNames": [
+              "contentUri"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_captures_contentUri` ON `${TABLE_NAME}` (`contentUri`)"
+          },
+          {
+            "name": "index_captures_privateRef",
+            "unique": true,
+            "columnNames": [
+              "privateRef"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_captures_privateRef` ON `${TABLE_NAME}` (`privateRef`)"
+          },
+          {
+            "name": "index_captures_createdAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "createdAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_captures_createdAtEpochMillis` ON `${TABLE_NAME}` (`createdAtEpochMillis`)"
+          },
+          {
+            "name": "index_captures_storageDestination_state",
+            "unique": false,
+            "columnNames": [
+              "storageDestination",
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_captures_storageDestination_state` ON `${TABLE_NAME}` (`storageDestination`, `state`)"
+          },
+          {
+            "name": "index_captures_favorite_state",
+            "unique": false,
+            "columnNames": [
+              "favorite",
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_captures_favorite_state` ON `${TABLE_NAME}` (`favorite`, `state`)"
+          },
+          {
+            "name": "index_captures_trashedAtEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "trashedAtEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_captures_trashedAtEpochMillis` ON `${TABLE_NAME}` (`trashedAtEpochMillis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "pending_operations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `captureId` TEXT NOT NULL, `type` TEXT NOT NULL, `payload` TEXT, `attempts` INTEGER NOT NULL, `nextAttemptEpochMillis` INTEGER NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "captureId",
+            "columnName": "captureId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "payload",
+            "columnName": "payload",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "attempts",
+            "columnName": "attempts",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nextAttemptEpochMillis",
+            "columnName": "nextAttemptEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "createdAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pending_operations_captureId_type",
+            "unique": true,
+            "columnNames": [
+              "captureId",
+              "type"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_pending_operations_captureId_type` ON `${TABLE_NAME}` (`captureId`, `type`)"
+          },
+          {
+            "name": "index_pending_operations_nextAttemptEpochMillis",
+            "unique": false,
+            "columnNames": [
+              "nextAttemptEpochMillis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_pending_operations_nextAttemptEpochMillis` ON `${TABLE_NAME}` (`nextAttemptEpochMillis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "playback_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`captureId` TEXT NOT NULL, `positionMillis` INTEGER NOT NULL, `updatedAtEpochMillis` INTEGER NOT NULL, PRIMARY KEY(`captureId`))",
+        "fields": [
+          {
+            "fieldPath": "captureId",
+            "columnName": "captureId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "positionMillis",
+            "columnName": "positionMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updatedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "captureId"
+          ]
+        }
+      },
+      {
+        "tableName": "migration_markers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`name` TEXT NOT NULL, `completedAtEpochMillis` INTEGER NOT NULL, `importedRows` INTEGER NOT NULL, `malformedRows` INTEGER NOT NULL, PRIMARY KEY(`name`))",
+        "fields": [
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAtEpochMillis",
+            "columnName": "completedAtEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importedRows",
+            "columnName": "importedRows",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "malformedRows",
+            "columnName": "malformedRows",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "name"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1f1222adcfd9c324c929b9e11d271d96')"
+    ]
+  }
+}

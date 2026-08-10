@@ -405,14 +405,15 @@ class ProductionUiDependencies(
 
     override fun loadThumbnail(
         uri: String,
-        sizePx: Int,
+        widthPx: Int,
+        heightPx: Int,
         cancellationSignal: CancellationSignal,
     ): Bitmap? {
-        if (cancellationSignal.isCanceled || sizePx <= 0) return null
+        if (cancellationSignal.isCanceled || widthPx <= 0 || heightPx <= 0) return null
         val parsed = runCatching { uri.toUri() }.getOrNull() ?: return null
         val platform =
             runCatching {
-                activity.contentResolver.loadThumbnail(parsed, Size(sizePx, sizePx), cancellationSignal)
+                activity.contentResolver.loadThumbnail(parsed, Size(widthPx, heightPx), cancellationSignal)
             }.getOrNull()
         if (platform != null || cancellationSignal.isCanceled) return platform
         val retriever = MediaMetadataRetriever()
@@ -424,8 +425,8 @@ class ProductionUiDependencies(
                 retriever.getScaledFrameAtTime(
                     -1,
                     MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                    sizePx,
-                    sizePx,
+                    widthPx,
+                    heightPx,
                 )
             }
         } catch (_: RuntimeException) {

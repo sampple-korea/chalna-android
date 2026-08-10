@@ -24,6 +24,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -172,7 +173,8 @@ class PlayerController(
 
     suspend fun close() {
         val current = player
-        persistPosition(force = true)
+        val closingState = mutableState.value
+        val closingPosition = (current?.currentPosition ?: closingState?.positionMillis ?: 0).coerceAtLeast(0)
         ticker?.cancel()
         ticker = null
         surfaceView?.keepScreenOn = false
@@ -182,6 +184,7 @@ class PlayerController(
         player = null
         mutableState.value = null
         unregisterNoisyReceiver()
+        if (closingState != null) persistPositionNow(closingState, closingPosition)
     }
 
     fun bookmark(): Pair<String, Long>? =
@@ -270,15 +273,31 @@ class PlayerController(
         lastPersistedPosition = position
         val stored = if (snapshot.durationMillis > 0 && snapshot.durationMillis - position <= COMPLETION_RESET_MILLIS) 0 else position
         scope.launch(Dispatchers.IO) {
-            try {
-                database.playbackStateDao().upsert(
-                    PlaybackStateEntity(snapshot.item.id, stored, System.currentTimeMillis()),
-                )
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                Unit
-            }
+            writePosition(snapshot.item.id, stored)
+        }
+    }
+
+    private suspend fun persistPositionNow(
+        snapshot: PlayerSnapshot,
+        position: Long,
+    ) = withContext(NonCancellable + Dispatchers.IO) {
+        val stored =
+            if (snapshot.durationMillis > 0 && snapshot.durationMillis - position <= COMPLETION_RESET_MILLIS) 0 else position
+        writePosition(snapshot.item.id, stored)
+    }
+
+    private suspend fun writePosition(
+        captureId: String,
+        position: Long,
+    ) {
+        try {
+            database.playbackStateDao().upsert(
+                PlaybackStateEntity(captureId, position, System.currentTimeMillis()),
+            )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            Unit
         }
     }
 

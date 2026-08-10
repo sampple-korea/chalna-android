@@ -1171,15 +1171,18 @@ internal fun MediaThumbnail(
 ) {
     BoxWithConstraints(modifier.background(ChalnaTheme.colors.surfaceHigh), contentAlignment = Alignment.Center) {
         val density = LocalDensity.current
-        val requestedPx = with(density) { maxOf(maxWidth, maxHeight).roundToPx().coerceIn(96, 720) }
-        val key = "${item.contentUri}:$requestedPx"
+        val requestedWidthPx = with(density) { maxWidth.roundToPx().coerceIn(96, 720) }
+        val requestedHeightPx = with(density) { maxHeight.roundToPx().coerceIn(96, 720) }
+        val key = "${item.contentUri}:$requestedWidthPx:$requestedHeightPx"
         val signal = remember(key) { CancellationSignal() }
         DisposableEffect(signal) { onDispose { signal.cancel() } }
         val bitmap by produceState<Bitmap?>(ThumbnailMemoryCache.get(key), key) {
             if (value == null) {
                 value =
                     withContext(Dispatchers.IO) {
-                        dependencies.loadThumbnail(item.contentUri, requestedPx, signal)?.also { ThumbnailMemoryCache.put(key, it) }
+                        dependencies
+                            .loadThumbnail(item.contentUri, requestedWidthPx, requestedHeightPx, signal)
+                            ?.also { ThumbnailMemoryCache.put(key, it) }
                     }
             }
         }

@@ -88,7 +88,7 @@ class ChalnaScreenshotTest {
     @Test fun galleryDeleteConfirmationNight() =
         captureApp("gallery-delete-confirmation-night", ChalnaScreenshotStates.gallerySelected) {
             onNodeWithContentDescription("갤러리").performClick()
-            onNodeWithContentDescription("삭제").performClick()
+            onNodeWithContentDescription("최근 삭제됨으로 이동").performClick()
         }
 
     @Test fun galleryMist() =

@@ -58,7 +58,7 @@ class ChalnaUiTest {
         compose.setContent { ChalnaApp(fake) }
         compose.onNodeWithContentDescription("Gallery").performClick()
         compose.onNodeWithContentDescription("Share").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Move to trash").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Move to Recently deleted").assertIsDisplayed()
     }
 
     @Test fun productionHomeHasNoDiagnosticsAndNotificationDenialDoesNotBlockReady() {
