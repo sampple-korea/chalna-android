@@ -364,7 +364,9 @@ class CaptureService : Service(), LifecycleOwner {
     }
 
     private fun systemHapticsEnabled(): Boolean = runCatching {
-        Settings.System.getInt(contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 1
+        @Suppress("DEPRECATION")
+        val setting = Settings.System.HAPTIC_FEEDBACK_ENABLED
+        Settings.System.getInt(contentResolver, setting, 1) == 1
     }.getOrDefault(true)
 
     private fun hasPermission(permission: String): Boolean =

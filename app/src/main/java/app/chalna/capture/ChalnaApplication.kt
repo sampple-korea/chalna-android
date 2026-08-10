@@ -38,7 +38,9 @@ class ChalnaGraph(private val application: Application) {
     }
 
     fun onTrimMemory(level: Int) {
-        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+        @Suppress("DEPRECATION")
+        val runningLow = android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
+        if (level >= runningLow) {
             app.chalna.capture.ui.ThumbnailMemoryCache.trim(level)
         }
     }

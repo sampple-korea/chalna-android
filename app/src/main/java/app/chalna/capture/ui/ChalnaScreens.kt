@@ -926,7 +926,9 @@ internal object ThumbnailMemoryCache : android.util.LruCache<String, Bitmap>(
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
 
     fun trim(level: Int) {
-        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE) evictAll()
+        @Suppress("DEPRECATION")
+        val complete = android.content.ComponentCallbacks2.TRIM_MEMORY_COMPLETE
+        if (level >= complete) evictAll()
         else trimToSize(maxSize() / 2)
     }
 }

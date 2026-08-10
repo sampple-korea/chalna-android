@@ -1,5 +1,6 @@
 package app.chalna.capture.assistant
 
+import android.annotation.SuppressLint
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -26,6 +27,7 @@ import android.service.voice.VoiceInteractionSession
 import android.view.View
 import android.view.RoundedCorner
 import android.view.animation.PathInterpolator
+import androidx.core.graphics.withRotation
 import app.chalna.capture.capture.CaptureRuntime
 import app.chalna.capture.capture.CaptureTelemetryRegistry
 import app.chalna.capture.ChalnaApplication
@@ -113,6 +115,7 @@ class ChalnaVoiceInteractionSession(private val appContext: Context) : VoiceInte
         pulseView?.resolve(kind)
     }
 
+    @Suppress("DEPRECATION")
     override fun onHandleAssist(data: Bundle?, structure: AssistStructure?, content: AssistContent?) {
         // Assist structure, screen content, and foreground-app context are deliberately ignored.
     }
@@ -271,6 +274,9 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             bloomNode.discardDisplayList()
         }
 
+        // RoundedCorner position constants are inlined integers and are only passed to the
+        // API-31 call inside the guarded branch below. The fallback never touches that API.
+        @SuppressLint("InlinedApi")
         override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
             val opticalInset = max(1f, density * 0.8f)
             edgeBounds.set(opticalInset, opticalInset, width - opticalInset, height - opticalInset)
@@ -351,15 +357,14 @@ internal class ChalnaInvocationGlowView(context: Context, private val finished: 
             val centerX = hotspotPosition[0]
             val centerY = hotspotPosition[1]
             val bloomRadius = density * (10f + 2f * resolveBoost)
-            val checkpoint = canvas.save()
-            canvas.rotate(
+            canvas.withRotation(
                 Math.toDegrees(atan2(tangentY, tangentX).toDouble()).toFloat(),
                 centerX,
                 centerY,
-            )
-            canvas.scale(2.15f, 0.78f, centerX, centerY)
-            canvas.drawCircle(centerX, centerY, bloomRadius, hotspotBloomPaint)
-            canvas.restoreToCount(checkpoint)
+            ) {
+                scale(2.15f, 0.78f, centerX, centerY)
+                drawCircle(centerX, centerY, bloomRadius, hotspotBloomPaint)
+            }
             canvas.drawLine(
                 centerX - tangentX * density * 19f,
                 centerY - tangentY * density * 19f,

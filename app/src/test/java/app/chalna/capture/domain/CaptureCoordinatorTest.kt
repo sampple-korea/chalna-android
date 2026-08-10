@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CaptureCoordinatorTest {
     @Test fun serializedStartThenStopFinalizesExactlyOnce() = runTest {
         val engine = FakeEngine()
