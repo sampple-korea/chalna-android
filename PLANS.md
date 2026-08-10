@@ -54,6 +54,13 @@
 - Repository visibility was independently re-read through the GitHub API and corrected to `PRIVATE`; default branch is `main`, force-push and deletion are disabled, and immutable releases are enabled.
 - Pending: v1.2.0 APK/AAB metadata, checksums, signer match, immutable release and re-downloaded asset verification.
 
+## Active external blocker — 2026-08-10
+
+- Final source commit `58a29fd40337e68f69c872138653c2c2979e3fc4` includes the Android 14+ integer session-ID correction and its API 34 instrumentation assertion.
+- GitHub accepted the push but refused to start every hosted job. Android CI `31366297566`, UI QA `31366297558`, Benchmark `31366297590`, and Security `31366297542` each contain the same GitHub-generated annotation: recent account payments failed or the Actions spending limit must be increased.
+- No workflow step ran, so these failures are account billing/Actions allocation failures rather than build or test results. Repository Actions remain enabled and workflow permissions remain read-only by default.
+- Required user action: restore GitHub Actions billing availability for the `sampple-korea` account in GitHub **Settings → Billing & plans**. After that single external action, rerun the four workflows on the exact final main commit, then run the signed v1.2.0 release workflow and remote verification.
+
 ---
 
 # Archived v1.1.1 Assistant eligibility hotfix
